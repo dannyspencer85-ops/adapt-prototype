@@ -1833,7 +1833,7 @@
       </button>
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <div class="greeting">47 days to Rockford 70.3</div>
+          <div class="greeting" id="progressGreeting">Days to your race</div>
           <div class="title">Your progress</div>
         </div>
         <div class="readiness-pill" onclick="openReadinessModal()" id="rp-data" style="display:none;">
@@ -1845,8 +1845,8 @@
     <div class="screen-inner">
       <div class="card" style="background: linear-gradient(135deg, var(--primary), #5DA985); color: #fff; border: 0;">
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85;">Your race</div>
-        <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-top: 4px;">Half Ironman · Rockford IL</div>
-        <div style="font-size: 14px; opacity: 0.9; margin-top: 4px;">June 7, 2026 — <strong>47 days away</strong></div>
+        <div id="progressRaceTitle" style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-top: 4px;">Your race</div>
+        <div id="progressRaceDate" style="font-size: 14px; opacity: 0.9; margin-top: 4px;"></div>
         <div style="margin-top: 12px; padding: 10px 12px; background: rgba(255,255,255,0.15); border-radius: 10px; font-size: 13px; line-height: 1.5;">
           <strong>Week 2 of 7</strong> · Build phase · peak week is May 18-24
         </div>
@@ -2174,8 +2174,8 @@
 
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
           <div style="font-size: 11px; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Primary goal</div>
-          <div style="font-size: 16px; font-weight: 700;">Half Ironman · Rockford IL</div>
-          <div style="color: var(--text-soft); font-size: 13px; margin-top: 2px;">June 7, 2026 · 39 days away</div>
+          <div style="font-size: 16px; font-weight: 700;" id="profileGoalTitle">Your race</div>
+          <div style="color: var(--text-soft); font-size: 13px; margin-top: 2px;" id="profileGoalDate"></div>
         </div>
 
         <div style="padding: 12px 0 6px;">
@@ -2380,6 +2380,35 @@
       <div class="sub" id="srWhen"></div>
       <div id="srBody"></div>
       <button class="btn btn-ghost btn-full" onclick="closeSessionReport()" style="margin-top: 14px;">Close</button>
+    </div>
+  </div>
+
+  <!-- SORENESS UNDERSTOOD MODAL -->
+  <div class="modal-bg" id="sorenessModal">
+    <div class="modal" style="max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">We read your note</h2>
+        <button onclick="closeSoreness()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">Confirm we got it right, then we'll adjust the plan.</div>
+      <div style="padding: 12px 14px; background: var(--bg); border-radius: 10px; font-size: 13px; line-height: 1.5; margin-top: 10px; font-style: italic; color: var(--text-soft);" id="sorenessUnderstoodWhat"></div>
+      <div class="detail-section" style="margin-top: 14px;">
+        <div class="detail-label">Understood as</div>
+        <div style="font-size: 14px; line-height: 1.7;">
+          <div><strong>Area:</strong> <span id="sorenessUnderstoodArea"></span></div>
+          <div><strong>Severity:</strong> <span id="sorenessUnderstoodSeverity"></span></div>
+          <div id="sorenessUnderstoodContext" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="detail-section" style="margin-top: 14px;">
+        <div class="detail-label">What we'll do</div>
+        <div style="font-size: 13px; color: var(--text); margin-bottom: 6px;" id="sorenessUnderstoodSummary"></div>
+        <ul class="detail-list" id="sorenessUnderstoodActions"></ul>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeSoreness()">Not yet</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="applySoreness()">Apply this</button>
+      </div>
     </div>
   </div>
 
@@ -4718,6 +4747,37 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (m) m.textContent = s.meta + ' · ' + (s.completed ? 'Completed' : 'Planned');
   }
 
+  function formatRaceDate() {
+    const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '2026-06-07';
+    const d = new Date(raceStr + 'T00:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  }
+
+  function getRaceTitle() {
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || 'Half Ironman';
+    const loc = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
+    return loc ? `${event} · ${loc}` : event;
+  }
+
+  function renderRaceMeta() {
+    const days = getDaysToRace();
+    const title = getRaceTitle();
+    const dateStr = formatRaceDate();
+    const dayLabel = days < 0 ? `${Math.abs(days)} days ago — race complete` : days === 0 ? 'race day' : `${days} day${days !== 1 ? 's' : ''} away`;
+
+    const pg = document.getElementById('progressGreeting');
+    if (pg) pg.textContent = days < 0 ? 'Race complete' : days === 0 ? 'Race day' : `${days} days to ${title.split('·')[0].trim().toLowerCase()}`;
+    const prt = document.getElementById('progressRaceTitle');
+    if (prt) prt.textContent = title;
+    const prd = document.getElementById('progressRaceDate');
+    if (prd) prd.innerHTML = `${dateStr} — <strong>${dayLabel}</strong>`;
+    const pgt = document.getElementById('profileGoalTitle');
+    if (pgt) pgt.textContent = title;
+    const pgd = document.getElementById('profileGoalDate');
+    if (pgd) pgd.textContent = `${dateStr} · ${dayLabel}`;
+  }
+
   function renderTodayGreetingAndRace() {
     const greetingDate = document.getElementById('todayGreetingDate');
     const greetingName = document.getElementById('todayGreetingName');
@@ -4864,6 +4924,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function renderAll() {
     renderTodayGreetingAndRace();
+    renderRaceMeta();
     renderTodayHero();
     renderLogSession();
     renderWeekSessions();
@@ -6008,12 +6069,134 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     return b;
   }
   function openCrunch() { document.getElementById('crunch').classList.add('show'); }
+  function parseSorenessNotes(text) {
+    if (!text) return null;
+    const t = text.toLowerCase();
+    const areas = {
+      'knee': /\bknees?\b/,
+      'ankle': /\bankles?\b/,
+      'foot': /\b(foot|feet|arch|heel|toe)\b/,
+      'shin': /\bshins?\b|\bshin\s+splint/,
+      'calf': /\bcalves?\b|\bcalf\b/,
+      'hamstring': /\bhamstrings?\b|\bhammy\b/,
+      'quad': /\bquads?\b|\bquadriceps?\b/,
+      'hip': /\bhips?\b|\bhip\s+flexor\b/,
+      'lower back': /\blower\s+back\b|\blow\s+back\b/,
+      'back': /\bbacks?\b/,
+      'shoulder': /\bshoulders?\b/,
+      'neck': /\bneck\b/,
+      'achilles': /\bachilles?\b/,
+      'plantar fascia': /\bplantar/,
+      'IT band': /\b(it|iliotibial)\s*band\b/,
+      'glute': /\bglutes?\b|\bbutt\b/,
+      'elbow': /\belbows?\b/,
+      'wrist': /\bwrists?\b/,
+      'groin': /\bgroin\b/
+    };
+    let area = null;
+    for (const name in areas) {
+      if (areas[name].test(t)) { area = name; break; }
+    }
+    if (!area) return null;
+    const sideMatch = t.match(/\b(left|right|both)\b/);
+    const side = sideMatch ? sideMatch[1] : null;
+    let severity = 'low';
+    if (/\b(sharp|severe|excruciating|agony|swollen|swelling|can('|’)?t\s+(walk|run|move|bend)|terrible|shooting|stabbing|locked\s+up|popped|tore|torn|rupture)\b/.test(t)) {
+      severity = 'high';
+    } else if (/\b(painful|hurts?|ache|aches|aching|persistent|nagging|won('|’)?t\s+go\s+away|bothering|limiting|throbbing|ongoing|days|weeks|getting\s+worse)\b/.test(t)) {
+      severity = 'moderate';
+    }
+    const context = [];
+    if (/yesterday|last\s+session|after.*workout|after.*ride|after.*run|since/.test(t)) context.push('post-workout onset');
+    if (/morning|woke\s+up|got\s+up/.test(t)) context.push('morning stiffness');
+    if (/all\s+day|throughout|constant/.test(t)) context.push('constant');
+    return { area, side, severity, context, originalText: text };
+  }
+
+  function describeParseAction(parsed) {
+    if (parsed.severity === 'high') {
+      return {
+        summary: 'Stop training and see a doctor or physiotherapist.',
+        actions: [
+          `Pause the plan immediately`,
+          `Strongly recommend you see a sports doctor or PT today or tomorrow`,
+          `When you have a diagnosis, return to the app and we'll rebuild around it`,
+        ]
+      };
+    }
+    if (parsed.severity === 'moderate') {
+      const isLeg = /knee|ankle|foot|shin|calf|hamstring|quad|hip|achilles|plantar|IT band|glute|groin/.test(parsed.area);
+      return {
+        summary: 'Adjust the plan to protect the area while keeping fitness.',
+        actions: [
+          `Flag ${parsed.side ? parsed.side + ' ' : ''}${parsed.area} as a moderate injury`,
+          `Reduce quality session intensity by 40% this week`,
+          isLeg ? `Substitute impact run sessions with bike or pool work` : `Keep upper-body protected during related movements`,
+          `Re-check next week — if no improvement, see a professional`
+        ]
+      };
+    }
+    return {
+      summary: 'Monitor and tweak — no major plan change yet.',
+      actions: [
+        `Flag ${parsed.side ? parsed.side + ' ' : ''}${parsed.area} as a watch item`,
+        `No volume or intensity changes this week`,
+        `Engine watches for it getting worse — if you mention it again, we adjust`,
+        `Light mobility/foam-rolling for the area is fine`
+      ]
+    };
+  }
+
+  let pendingInjuryFromCheckin = null;
+  function showSorenessUnderstood(parsed) {
+    pendingInjuryFromCheckin = parsed;
+    const action = describeParseAction(parsed);
+    const sevColor = parsed.severity === 'high' ? 'var(--warn)' : parsed.severity === 'moderate' ? '#B8862E' : 'var(--primary)';
+    const sevLabel = parsed.severity === 'high' ? 'High — see a professional' : parsed.severity === 'moderate' ? 'Moderate — plan adjusts' : 'Low — monitoring';
+    document.getElementById('sorenessUnderstoodWhat').textContent = `"${parsed.originalText}"`;
+    document.getElementById('sorenessUnderstoodArea').innerHTML = `<strong>${parsed.side ? parsed.side.charAt(0).toUpperCase() + parsed.side.slice(1) + ' ' : ''}${parsed.area}</strong>`;
+    document.getElementById('sorenessUnderstoodSeverity').innerHTML = `<span style="color:${sevColor}; font-weight:700;">${sevLabel}</span>`;
+    if (parsed.context.length > 0) {
+      document.getElementById('sorenessUnderstoodContext').innerHTML = `<strong>Context:</strong> ${parsed.context.join(', ')}`;
+      document.getElementById('sorenessUnderstoodContext').style.display = 'block';
+    } else {
+      document.getElementById('sorenessUnderstoodContext').style.display = 'none';
+    }
+    document.getElementById('sorenessUnderstoodSummary').textContent = action.summary;
+    document.getElementById('sorenessUnderstoodActions').innerHTML = action.actions.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+    document.getElementById('sorenessModal').classList.add('show');
+  }
+
+  function applySoreness() {
+    const p = pendingInjuryFromCheckin;
+    if (!p) { closeSoreness(); return; }
+    const fullArea = p.side ? `${p.side} ${p.area}` : p.area;
+    lastSnapshot = JSON.parse(JSON.stringify(planState));
+    executeTool('flagInjury', { area: fullArea, severity: p.severity, notes: p.originalText });
+    pendingInjuryFromCheckin = null;
+    closeSoreness();
+  }
+
+  function closeSoreness() {
+    document.getElementById('sorenessModal').classList.remove('show');
+  }
+
   function saveMorningCheckin() {
     const body = document.querySelector('#ciBody .chip.active')?.textContent || 'OK';
     const sleep = document.querySelector('#ciSleep .chip.active')?.textContent || '7-8h';
     const stress = document.querySelector('#ciStress .chip.active')?.textContent || 'Normal';
     const notes = document.getElementById('ciNotes').value.trim();
     planState.lastCheckin = { body, sleep, stress, notes, when: Date.now() };
+    trackEvent('morning_checkin', { body, sleep, stress, hasNotes: !!notes });
+
+    if (notes) {
+      const parsed = parseSorenessNotes(notes);
+      if (parsed) {
+        trackEvent('soreness_parsed', { area: parsed.area, severity: parsed.severity, side: parsed.side });
+        showSorenessUnderstood(parsed);
+      }
+    }
+
     if (body === 'Exhausted' || sleep === 'Under 5h' || sleep === '5-6h') {
       planState.notifications.push({
         id: 'notif_ci_' + Date.now(),
