@@ -3289,9 +3289,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const session = (viewWeekOffset === 0) ? planState.sessions[day] : null;
       const hasSession = session && session.type !== 'rest';
       const dot = hasSession ? '<div class="dot"></div>' : '';
-      const click = (viewWeekOffset === 0)
-        ? `onclick="openSessionModal('${day}')" style="cursor:pointer;"`
-        : `style="cursor:default; opacity:0.55;"`;
+      const opacity = viewWeekOffset !== 0 ? 'opacity:0.7;' : '';
+      const click = `onclick="openSessionModal('${day}', ${viewWeekOffset})" style="cursor:pointer; ${opacity}"`;
       html += `<div class="${cls}" ${click}><div class="dow">${day}</div><div class="dnum">${dayNum}</div>${dot}</div>`;
     });
     el.innerHTML = html;
@@ -4229,14 +4228,44 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     };
   }
 
-  function openSessionModal(day) {
+  function openSessionModal(day, weekOffset) {
+    weekOffset = weekOffset || 0;
     const s = planState.sessions[day];
     if (!s) return;
     currentEditDay = day;
-    const d = sessionDetail(s, day);
+
+    let scaleFactor = 1;
+    let phaseLabel = '';
+    let weekLabel = '';
+    if (weekOffset !== 0) {
+      const arc = planState.weekArc || [];
+      const currentIdx = getCurrentWeekIdx();
+      const targetIdx = currentIdx + weekOffset;
+      const arcEntry = arc[targetIdx];
+      if (arcEntry) {
+        const baseHours = parseWeekHours((arc[currentIdx] || arc[0] || {}).hours || '5:00');
+        const targetHours = parseWeekHours(arcEntry.hours);
+        scaleFactor = baseHours > 0 ? targetHours / baseHours : 1;
+        phaseLabel = arcEntry.focus;
+      }
+      weekLabel = weekOffset > 0 ? `${weekOffset} week${weekOffset > 1 ? 's' : ''} from now` : `${Math.abs(weekOffset)} week${Math.abs(weekOffset) > 1 ? 's' : ''} ago`;
+    }
+
+    const scaledDuration = Math.round((s.duration || 0) * scaleFactor);
+    const scaledSession = { ...s, duration: scaledDuration };
+    const d = sessionDetail(scaledSession, day);
+
     document.getElementById('sdTitle').textContent = d.title;
-    document.getElementById('sdWhen').textContent = `${d.date} · ${day} · ${d.duration} min`;
+    document.getElementById('sdWhen').textContent = weekOffset === 0
+      ? `${d.date} · ${day} · ${d.duration} min`
+      : `${weekLabel} · ${day} · ${d.duration} min planned${phaseLabel ? ' · ' + phaseLabel : ''}`;
+
     let html = '';
+    if (weekOffset > 0) {
+      html += `<div style="background: var(--secondary-soft); border-left: 3px solid var(--secondary); padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 14px;"><strong>Future preview.</strong> Specifics adapt based on what you actually train between now and then. Use this as a rough shape of what to expect.</div>`;
+    } else if (weekOffset < 0) {
+      html += `<div style="background: var(--bg); border-left: 3px solid var(--text-soft); padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 14px;"><strong>Past week reference.</strong> See Progress tab for actual completed session data.</div>`;
+    }
     if (d.warmup) html += `<div class="detail-section"><div class="detail-label">Warm-up</div><div class="detail-body">${escapeHtml(d.warmup)}</div></div>`;
     if (d.main) html += `<div class="detail-section"><div class="detail-label">Main set</div><div class="detail-body" style="white-space:pre-line;">${escapeHtml(d.main)}</div></div>`;
     if (d.cooldown) html += `<div class="detail-section"><div class="detail-label">Cool-down</div><div class="detail-body">${escapeHtml(d.cooldown)}</div></div>`;
