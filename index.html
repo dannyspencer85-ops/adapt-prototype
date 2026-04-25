@@ -2870,7 +2870,7 @@
       const btn = document.getElementById('back-' + s);
       if (btn) btn.style.display = screenHistory.length > 0 ? 'inline-flex' : 'none';
     });
-    document.getElementById('nav').style.display = name === 'onboard' ? 'none' : 'flex';
+    document.getElementById('nav').style.display = (name === 'onboard' || name === 'auth') ? 'none' : 'flex';
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
