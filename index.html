@@ -1571,6 +1571,16 @@
         </div>
       </div>
 
+      <div class="card" id="weeklyRecalcCard" style="cursor: pointer;" onclick="runWeeklyRecalc()">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--secondary-soft); display: flex; align-items: center; justify-content: center; color: var(--secondary); font-size: 20px;">↻</div>
+          <div style="flex:1;">
+            <div style="font-weight: 700; font-size: 15px;">Weekly review</div>
+            <div style="color: var(--text-soft); font-size: 12px; margin-top: 2px;">See how this week went and let the engine reshape next week →</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="todayCheckin">
         <div class="card-title">Morning check-in</div>
         <div style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">15 seconds. Tells the engine how to shape today.</div>
@@ -2359,6 +2369,22 @@
       <div class="sub" id="srWhen"></div>
       <div id="srBody"></div>
       <button class="btn btn-ghost btn-full" onclick="closeSessionReport()" style="margin-top: 14px;">Close</button>
+    </div>
+  </div>
+
+  <!-- WEEKLY RECALC MODAL -->
+  <div class="modal-bg" id="recalcModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Weekly review</h2>
+        <button onclick="closeRecalcModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub" id="recalcWhen"></div>
+      <div id="recalcBody"></div>
+      <div id="recalcActions" style="display:none; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeRecalcModal()">Not now</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="applyRecalc()">Apply changes</button>
+      </div>
     </div>
   </div>
 
@@ -3257,6 +3283,137 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     } catch (err) {
       return { success: false, message: 'Tool error: ' + err.message };
     }
+  }
+
+  let pendingRecalc = null;
+
+  function analyzeWeek() {
+    const trainingSessions = Object.entries(planState.sessions).filter(([d, s]) => s.type !== 'rest');
+    const completed = trainingSessions.filter(([d, s]) => s.completed);
+    const adherence = trainingSessions.length > 0 ? completed.length / trainingSessions.length : 0;
+    const completedRPEs = completed.filter(([d, s]) => s.rpe).map(([d, s]) => s.rpe);
+    const avgRPE = completedRPEs.length > 0 ? completedRPEs.reduce((a, b) => a + b, 0) / completedRPEs.length : null;
+    const checkin = planState.lastCheckin;
+    const checkinIssues = checkin && (checkin.body === 'Exhausted' || checkin.sleep === 'Under 5h' || checkin.sleep === '5-6h' || checkin.stress === 'High');
+
+    let volumeAdjust = 0;
+    let intensityShift = 'maintain';
+    const reasons = [];
+    const wins = [];
+
+    if (adherence === 1 && trainingSessions.length > 0) {
+      volumeAdjust += 5;
+      wins.push(`Hit ${completed.length} of ${trainingSessions.length} sessions — full adherence.`);
+      reasons.push(`Adding ~5% volume next week — progressive overload since you handled this week well.`);
+    } else if (adherence < 0.6 && trainingSessions.length > 0) {
+      volumeAdjust -= 15;
+      reasons.push(`Only ${Math.round(adherence * 100)}% of sessions completed (${completed.length} of ${trainingSessions.length}). Easing volume next week — don't try to make up missed work.`);
+    } else if (adherence > 0) {
+      wins.push(`${completed.length} of ${trainingSessions.length} sessions completed (${Math.round(adherence * 100)}%).`);
+    }
+
+    if (avgRPE !== null) {
+      if (avgRPE > 7.5) {
+        intensityShift = 'reduce';
+        reasons.push(`Average effort was ${avgRPE.toFixed(1)}/10 — higher than ideal. Reducing intensity next week to allow real recovery.`);
+      } else if (avgRPE < 5) {
+        intensityShift = 'push';
+        wins.push(`Effort averaged ${avgRPE.toFixed(1)}/10 — you have capacity.`);
+        reasons.push(`Slightly increasing next week's intensity — sessions felt easier than expected.`);
+      } else {
+        wins.push(`Effort levels appropriate (avg ${avgRPE.toFixed(1)}/10).`);
+      }
+    }
+
+    if (checkinIssues) {
+      volumeAdjust = Math.min(volumeAdjust, -10);
+      intensityShift = 'reduce';
+      const issues = [];
+      if (checkin.body === 'Exhausted') issues.push('exhausted');
+      if (checkin.sleep === 'Under 5h' || checkin.sleep === '5-6h') issues.push('low sleep');
+      if (checkin.stress === 'High') issues.push('high stress');
+      reasons.push(`Recovery signals concerning (${issues.join(', ')}). Cutting next week's volume and intensity to protect you.`);
+    } else if (checkin) {
+      wins.push(`Recovery signals look good.`);
+    }
+
+    if (planState.injury && planState.injury.severity !== 'low') {
+      reasons.push(`${planState.injury.area} injury still flagged (${planState.injury.severity}). Maintaining cross-training adaptations next week.`);
+    }
+
+    if (reasons.length === 0) {
+      reasons.push(`No major adjustments needed. Plan stays on the original arc — keep doing what's working.`);
+    }
+
+    return { adherence, avgRPE, volumeAdjust, intensityShift, reasons, wins, completed: completed.length, planned: trainingSessions.length };
+  }
+
+  function runWeeklyRecalc() {
+    const a = analyzeWeek();
+    const arc = planState.weekArc || [];
+    const currentIdx = getCurrentWeekIdx();
+    const nextIdx = currentIdx + 1;
+    const nextWeek = arc[nextIdx];
+
+    if (!nextWeek) {
+      document.getElementById('recalcWhen').textContent = 'No more weeks to adjust';
+      document.getElementById('recalcBody').innerHTML = `<div style="padding: 20px 0; text-align: center; color: var(--text-soft); font-size: 14px;">You're on the last week of your plan. Nothing more to recalculate — focus on race day execution.</div>`;
+      document.getElementById('recalcActions').style.display = 'none';
+      document.getElementById('recalcModal').classList.add('show');
+      return;
+    }
+
+    const proposedHours = parseWeekHours(nextWeek.hours) * (1 + a.volumeAdjust / 100);
+    const proposedHoursStr = `${Math.floor(proposedHours)}:${String(Math.round((proposedHours - Math.floor(proposedHours)) * 60)).padStart(2, '0')}`;
+
+    pendingRecalc = { volumeAdjust: a.volumeAdjust, intensityShift: a.intensityShift, nextIdx, proposedHoursStr };
+
+    document.getElementById('recalcWhen').textContent = `Week of ${getTodayDateString()} review`;
+    let html = `<div class="stat-grid" style="margin-top: 12px;">
+      <div class="stat-tile"><div class="stat-label">Adherence</div><div class="stat-value">${a.completed}/${a.planned}</div><div class="stat-sub">sessions done</div></div>
+      <div class="stat-tile"><div class="stat-label">Avg effort</div><div class="stat-value">${a.avgRPE !== null ? a.avgRPE.toFixed(1) : '—'}</div><div class="stat-sub">RPE 1-10</div></div>
+      <div class="stat-tile"><div class="stat-label">Recovery</div><div class="stat-value" style="font-size:14px;">${planState.lastCheckin ? (planState.lastCheckin.body === 'Exhausted' || planState.lastCheckin.sleep === 'Under 5h' || planState.lastCheckin.sleep === '5-6h' ? 'Off' : 'Good') : '—'}</div><div class="stat-sub">based on check-in</div></div>
+    </div>`;
+
+    if (a.wins.length > 0) {
+      html += `<div class="detail-section" style="margin-top: 18px;"><div class="detail-label" style="color: var(--primary);">✓ What worked</div><ul class="detail-list">${a.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
+    }
+
+    html += `<div class="detail-section" style="margin-top: 14px;"><div class="detail-label">Proposed adjustments for next week</div>`;
+    a.reasons.forEach(r => {
+      html += `<div style="background: var(--bg); border-left: 3px solid var(--primary); padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; line-height: 1.5;">${escapeHtml(r)}</div>`;
+    });
+    html += `</div>`;
+
+    if (a.volumeAdjust !== 0 || a.intensityShift !== 'maintain') {
+      html += `<div class="detail-section" style="margin-top: 14px;"><div class="detail-label">Net effect on next week</div>
+        <div style="background: var(--primary-soft); border: 1px solid var(--primary); border-radius: 10px; padding: 12px; font-size: 13px; line-height: 1.6;">
+          <div><strong>Volume:</strong> ${nextWeek.hours} → ${proposedHoursStr} (${a.volumeAdjust >= 0 ? '+' : ''}${a.volumeAdjust}%)</div>
+          ${a.intensityShift !== 'maintain' ? `<div><strong>Intensity:</strong> ${a.intensityShift === 'reduce' ? 'softer — more easy aerobic' : 'pushed — slight progressive overload'}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    document.getElementById('recalcBody').innerHTML = html;
+    document.getElementById('recalcActions').style.display = 'flex';
+    document.getElementById('recalcModal').classList.add('show');
+  }
+
+  function applyRecalc() {
+    if (!pendingRecalc) { closeRecalcModal(); return; }
+    lastSnapshot = JSON.parse(JSON.stringify(planState));
+    const arc = planState.weekArc;
+    const i = pendingRecalc.nextIdx;
+    if (arc[i] && pendingRecalc.volumeAdjust !== 0) {
+      arc[i].hours = pendingRecalc.proposedHoursStr;
+    }
+    setChange(`Next week recalibrated (${pendingRecalc.volumeAdjust >= 0 ? '+' : ''}${pendingRecalc.volumeAdjust}% volume, intensity ${pendingRecalc.intensityShift}). Engine adapted based on this week's training.`);
+    closeRecalcModal();
+    pendingRecalc = null;
+  }
+
+  function closeRecalcModal() {
+    document.getElementById('recalcModal').classList.remove('show');
   }
 
   let viewWeekOffset = 0;
