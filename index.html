@@ -4925,6 +4925,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderAll() {
     renderTodayGreetingAndRace();
     renderRaceMeta();
+    restoreCheckinSummaryIfSaved();
     renderTodayHero();
     renderLogSession();
     renderWeekSessions();
@@ -6069,6 +6070,61 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     return b;
   }
   function openCrunch() { document.getElementById('crunch').classList.add('show'); }
+  let _checkinFormHTML = null;
+  function renderCheckinSummary(body, sleep, stress, notes) {
+    const card = document.getElementById('todayCheckin');
+    if (!card) return;
+    if (!_checkinFormHTML) _checkinFormHTML = card.innerHTML;
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;">
+        <div>
+          <div class="card-title" style="margin:0;">Today's check-in</div>
+          <div style="font-size:11px; color:var(--primary); font-weight:600; margin-top:2px;">✓ Saved · engine using this</div>
+        </div>
+        <button onclick="editCheckin()" style="background:var(--primary); color:#fff; border:0; padding:7px 14px; border-radius:100px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 2px 6px rgba(59,137,104,0.25);">Edit ›</button>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px;">
+        <div style="background:var(--bg); padding:8px 10px; border-radius:10px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Body</div>
+          <div style="font-size:14px; font-weight:700; margin-top:2px;">${escapeHtml(body)}</div>
+        </div>
+        <div style="background:var(--bg); padding:8px 10px; border-radius:10px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Sleep</div>
+          <div style="font-size:14px; font-weight:700; margin-top:2px;">${escapeHtml(sleep)}</div>
+        </div>
+        <div style="background:var(--bg); padding:8px 10px; border-radius:10px; text-align:center;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Stress</div>
+          <div style="font-size:14px; font-weight:700; margin-top:2px;">${escapeHtml(stress)}</div>
+        </div>
+      </div>
+      ${notes ? `<div style="margin-top:10px; padding:8px 12px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.5; color:var(--text-soft);"><strong style="color:var(--text);">Notes:</strong> "${escapeHtml(notes)}"</div>` : ''}
+    `;
+  }
+
+  function editCheckin() {
+    const card = document.getElementById('todayCheckin');
+    if (!card || !_checkinFormHTML) return;
+    card.innerHTML = _checkinFormHTML;
+    const ci = planState.lastCheckin;
+    if (ci) {
+      ['#ciBody','#ciSleep','#ciStress'].forEach(sel => {
+        document.querySelectorAll(sel + ' .chip').forEach(c => {
+          c.classList.toggle('active', c.textContent.trim() === ({'#ciBody':ci.body, '#ciSleep':ci.sleep, '#ciStress':ci.stress}[sel]));
+        });
+      });
+      const notes = document.getElementById('ciNotes');
+      if (notes) notes.value = ci.notes || '';
+    }
+    trackEvent('checkin_edit');
+  }
+
+  function restoreCheckinSummaryIfSaved() {
+    const ci = planState.lastCheckin;
+    if (ci && ci.when && (Date.now() - ci.when < 86400000)) {
+      renderCheckinSummary(ci.body, ci.sleep, ci.stress, ci.notes || '');
+    }
+  }
+
   function parseSorenessNotes(text) {
     if (!text) return null;
     const t = text.toLowerCase();
@@ -6216,16 +6272,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
         fix: { tool: 'shortenSession', input: { day: 'Wed', newMinutes: 40, newName: 'Easy aerobic (recovery day)', newMeta: '40 min · Zone 2', reason: 'morning check-in signaled low recovery' }}
       });
     }
-    const hideCard = document.getElementById('checkinCard');
-    const prompt = document.getElementById('todayCheckinPrompt');
-    if (prompt) {
-      prompt.innerHTML = `<div style="font-size: 20px;">✓</div><div style="flex:1; font-size: 13px; line-height: 1.4;"><strong>Check-in saved.</strong> Body: ${body}, Sleep: ${sleep}, Stress: ${stress}.</div>`;
-      prompt.style.cursor = 'default';
-      prompt.onclick = null;
-    }
-    if (hideCard) {
-      hideCard.innerHTML = `<div class="card-title">Morning check-in · saved</div><div style="font-size:14px; color:var(--text); line-height:1.5;"><strong>Body:</strong> ${body}<br><strong>Sleep:</strong> ${sleep}<br><strong>Stress:</strong> ${stress}${notes ? '<br><strong>Notes:</strong> ' + escapeHtml(notes) : ''}</div><div style="font-size:12px; color:var(--text-soft); margin-top:10px;">Engine is using this to shape today's recommendations.</div>`;
-    }
+    renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();
   }
