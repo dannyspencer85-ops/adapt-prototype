@@ -2205,6 +2205,17 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Analytics (optional)</div>
+        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Paste a PostHog project key to track app usage. Leave blank for no tracking. Events are also logged to your browser console (open DevTools to see).</div>
+        <input type="text" id="posthogKeyInput" placeholder="phc_xxxxxxxxxxxx" style="width:100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-primary btn-sm" onclick="savePosthogKey()" style="flex:1;">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Clear</button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get a free key at <a href="https://posthog.com" target="_blank" style="color: var(--primary);">posthog.com</a> (1M events/month free).</div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Coaching detail level</div>
         <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 10px;">How much explanation do you want with insights and warnings.</div>
         <div class="chip-row" id="complexityProfileChips">
@@ -2675,6 +2686,7 @@
     }
   }
   function finishOnboard() {
+    trackEvent('onboarding_complete');
     const event = document.getElementById('eventSelect')?.value || 'Half Ironman';
     const eventDateEl = document.querySelector('#onb-3 input[type="date"]');
     const eventDate = eventDateEl ? eventDateEl.value : '2026-06-07';
@@ -2894,6 +2906,7 @@
       if (btn) btn.style.display = screenHistory.length > 0 ? 'inline-flex' : 'none';
     });
     document.getElementById('nav').style.display = (name === 'onboard' || name === 'auth') ? 'none' : 'flex';
+    if (typeof trackEvent === 'function' && ['today','plan','data','profile','prep','ask','log','onboard','auth'].includes(name)) trackEvent('tab_view', { tab: name });
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
@@ -2923,6 +2936,7 @@
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     const s = planState.sessions.Wed;
     if (s) { s.completed = true; s.rpe = rpe; }
+    trackEvent('session_logged', { day: 'Wed', type: s ? s.type : null, rpe, name: s ? s.name : null });
     analyzeLoggedSession('Wed', rpe);
     setChange(`Logged Wednesday session (RPE ${rpe || '—'}). Engine reassessing week.`);
     showScreen('today');
@@ -3008,6 +3022,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 - Don't open every response with his name`;
 
   const chatMessages = [];
+
+  // ── Analytics (PostHog + console fallback) ──
+  function getAnalyticsKey() { return localStorage.getItem('posthog-key') || ''; }
+  let _posthogReady = false;
+  function initAnalytics() {
+    const key = getAnalyticsKey();
+    if (!key || _posthogReady || window.posthog) return;
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys getNextSurveyStep onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    window.posthog.init(key, { api_host: 'https://us.i.posthog.com', person_profiles: 'identified_only', capture_pageview: false });
+    const u = (typeof currentUser === 'function') ? currentUser() : null;
+    if (u) window.posthog.identify(u);
+    _posthogReady = true;
+  }
+  function trackEvent(event, props) {
+    const u = (typeof currentUser === 'function') ? currentUser() : null;
+    const payload = { ...(props || {}), $user: u || 'anonymous' };
+    console.log('[analytics]', event, payload);
+    initAnalytics();
+    if (window.posthog && _posthogReady) {
+      try { window.posthog.capture(event, payload); } catch (e) {}
+    }
+  }
 
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const DAY_FULL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
@@ -3266,6 +3302,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function executeTool(name, input) {
+    trackEvent('plan_modified', { tool: name, ...input });
     try {
       switch (name) {
         case 'moveSession': return tool_moveSession(input);
@@ -3401,6 +3438,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function applyRecalc() {
     if (!pendingRecalc) { closeRecalcModal(); return; }
+    trackEvent('weekly_recalc_applied', { volumeAdjust: pendingRecalc.volumeAdjust, intensityShift: pendingRecalc.intensityShift });
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     const arc = planState.weekArc;
     const i = pendingRecalc.nextIdx;
@@ -3809,6 +3847,22 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderComplexityProfileUI() {
     const mode = getComplexityMode();
     document.querySelectorAll('#complexityProfileChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === mode));
+    const phKey = document.getElementById('posthogKeyInput');
+    if (phKey) phKey.value = getAnalyticsKey();
+  }
+  function savePosthogKey() {
+    const v = document.getElementById('posthogKeyInput').value.trim();
+    if (!v) { localStorage.removeItem('posthog-key'); alert('Key cleared. Restart app to fully reset PostHog.'); return; }
+    if (!v.startsWith('phc_')) { alert('PostHog keys start with "phc_". Double-check what you pasted.'); return; }
+    localStorage.setItem('posthog-key', v);
+    initAnalytics();
+    trackEvent('analytics_configured');
+    alert('Saved. Events will start flowing to PostHog now.');
+  }
+  function clearPosthogKey() {
+    localStorage.removeItem('posthog-key');
+    document.getElementById('posthogKeyInput').value = '';
+    alert('Cleared. Events will only show in browser console going forward.');
   }
   function toggleInsightDetail(btn) {
     const detail = btn.nextElementSibling;
@@ -4571,6 +4625,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function openReadinessModal() {
+    trackEvent('readiness_viewed');
     renderReadinessCard('readinessModalBody');
     document.getElementById('readinessModal').classList.add('show');
   }
@@ -5052,6 +5107,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (accounts[username].password !== password) { showError('loginError', 'Incorrect password.'); return; }
     localStorage.setItem('adapt-session', username);
     loadUserData(username);
+    trackEvent('login', { username });
     enterApp();
   }
 
@@ -5076,6 +5132,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     };
     saveAccounts(accounts);
     localStorage.setItem('adapt-session', username);
+    trackEvent('signup', { username });
     enterApp();
   }
 
@@ -5146,11 +5203,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   document.addEventListener('DOMContentLoaded', () => {
     if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
     ensureDemoAccount();
+    initAnalytics();
     const session = currentUser();
     if (session && getAccounts()[session]) {
       loadUserData(session);
+      trackEvent('app_open', { returning: true });
       enterApp();
     } else {
+      trackEvent('app_open', { returning: false });
       showScreen('auth');
     }
     renderAll();
@@ -6010,6 +6070,8 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const meta = document.getElementById('crunchMeta').textContent;
     const mMatch = meta.match(/(\d+)\s*min/);
     const mins = mMatch ? parseInt(mMatch[1]) : 25;
+    const discs = getCrunchDiscs();
+    trackEvent('today_adjusted', { mins, disciplines: discs.join(',') });
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     executeTool('shortenSession', { day: 'Wed', newMinutes: mins, newName: title, newMeta: meta, reason: 'adjusted today via time-crunch tool' });
     closeCrunch();
