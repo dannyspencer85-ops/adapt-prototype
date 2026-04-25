@@ -1704,16 +1704,13 @@
         <strong>Peak week is May 18-24.</strong> Your long bike hits 2:45 and long run 1:30 — that's your dress rehearsal for race day.
       </div>
 
-      <div class="section-label">This week · Apr 27 – May 3</div>
-      <div class="week-strip">
-        <div class="day-pill done"><div class="dow">Mon</div><div class="dnum">27</div><div class="dot"></div></div>
-        <div class="day-pill"><div class="dow">Tue</div><div class="dnum">28</div></div>
-        <div class="day-pill today"><div class="dow">Wed</div><div class="dnum">29</div><div class="dot"></div></div>
-        <div class="day-pill"><div class="dow">Thu</div><div class="dnum">30</div></div>
-        <div class="day-pill"><div class="dow">Fri</div><div class="dnum">1</div></div>
-        <div class="day-pill"><div class="dow">Sat</div><div class="dnum">2</div><div class="dot"></div></div>
-        <div class="day-pill"><div class="dow">Sun</div><div class="dnum">3</div><div class="dot"></div></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; margin-bottom: 8px;">
+        <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
+        <div class="section-label" id="weekViewLabel" style="margin: 0;">This week</div>
+        <button onclick="navWeek(1)" id="weekNextBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Next ›</button>
       </div>
+      <div class="week-strip" id="weekStrip"></div>
+      <div id="weekStateBanner"></div>
 
       <div class="session-row done" style="display: block;" onclick="openSessionReport('sat_apr26')">
         <div style="display: flex; align-items: center; gap: 12px;">
@@ -3262,9 +3259,75 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
+  let viewWeekOffset = 0;
+
+  function navWeek(delta) {
+    const totalWeeks = (planState.weekArc || []).length;
+    const currentIdx = getCurrentWeekIdx();
+    const target = currentIdx + viewWeekOffset + delta;
+    if (target < 0 || target >= totalWeeks) return;
+    viewWeekOffset += delta;
+    renderWeekSessions();
+  }
+
+  function renderWeekStrip() {
+    const el = document.getElementById('weekStrip');
+    if (!el) return;
+    const todayIdx = getTodayIdx();
+    const monDate = new Date();
+    monDate.setDate(monDate.getDate() - ((monDate.getDay() + 6) % 7) + (viewWeekOffset * 7));
+    const isPastWeek = viewWeekOffset < 0;
+    const isFutureWeek = viewWeekOffset > 0;
+    let html = '';
+    DAYS.forEach((day, i) => {
+      const d = new Date(monDate);
+      d.setDate(monDate.getDate() + i);
+      const dayNum = d.getDate();
+      const isToday = viewWeekOffset === 0 && i === todayIdx;
+      const isPast = viewWeekOffset === 0 && i < todayIdx;
+      const cls = 'day-pill' + (isToday ? ' today' : isPast ? ' done' : '');
+      const session = (viewWeekOffset === 0) ? planState.sessions[day] : null;
+      const hasSession = session && session.type !== 'rest';
+      const dot = hasSession ? '<div class="dot"></div>' : '';
+      const click = (viewWeekOffset === 0)
+        ? `onclick="openSessionModal('${day}')" style="cursor:pointer;"`
+        : `style="cursor:default; opacity:0.55;"`;
+      html += `<div class="${cls}" ${click}><div class="dow">${day}</div><div class="dnum">${dayNum}</div>${dot}</div>`;
+    });
+    el.innerHTML = html;
+
+    const arc = planState.weekArc || [];
+    const currentIdx = getCurrentWeekIdx();
+    const targetIdx = currentIdx + viewWeekOffset;
+    const arcEntry = arc[targetIdx];
+    const label = document.getElementById('weekViewLabel');
+    if (label) {
+      if (viewWeekOffset === 0) label.textContent = 'This week';
+      else if (viewWeekOffset < 0) label.textContent = `${Math.abs(viewWeekOffset)} week${Math.abs(viewWeekOffset) > 1 ? 's' : ''} ago`;
+      else label.textContent = `${viewWeekOffset} week${viewWeekOffset > 1 ? 's' : ''} from now`;
+    }
+    const prev = document.getElementById('weekPrevBtn');
+    const next = document.getElementById('weekNextBtn');
+    if (prev) prev.style.opacity = (currentIdx + viewWeekOffset > 0) ? '1' : '0.3';
+    if (next) next.style.opacity = (currentIdx + viewWeekOffset < arc.length - 1) ? '1' : '0.3';
+
+    const banner = document.getElementById('weekStateBanner');
+    if (banner) {
+      if (viewWeekOffset === 0) {
+        banner.innerHTML = '';
+      } else if (isPastWeek) {
+        banner.innerHTML = `<div style="background: var(--bg); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"><strong style="color: var(--text);">${arcEntry ? arcEntry.focus : 'Past week'}.</strong> Completed sessions appear on the Progress tab — full historical detail lives there.</div>`;
+      } else {
+        banner.innerHTML = `<div style="background: var(--bg); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"><strong style="color: var(--text);">${arcEntry ? arcEntry.focus : 'Upcoming week'} · ${arcEntry ? arcEntry.hours : ''}h planned.</strong> Specific sessions get prescribed once you finish the current week — the plan adapts based on what you actually did.</div>`;
+      }
+    }
+  }
+
   function renderWeekSessions() {
+    renderWeekStrip();
     const el = document.getElementById('weekSessions');
     if (!el) return;
+    if (viewWeekOffset !== 0) { el.innerHTML = ''; return; }
     let html = '';
     DAYS.forEach((day, i) => {
       const s = planState.sessions[day];
