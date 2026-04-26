@@ -2204,15 +2204,18 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Analytics (optional)</div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Paste a PostHog project key to track app usage. Leave blank for no tracking. Events are also logged to your browser console (open DevTools to see).</div>
+      <div id="analyticsCollapsed" style="text-align: right; padding: 4px 0; margin-bottom: 4px;">
+        <button onclick="toggleAnalyticsCard()" style="background:none; border:0; color:var(--text-soft); font-size:11px; font-weight:500; cursor:pointer; padding:2px 6px; font-family:inherit;" id="analyticsToggleBtn">Advanced ›</button>
+      </div>
+      <div class="card" id="analyticsCard" style="display:none;">
+        <div class="card-title">Analytics</div>
+        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Tracking is on by default. Paste a different PostHog project key to override. Leave blank to use the default. Events also log to browser console.</div>
         <input type="text" id="posthogKeyInput" placeholder="phc_xxxxxxxxxxxx" style="width:100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
         <div style="display: flex; gap: 6px;">
           <button class="btn btn-primary btn-sm" onclick="savePosthogKey()" style="flex:1;">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Clear</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Reset to default</button>
         </div>
-        <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get a free key at <a href="https://posthog.com" target="_blank" style="color: var(--primary);">posthog.com</a> (1M events/month free).</div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get a free key at <a href="https://posthog.com" target="_blank" style="color: var(--primary);">posthog.com</a> if you want a separate dashboard.</div>
       </div>
 
       <div class="card">
@@ -3880,19 +3883,29 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const phKey = document.getElementById('posthogKeyInput');
     if (phKey) phKey.value = getAnalyticsKey();
   }
+  function toggleAnalyticsCard() {
+    const card = document.getElementById('analyticsCard');
+    const btn = document.getElementById('analyticsToggleBtn');
+    if (!card || !btn) return;
+    const opening = card.style.display === 'none';
+    card.style.display = opening ? 'block' : 'none';
+    btn.textContent = opening ? 'Hide ↑' : 'Advanced ›';
+  }
   function savePosthogKey() {
     const v = document.getElementById('posthogKeyInput').value.trim();
-    if (!v) { localStorage.removeItem('posthog-key'); alert('Key cleared. Restart app to fully reset PostHog.'); return; }
+    if (!v) { localStorage.removeItem('posthog-key'); alert('Reset to default key.'); toggleAnalyticsCard(); return; }
     if (!v.startsWith('phc_')) { alert('PostHog keys start with "phc_". Double-check what you pasted.'); return; }
     localStorage.setItem('posthog-key', v);
     initAnalytics();
     trackEvent('analytics_configured');
-    alert('Saved. Events will start flowing to PostHog now.');
+    alert('Saved. Events flow to your PostHog now.');
+    toggleAnalyticsCard();
   }
   function clearPosthogKey() {
     localStorage.removeItem('posthog-key');
     document.getElementById('posthogKeyInput').value = '';
-    alert('Cleared. Events will only show in browser console going forward.');
+    alert('Reset to default key.');
+    toggleAnalyticsCard();
   }
   function toggleInsightDetail(btn) {
     const detail = btn.nextElementSibling;
