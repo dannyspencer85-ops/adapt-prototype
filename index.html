@@ -449,6 +449,14 @@
     padding: 24px 22px 28px;
     animation: slideUp 0.25s ease-out;
   }
+  /* Glossary terms — dotted underline, primary color, tappable */
+  .glossary-term {
+    border-bottom: 1px dashed var(--primary);
+    color: var(--primary-dark);
+    cursor: help;
+    font-weight: 600;
+  }
+  .glossary-term:hover { background: var(--primary-soft); }
   /* Centered dialog: rounded all corners, fade-pop animation, capped width */
   .modal-bg.center .modal {
     border-radius: 18px;
@@ -2420,6 +2428,21 @@
   </div>
 
   <!-- SESSION REPORT (past session) MODAL -->
+  <!-- GLOSSARY POPOVER -->
+  <div class="modal-bg center" id="glossaryModal">
+    <div class="modal" style="max-width: 360px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;" id="glossaryShort">Term</div>
+          <h2 style="font-size: 20px; margin: 4px 0 0 0;" id="glossaryTerm">—</h2>
+        </div>
+        <button onclick="closeGlossary()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div style="font-size: 14px; line-height: 1.6; color: var(--text);" id="glossaryDef">—</div>
+      <button class="btn btn-ghost btn-full" onclick="closeGlossary()" style="margin-top: 16px;">Got it</button>
+    </div>
+  </div>
+
   <!-- HIDE WORKOUT CONFIRMATION MODAL -->
   <div class="modal-bg center" id="hideConfirmModal">
     <div class="modal">
@@ -4857,6 +4880,75 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     ['planInjuryBanner','todayInjuryBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = injuryHtml; });
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // GLOSSARY — tap any acronym to see a friendly definition.
+  // Each entry has: full (expanded name), def (plain-language explanation).
+  // ──────────────────────────────────────────────────────────────────────
+  const GLOSSARY = {
+    'ACWR': { full: 'Acute:Chronic Workload Ratio', def: 'How much you\'re training this week (acute) compared to your average over the last 4 weeks (chronic). 0.8–1.3 is the sweet spot. Above 1.5 — you\'re ramping up too fast and injury risk jumps 4–5×. Below 0.7 — you\'re losing fitness.' },
+    'RPE': { full: 'Rate of Perceived Exertion', def: 'How hard a workout felt on a 1–10 scale, in your own judgment. 1 = easy walk, 5 = conversational, 7 = solid, 10 = max effort. Useful because it captures fatigue, sleep, and stress that HR can\'t see.' },
+    'HRV': { full: 'Heart Rate Variability', def: 'The natural variation in time between heartbeats. High = recovered & ready. Low = stressed/fatigued. Tracked overnight by most watches.' },
+    'HR': { full: 'Heart Rate', def: 'Beats per minute. The most direct measure of how hard your cardiovascular system is working.' },
+    'BPM': { full: 'Beats Per Minute', def: 'Unit for heart rate. Resting BPM goes down as you get fitter; max BPM is roughly 220 minus your age (give or take 10–15).' },
+    'Z1': { full: 'Zone 1 — Recovery', def: 'Very easy effort, ~50–60% max HR. Conversation flows, you could go all day. Used for recovery rides/jogs.' },
+    'Z2': { full: 'Zone 2 — Aerobic Base', def: 'Easy effort, ~60–70% max HR. Conversational pace. THE most important zone — most weekly volume should live here. Builds the aerobic engine.' },
+    'Z3': { full: 'Zone 3 — Tempo', def: 'Moderate-hard, ~70–80% max HR. "Comfortably hard" — talking gets choppy. Tempo runs and steady efforts.' },
+    'Z4': { full: 'Zone 4 — Threshold', def: 'Hard, ~80–90% max HR. Lactate threshold — the highest sustainable effort. 20–60 min intervals at this level.' },
+    'Z5': { full: 'Zone 5 — VO2 Max', def: 'All-out, ~90–100% max HR. Short repeats (30s–5min). Builds top-end aerobic capacity.' },
+    'VO2max': { full: 'VO2 Max', def: 'The maximum amount of oxygen your body can use during all-out exercise. The aerobic ceiling. Higher = more potential.' },
+    'PR': { full: 'Personal Record', def: 'Your best time at a distance — 5K, marathon, century, etc. The number to beat.' },
+    'BQ': { full: 'Boston Qualifier', def: 'A marathon time that meets the Boston Marathon qualification standard for your age + sex. Usually means a sub-3 to sub-3:30 marathon depending on age.' },
+    '70.3': { full: 'Ironman 70.3 / Half Ironman', def: 'The half-iron distance: 1.2-mile swim, 56-mile bike, 13.1-mile run. 70.3 = total miles. Most finishers take 5–7 hours.' },
+    '140.6': { full: 'Ironman / Full Ironman', def: 'The full-iron distance: 2.4-mile swim, 112-mile bike, 26.2-mile run. 140.6 = total miles. Most finishers take 10–17 hours.' },
+    'OWS': { full: 'Open Water Swim', def: 'Swimming in lake/ocean/river — no walls to push off, sighting required, water is unpredictable. Very different feel from a pool.' },
+    'CSS': { full: 'Critical Swim Speed', def: 'The fastest pace you can sustain in the pool for ~20 min. The swim equivalent of lactate threshold — your training pace anchor.' },
+    'FTP': { full: 'Functional Threshold Power', def: 'The highest average watts you can hold for an hour on the bike. Cycling\'s threshold metric. Training zones are derived as % of FTP.' },
+    'TSS': { full: 'Training Stress Score', def: 'A single number summarizing how stressful a workout was, factoring duration AND intensity. 100 = an hour at threshold. Used to track cumulative load.' },
+    'IT band': { full: 'Iliotibial Band', def: 'A thick strip of connective tissue running along the outside of the thigh. Common irritation site for runners and cyclists, especially with sudden volume jumps.' },
+    'ITB': { full: 'Iliotibial Band', def: 'Same as IT band — thick connective tissue along the outer thigh.' },
+    'DOMS': { full: 'Delayed Onset Muscle Soreness', def: 'The soreness that hits 24–48h after a hard workout. Caused by microscopic muscle damage. Normal; resolves with easy movement and time.' },
+    'Brick': { full: 'Brick session', def: 'A workout combining two disciplines back-to-back — usually bike then run. Trains your body to run on tired legs (race-specific for triathlon).' },
+    'Threshold': { full: 'Lactate Threshold', def: 'The highest effort you can sustain for ~1 hour. Above it, lactate accumulates faster than you can clear it. The classic "comfortably hard" feeling.' },
+    'Effort': { full: 'Relative Effort (Strava)', def: 'Strava\'s name for cardiovascular load — calculated from heart rate over time. Formerly called "Suffer Score". Higher number = more cumulative HR stress in the workout.' },
+    'Suffer': { full: 'Suffer Score / Relative Effort', def: 'Strava\'s metric for cardiovascular load — same as "Effort". Higher = more time at high HR.' },
+    'Taper': { full: 'Taper', def: 'The 1–3 weeks before a race when training volume drops 30–60% (intensity stays sharp). Lets accumulated fatigue clear so you arrive fresh on race day.' },
+    'Z2 base': { full: 'Aerobic Base / Zone 2', def: 'Easy aerobic training — the foundation of endurance fitness. 70–80% of weekly time should be at this intensity.' },
+  };
+  // Open a centered tooltip-modal showing one term's definition
+  function defineTerm(term) {
+    const entry = GLOSSARY[term];
+    if (!entry) return;
+    document.getElementById('glossaryTerm').textContent = entry.full;
+    document.getElementById('glossaryShort').textContent = term;
+    document.getElementById('glossaryDef').textContent = entry.def;
+    document.getElementById('glossaryModal').classList.add('show');
+    if (typeof trackEvent === 'function') trackEvent('glossary_term_viewed', { term });
+  }
+  function closeGlossary() {
+    document.getElementById('glossaryModal').classList.remove('show');
+  }
+  // Wrap recognized acronyms in plain text with clickable glossary spans.
+  // Conservative: only wraps the FIRST occurrence per pass (avoids visual clutter).
+  function markupGlossaryTerms(text) {
+    if (!text || typeof text !== 'string') return text;
+    // Sort terms by length descending so '70.3' matches before '0.3', etc.
+    const terms = Object.keys(GLOSSARY).sort((a, b) => b.length - a.length);
+    const seen = new Set();
+    let result = escapeHtml(text);
+    terms.forEach(term => {
+      if (seen.has(term.toLowerCase())) return;
+      // Word boundaries — but allow internal periods (70.3, V02max etc.) and hyphens
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(?<![A-Za-z0-9])(${escaped})(?![A-Za-z0-9])`, 'i');
+      const match = result.match(re);
+      if (match) {
+        seen.add(term.toLowerCase());
+        result = result.replace(re, `<span class="glossary-term" onclick="defineTerm('${term}')">${match[1]}</span>`);
+      }
+    });
+    return result;
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
@@ -5461,19 +5553,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     if (isSimple) {
       const expandBtn = i.message ? `<button onclick="toggleInsightDetail(this)" style="display:block; background:none; border:0; color:${tone.color}; font-weight:600; font-size:12px; cursor:pointer; padding:6px 0 0; font-family:inherit; text-align:left;">Tell me more →</button>` : '';
-      const detailBlock = i.message ? `<div style="display:none; margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.04); border-radius:8px; font-size:12px; color:var(--text-soft); line-height:1.5;"><strong style="color:var(--text);">Why this matters:</strong> ${escapeHtml(i.message)}${i.suggestion ? `<br><br><em>${escapeHtml(i.suggestion)}</em>` : ''}</div>` : '';
+      const detailBlock = i.message ? `<div style="display:none; margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.04); border-radius:8px; font-size:12px; color:var(--text-soft); line-height:1.5;"><strong style="color:var(--text);">Why this matters:</strong> ${markupGlossaryTerms(i.message)}${i.suggestion ? `<br><br><em>${markupGlossaryTerms(i.suggestion)}</em>` : ''}</div>` : '';
       return `<div style="background:${tone.bg}; border-left:3px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
-        <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${escapeHtml(i.title)}</div>
-        <div style="color:var(--text);">${escapeHtml(i.simpleMessage)}</div>
+        <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+        <div style="color:var(--text);">${markupGlossaryTerms(i.simpleMessage)}</div>
         ${expandBtn}
         ${detailBlock}
         ${fixBtn}
       </div>`;
     }
     return `<div style="background:${tone.bg}; border-left:3px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
-      <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${escapeHtml(i.title)}</div>
-      <div style="color:var(--text);">${escapeHtml(i.message || i.simpleMessage)}</div>
-      ${i.suggestion ? `<div style="color:var(--text-soft); margin-top:6px; font-style:italic;">→ ${escapeHtml(i.suggestion)}</div>` : ''}
+      <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+      <div style="color:var(--text);">${markupGlossaryTerms(i.message || i.simpleMessage)}</div>
+      ${i.suggestion ? `<div style="color:var(--text-soft); margin-top:6px; font-style:italic;">→ ${markupGlossaryTerms(i.suggestion)}</div>` : ''}
       ${fixBtn}
     </div>`;
   }
