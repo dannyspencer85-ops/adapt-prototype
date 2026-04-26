@@ -1769,6 +1769,11 @@
         <div id="heroActionsDone" style="display: none; margin-top: 14px;">
           <button id="heroViewDetails" onclick="" class="btn btn-on-hero" style="width: 100%;">View workout details →</button>
         </div>
+        <!-- Action row: shown when today is a rest day — let user swap in a workout -->
+        <div id="heroActionsRest" style="display: none; margin-top: 14px;">
+          <button onclick="switchTodayToWorkout()" class="btn btn-on-hero" style="width: 100%;">💪 Workout instead?</button>
+          <div style="font-size: 11px; opacity: 0.85; text-align: center; margin-top: 8px;">Pick a discipline + duration. Plan adapts to keep things balanced.</div>
+        </div>
       </div>
 
       <div class="section-label">Coming up</div>
@@ -6489,6 +6494,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const heroCard = document.getElementById('heroCard');
     const actionsPending = document.getElementById('heroActionsPending');
     const actionsDone = document.getElementById('heroActionsDone');
+    const actionsRest = document.getElementById('heroActionsRest');
     const logActions = document.getElementById('heroLogActions');
     const syncNote = document.getElementById('heroSyncNote');
     const doneStats = document.getElementById('heroDoneStats');
@@ -6572,11 +6578,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // Toggle action rows: pending vs done
-    if (actionsPending) actionsPending.style.display = completed ? 'none' : 'grid';
-    if (logActions) logActions.style.display = completed ? 'none' : 'flex';
-    if (syncNote) syncNote.style.display = completed ? 'none' : 'block';
+    // Toggle action rows: pending vs done vs rest
+    const isRest = !completed && s.type === 'rest';
+    if (actionsPending) actionsPending.style.display = (completed || isRest) ? 'none' : 'grid';
+    if (logActions) logActions.style.display = (completed || isRest) ? 'none' : 'flex';
+    if (syncNote) syncNote.style.display = (completed || isRest) ? 'none' : 'block';
     if (actionsDone) actionsDone.style.display = completed ? 'block' : 'none';
+    if (actionsRest) actionsRest.style.display = isRest ? 'block' : 'none';
 
     // Wire the "View details" button to the Strava session report (if we have an ID)
     const viewBtn = document.getElementById('heroViewDetails');
@@ -9657,6 +9665,28 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();
+  }
+
+  // Today is a rest day, but user wants to train — open the session editor with sensible defaults.
+  // Picks a default discipline based on what the user has done LEAST recently in their schedule prefs.
+  function switchTodayToWorkout() {
+    const today = getTodayDay();
+    const prefs = getSchedulePrefs();
+    const todayPrefs = prefs[today] || { available: true, disciplines: ['run','bike','swim','strength'] };
+    // Default discipline: first one allowed for today
+    const allowed = todayPrefs.disciplines || ['run'];
+    const def = allowed[0] || 'run';
+    // Open session modal in edit mode pre-set to easy 45min of that discipline
+    currentEditDay = today;
+    _edDraft = { discipline: def, intensity: 'easy', duration: 45 };
+    applyEdDraftToInputs();
+    document.getElementById('sdEditWhen').textContent = `${planState.dates[today]} · ${today} · was rest day`;
+    document.getElementById('sdView').style.display = 'none';
+    document.getElementById('sdEdit').style.display = 'block';
+    syncEdChipState();
+    refreshEditImpact();
+    document.getElementById('sessionModal').classList.add('show');
+    if (typeof trackEvent === 'function') trackEvent('today_rest_to_workout');
   }
 
   function quickMarkDone() {
