@@ -1398,7 +1398,7 @@
         <p class="sub">Pick an event or just say "get fitter." We'll show you an honest timeline either way.</p>
         <div class="field">
           <label>What are you training for?</label>
-          <select id="eventSelect" onchange="updateTriFocusVisibility()">
+          <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker();">
             <option>Half Ironman</option>
             <option>Full Ironman</option>
             <option>Marathon</option>
@@ -1419,6 +1419,85 @@
           <label>Race location <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
           <input type="text" id="eventLocation" placeholder="City, state">
         </div>
+
+        <!-- Phase 1: Curated race picker -->
+        <div class="field">
+          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;">(optional — for course-specific training)</span></label>
+          <select id="racePickerSelect" onchange="onPickCuratedRace()">
+            <option value="">— I'll add details manually —</option>
+          </select>
+          <div id="racePickerSummary" style="display:none; margin-top:10px; padding:12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5;"></div>
+        </div>
+
+        <!-- Phase 2: Manual course detail entry (collapsible) -->
+        <div class="field">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Course details <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></span>
+            <button type="button" onclick="toggleCourseDetails()" id="courseDetailsToggle" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Show</button>
+          </label>
+          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">Tell us what makes your course tough and the engine will adjust your plan.</div>
+        </div>
+        <div id="courseDetailsFields" style="display:none;">
+          <div class="field">
+            <label>Terrain</label>
+            <div class="chip-row" id="courseTerrainChips">
+              <button type="button" class="chip active" data-val="flat" onclick="singleChipVal(this)">Flat</button>
+              <button type="button" class="chip" data-val="rolling" onclick="singleChipVal(this)">Rolling</button>
+              <button type="button" class="chip" data-val="hilly" onclick="singleChipVal(this)">Hilly</button>
+              <button type="button" class="chip" data-val="mountainous" onclick="singleChipVal(this)">Mountainous</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Surface</label>
+            <div class="chip-row" id="courseSurfaceChips">
+              <button type="button" class="chip active" data-val="road" onclick="singleChipVal(this)">Road</button>
+              <button type="button" class="chip" data-val="trail" onclick="singleChipVal(this)">Trail</button>
+              <button type="button" class="chip" data-val="gravel" onclick="singleChipVal(this)">Gravel</button>
+              <button type="button" class="chip" data-val="mixed" onclick="singleChipVal(this)">Mixed</button>
+            </div>
+          </div>
+          <div class="field" id="courseSwimField">
+            <label>Swim type</label>
+            <div class="chip-row" id="courseSwimChips">
+              <button type="button" class="chip active" data-val="none" onclick="singleChipVal(this)">None</button>
+              <button type="button" class="chip" data-val="pool" onclick="singleChipVal(this)">Pool</button>
+              <button type="button" class="chip" data-val="lake" onclick="singleChipVal(this)">Lake</button>
+              <button type="button" class="chip" data-val="river" onclick="singleChipVal(this)">River</button>
+              <button type="button" class="chip" data-val="ocean" onclick="singleChipVal(this)">Ocean</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Race-day climate</label>
+            <div class="chip-row" id="courseClimateChips">
+              <button type="button" class="chip" data-val="cool" onclick="singleChipVal(this)">Cool</button>
+              <button type="button" class="chip active" data-val="temperate" onclick="singleChipVal(this)">Temperate</button>
+              <button type="button" class="chip" data-val="hot" onclick="singleChipVal(this)">Hot &amp; dry</button>
+              <button type="button" class="chip" data-val="hot-humid" onclick="singleChipVal(this)">Hot &amp; humid</button>
+              <button type="button" class="chip" data-val="variable" onclick="singleChipVal(this)">Variable</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Altitude</label>
+            <div class="chip-row" id="courseAltitudeChips">
+              <button type="button" class="chip active" data-val="sea" onclick="singleChipVal(this)">Sea level</button>
+              <button type="button" class="chip" data-val="moderate" onclick="singleChipVal(this)">Moderate (2,000–6,500ft)</button>
+              <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Notable challenges <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
+            <input type="text" id="courseNotes" placeholder="e.g. river current, technical descents, prairie wind">
+          </div>
+
+          <!-- Phase 3 stub: live API auto-detect -->
+          <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border:1px dashed var(--border); border-radius:10px;">
+            <div style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Coming soon</div>
+            <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">
+              <strong>Auto-detect course from race website</strong> — paste a race URL and we'll pull elevation, distance, and weather data. Requires Athlinks/Strava API keys (not yet connected).
+            </div>
+          </div>
+        </div>
+
         <div class="field">
           <label>What's your goal?</label>
           <div class="chip-row">
@@ -1728,6 +1807,7 @@
       <div id="planInjuryBanner"></div>
       <div id="planChangeBanner"></div>
       <div id="planInsights"></div>
+      <div id="courseIntelCard"></div>
       <div class="info-banner">
         <strong>Peak week is May 18-24.</strong> Your long bike hits 2:45 and long run 1:30 — that's your dress rehearsal for race day.
       </div>
@@ -2429,6 +2509,85 @@
     </div>
   </div>
 
+  <!-- COURSE INTEL EDITOR MODAL -->
+  <div class="modal-bg" id="courseIntelModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Course intel</h2>
+        <button onclick="closeCourseIntelEditor()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">Tell us about your course. We'll adjust your training to match.</div>
+
+      <div class="field" style="margin-top: 14px;">
+        <label>Pick from popular races</label>
+        <select id="cieRaceSelect" onchange="onCieRacePick()"></select>
+      </div>
+
+      <div class="field">
+        <label>Terrain</label>
+        <div class="chip-row" id="cieTerrainChips">
+          <button type="button" class="chip" data-val="flat" onclick="singleChipVal(this)">Flat</button>
+          <button type="button" class="chip" data-val="rolling" onclick="singleChipVal(this)">Rolling</button>
+          <button type="button" class="chip" data-val="hilly" onclick="singleChipVal(this)">Hilly</button>
+          <button type="button" class="chip" data-val="mountainous" onclick="singleChipVal(this)">Mountainous</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Surface</label>
+        <div class="chip-row" id="cieSurfaceChips">
+          <button type="button" class="chip" data-val="road" onclick="singleChipVal(this)">Road</button>
+          <button type="button" class="chip" data-val="trail" onclick="singleChipVal(this)">Trail</button>
+          <button type="button" class="chip" data-val="gravel" onclick="singleChipVal(this)">Gravel</button>
+          <button type="button" class="chip" data-val="mixed" onclick="singleChipVal(this)">Mixed</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Swim type</label>
+        <div class="chip-row" id="cieSwimChips">
+          <button type="button" class="chip" data-val="none" onclick="singleChipVal(this)">None</button>
+          <button type="button" class="chip" data-val="pool" onclick="singleChipVal(this)">Pool</button>
+          <button type="button" class="chip" data-val="lake" onclick="singleChipVal(this)">Lake</button>
+          <button type="button" class="chip" data-val="river" onclick="singleChipVal(this)">River</button>
+          <button type="button" class="chip" data-val="ocean" onclick="singleChipVal(this)">Ocean</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Race-day climate</label>
+        <div class="chip-row" id="cieClimateChips">
+          <button type="button" class="chip" data-val="cool" onclick="singleChipVal(this)">Cool</button>
+          <button type="button" class="chip" data-val="temperate" onclick="singleChipVal(this)">Temperate</button>
+          <button type="button" class="chip" data-val="hot" onclick="singleChipVal(this)">Hot &amp; dry</button>
+          <button type="button" class="chip" data-val="hot-humid" onclick="singleChipVal(this)">Hot &amp; humid</button>
+          <button type="button" class="chip" data-val="variable" onclick="singleChipVal(this)">Variable</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Altitude</label>
+        <div class="chip-row" id="cieAltitudeChips">
+          <button type="button" class="chip" data-val="sea" onclick="singleChipVal(this)">Sea level</button>
+          <button type="button" class="chip" data-val="moderate" onclick="singleChipVal(this)">Moderate</button>
+          <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Notable challenges <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
+        <input type="text" id="cieNotes" placeholder="e.g. river current, technical descents">
+      </div>
+
+      <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border:1px dashed var(--border); border-radius:10px; margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Coming soon</div>
+        <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">
+          <strong>Auto-detect from race URL</strong> — paste your race website link and we'll fetch elevation, distance, and weather. Requires Athlinks/Strava API setup.
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeCourseIntelEditor()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveCourseIntelEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SORENESS UNDERSTOOD MODAL -->
   <div class="modal-bg" id="sorenessModal">
     <div class="modal" style="max-height: 85vh; overflow-y: auto;">
@@ -2779,6 +2938,12 @@
     localStorage.setItem('training-days', JSON.stringify(activeDays));
     planState.raceEvent = event;
     planState.raceDate = eventDate;
+
+    // Save course intel (Phase 1 + 2)
+    const intel = readCourseIntelFromInputs();
+    planState.courseIntel = intel;
+    localStorage.setItem('course-intel', JSON.stringify(intel));
+
     generatePlanFromInputs();
     computeReadinessFlags();
     onbStep(6);
@@ -3002,6 +3167,85 @@
     [...el.parentElement.children].forEach(c => c.classList.remove('active'));
     el.classList.add('active');
   }
+  // Same as singleChip but used by the course-detail chips that carry data-val
+  function singleChipVal(el) {
+    [...el.parentElement.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function getActiveChipVal(containerId) {
+    const c = document.getElementById(containerId);
+    if (!c) return '';
+    const a = c.querySelector('.chip.active');
+    return a ? (a.dataset.val || '') : '';
+  }
+  function setActiveChipVal(containerId, val) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    [...c.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === val));
+  }
+  function toggleCourseDetails() {
+    const f = document.getElementById('courseDetailsFields');
+    const t = document.getElementById('courseDetailsToggle');
+    if (!f || !t) return;
+    if (f.style.display === 'none') { f.style.display = 'block'; t.textContent = 'Hide'; }
+    else { f.style.display = 'none'; t.textContent = 'Show'; }
+  }
+  // Populate the curated race dropdown based on the currently selected event type
+  function refreshRacePicker() {
+    const eventName = document.getElementById('eventSelect')?.value || '';
+    const sel = document.getElementById('racePickerSelect');
+    if (!sel) return;
+    const matches = filterRacesByEvent(eventName);
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— I\'ll add details manually —</option>' +
+      matches.map(r => `<option value="${r.id}">${r.name} · ${r.location}</option>`).join('');
+    // Restore selection if still valid
+    if (matches.some(r => r.id === current)) sel.value = current;
+    // Re-render summary if a race is currently picked
+    onPickCuratedRace();
+  }
+  function onPickCuratedRace() {
+    const sel = document.getElementById('racePickerSelect');
+    const summary = document.getElementById('racePickerSummary');
+    if (!sel || !summary) return;
+    const race = getRaceById(sel.value);
+    if (!race) {
+      summary.style.display = 'none';
+      summary.innerHTML = '';
+      return;
+    }
+    // Populate manual chips so the user can see/edit what we'll apply
+    setActiveChipVal('courseTerrainChips', race.terrain);
+    setActiveChipVal('courseSurfaceChips', race.surface);
+    setActiveChipVal('courseSwimChips', race.swim);
+    setActiveChipVal('courseClimateChips', race.climate);
+    setActiveChipVal('courseAltitudeChips', race.altitude);
+    const notesEl = document.getElementById('courseNotes');
+    if (notesEl) notesEl.value = race.notes || '';
+    // Auto-fill location if blank
+    const locEl = document.getElementById('eventLocation');
+    if (locEl && !locEl.value.trim()) locEl.value = race.location;
+    summary.style.display = 'block';
+    summary.innerHTML = `
+      <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(race.name)}</div>
+      <div style="color:var(--text-soft); margin-bottom:8px;">${escapeHtml(race.location)} · typical month: ${escapeHtml(race.month)}</div>
+      <div>${escapeHtml(race.notes || '')}</div>
+    `;
+  }
+  // Read the current onboarding course-detail inputs into a courseIntel object
+  function readCourseIntelFromInputs() {
+    const raceId = document.getElementById('racePickerSelect')?.value || '';
+    return {
+      raceId: raceId || null,
+      terrain: getActiveChipVal('courseTerrainChips') || 'rolling',
+      surface: getActiveChipVal('courseSurfaceChips') || 'road',
+      swim: getActiveChipVal('courseSwimChips') || 'none',
+      climate: getActiveChipVal('courseClimateChips') || 'temperate',
+      altitude: getActiveChipVal('courseAltitudeChips') || 'sea',
+      notes: document.getElementById('courseNotes')?.value.trim() || '',
+      source: raceId ? 'curated' : 'manual'
+    };
+  }
   function setRpe(n) {
     document.querySelectorAll('#rpe .rpe-btn').forEach((b, i) => {
       b.classList.toggle('active', i + 1 === n);
@@ -3215,6 +3459,131 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   };
 
   const ICON = { rest: '💤', quality: '💪', brick: '🚴', run: '🏃', bike: '🚴', swim: '🏊', strength: '🏋️', mobility: '🧘' };
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PHASE 1: Curated race database
+  // Each race carries course attributes the engine reads to adjust training.
+  // Attribute schema:
+  //   terrain: 'flat' | 'rolling' | 'hilly' | 'mountainous'
+  //   surface: 'road' | 'trail' | 'gravel' | 'mixed'
+  //   swim:    'none' | 'pool' | 'lake' | 'river' | 'ocean'
+  //   climate: 'cool' | 'temperate' | 'hot' | 'hot-humid' | 'variable'
+  //   altitude:'sea' | 'moderate' | 'high'   (sea<2000ft, moderate<6500ft, high>6500ft)
+  //   notes:   short string highlighting course quirks
+  // ──────────────────────────────────────────────────────────────────────
+  const RACE_DATABASE = [
+    // Triathlon
+    { id: 'kona', name: 'Ironman World Championship', location: 'Kona, HI', event: 'Full Ironman', month: 'Oct',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Brutal heat + humidity, ocean chop, Queen K crosswinds, lava-field radiant heat on the run.' },
+    { id: 'lake-placid', name: 'Ironman Lake Placid', location: 'Lake Placid, NY', event: 'Full Ironman', month: 'Jul',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Two big climbs per bike loop, calm freshwater swim, hilly run.' },
+    { id: 'oceanside', name: 'Ironman 70.3 Oceanside', location: 'Oceanside, CA', event: 'Half Ironman', month: 'Apr',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
+      notes: 'Cold ocean swim (often wetsuit-legal), rolling Camp Pendleton bike, flat run.' },
+    { id: '703-worlds', name: 'Ironman 70.3 World Championship', location: 'Varies', event: 'Half Ironman', month: 'Sep',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'variable', altitude: 'moderate',
+      notes: 'Course rotates each year — hilly is the safe assumption.' },
+    { id: 'nyc-tri', name: 'New York City Triathlon', location: 'New York, NY', event: 'Olympic Triathlon', month: 'Jul',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Hudson River current-aided swim, hilly Henry Hudson bike, hot July run in Central Park.' },
+    { id: 'escape-alcatraz', name: 'Escape from Alcatraz Triathlon', location: 'San Francisco, CA', event: 'Olympic Triathlon', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
+      notes: 'Cold bay swim with current, very hilly bike + run including the Sand Ladder.' },
+
+    // Running — marathons
+    { id: 'boston', name: 'Boston Marathon', location: 'Boston, MA', event: 'Marathon', month: 'Apr',
+      terrain: 'hilly', surface: 'road', swim: 'none', climate: 'variable', altitude: 'sea',
+      notes: 'Net downhill but quad-shredding — Newton hills (incl. Heartbreak) at mile 20.' },
+    { id: 'nyc-marathon', name: 'NYC Marathon', location: 'New York, NY', event: 'Marathon', month: 'Nov',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Five borough bridges = stealth elevation. Headwind on 1st Ave a real factor.' },
+    { id: 'chicago-marathon', name: 'Chicago Marathon', location: 'Chicago, IL', event: 'Marathon', month: 'Oct',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Pancake flat — PR course. Wind off the lake is the only wildcard.' },
+    { id: 'london-marathon', name: 'London Marathon', location: 'London, UK', event: 'Marathon', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Mostly flat, mild April weather, fast course.' },
+
+    // Running — trail / ultra
+    { id: 'western-states', name: 'Western States 100', location: 'Olympic Valley, CA', event: 'Ultramarathon', month: 'Jun',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'hot', altitude: 'high',
+      notes: 'Massive descent, canyon heat (often 100°F+), high-altitude start. Heat training is non-negotiable.' },
+    { id: 'utmb', name: 'UTMB (Ultra-Trail du Mont-Blanc)', location: 'Chamonix, France', event: 'Ultramarathon', month: 'Aug',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: '~10,000m vert. Night running, alpine cold, technical descents.' },
+
+    // Cycling — gravel / ultra
+    { id: 'unbound', name: 'Unbound Gravel 200', location: 'Emporia, KS', event: 'Gravel Race', month: 'Jun',
+      terrain: 'rolling', surface: 'gravel', swim: 'none', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Flint Hills chunk, mud risk, prairie heat, 12+ hour day for most.' },
+    { id: 'leadville', name: 'Leadville Trail 100 MTB', location: 'Leadville, CO', event: 'Gravel Race', month: 'Aug',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: 'Starts at 10,200ft, tops 12,400ft. Altitude is the race.' },
+    { id: 'sbt-grvl', name: 'SBT GRVL', location: 'Steamboat Springs, CO', event: 'Gravel Race', month: 'Aug',
+      terrain: 'hilly', surface: 'gravel', swim: 'none', climate: 'temperate', altitude: 'high',
+      notes: 'Climbing-heavy, dry mountain air, rolling ranch terrain.' },
+  ];
+
+  // Course intel → training adjustments. Each rule produces an emphasis the engine surfaces.
+  function deriveCourseEmphasis(intel) {
+    if (!intel) return [];
+    const out = [];
+    if (intel.terrain === 'hilly' || intel.terrain === 'mountainous') {
+      out.push({ icon: '⛰️', label: 'Hill-strength priority',
+        detail: 'Add a weekly hill repeat session and target +25% elevation gain on long sessions vs. a flat course.' });
+    }
+    if (intel.terrain === 'flat') {
+      out.push({ icon: '🛣️', label: 'Sustained-power focus',
+        detail: 'Flat courses reward steady tempo. Long intervals at race pace beat hill work for this race.' });
+    }
+    if (intel.surface === 'trail' || intel.surface === 'gravel') {
+      out.push({ icon: '🪨', label: 'Surface-specific running/riding',
+        detail: 'At least one weekly session on similar terrain. Builds ankle stability + handling skills.' });
+    }
+    if (intel.swim === 'ocean' || intel.swim === 'river') {
+      out.push({ icon: '🌊', label: 'Open-water sessions',
+        detail: 'Swap one pool swim for open water every other week once water is safe — sighting, chop, wetsuit feel matter on race day.' });
+    }
+    if (intel.climate === 'hot' || intel.climate === 'hot-humid') {
+      out.push({ icon: '🔥', label: 'Heat acclimatization block',
+        detail: '10–14 days of heat exposure (sauna or overdressed sessions) in the final 4 weeks. Big aerobic gains, big race-day insurance.' });
+    }
+    if (intel.climate === 'cool') {
+      out.push({ icon: '🧥', label: 'Cool-weather pacing',
+        detail: 'Cold starts can spike HR. Practice warm-up routine and layering on long sessions.' });
+    }
+    if (intel.altitude === 'high') {
+      out.push({ icon: '🏔️', label: 'Altitude prep',
+        detail: 'Arriving 7+ days early or 12+ hrs the night before is best. Lower long-session intensity for the first 3 days at altitude.' });
+    }
+    if (intel.altitude === 'moderate') {
+      out.push({ icon: '🏕️', label: 'Mild altitude awareness',
+        detail: 'Expect ~5% pace drop. Don\'t panic-train at altitude — your sea-level fitness still applies.' });
+    }
+    return out;
+  }
+
+  function getRaceById(id) { return RACE_DATABASE.find(r => r.id === id); }
+
+  function filterRacesByEvent(eventName) {
+    if (!eventName) return RACE_DATABASE;
+    // Group "Triathlon" / "Ironman" / "Marathon" loosely
+    const e = eventName.toLowerCase();
+    return RACE_DATABASE.filter(r => {
+      const re = r.event.toLowerCase();
+      if (e.includes('full ironman')) return re === 'full ironman';
+      if (e.includes('half ironman') || e.includes('70.3')) return re === 'half ironman';
+      if (e.includes('olympic')) return re === 'olympic triathlon';
+      if (e.includes('sprint')) return re === 'sprint triathlon';
+      if (e.includes('marathon') && !e.includes('half')) return re === 'marathon' || re === 'ultramarathon';
+      if (e.includes('half marathon')) return re === 'half marathon' || re === 'marathon';
+      if (e.includes('ultra')) return re === 'ultramarathon';
+      if (e.includes('gravel')) return re === 'gravel race';
+      return re === e;
+    });
+  }
 
   const TOOLS = [
     {
@@ -3900,6 +4269,67 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         suggestion: '"Reduce week 6 by 30%" if changes pushed volume up.',
         fix: { label: `Reduce race week by 30%`, tool: 'adjustVolume', input: { fromWeekIndex: planState.weekArc.length - 1, toWeekIndex: planState.weekArc.length - 1, percentChange: -30, reason: 'enforce proper taper' } }
       });
+    }
+
+    // 8. Course-intel awareness — flag missing course-specific prep when race is close
+    const intel = planState.courseIntel;
+    const daysToRace = getDaysToRace();
+    if (intel && daysToRace > 0 && daysToRace <= 56) {
+      // Heat acclimatization warning — within 4 weeks for hot race, ideally start by then
+      if ((intel.climate === 'hot' || intel.climate === 'hot-humid') && daysToRace <= 28 && daysToRace >= 7) {
+        insights.push({
+          severity: 'warn',
+          title: 'Heat acclimatization window',
+          simpleMessage: `Your race is hot. Start sweating on purpose now — saunas, overdressed runs — so race-day heat doesn't blow up your day.`,
+          message: `${daysToRace} days to a ${intel.climate === 'hot-humid' ? 'hot & humid' : 'hot'} race. The ideal heat block is 10–14 days of progressive heat exposure inside the final 4 weeks. Start within the next 7 days.`,
+          suggestion: 'Add 4 sauna sessions per week (15-30 min post-easy-run) or do 2 weekly Z2 sessions overdressed.',
+        });
+      }
+      // Altitude prep warning — high altitude race
+      if (intel.altitude === 'high' && daysToRace <= 21) {
+        insights.push({
+          severity: 'info',
+          title: 'High-altitude race ahead',
+          simpleMessage: `Your race is at altitude. Plan to arrive 7+ days early or land the night before — anything in between makes you feel worse.`,
+          message: `Altitude takes 7-14 days to acclimate. Splitting the difference (3-5 days early) is the worst option physiologically. Pick a strategy now and book travel accordingly.`,
+          suggestion: 'Book to arrive 7+ days before, or 12 hours before. Drop intensity for the first 3 days at altitude.',
+        });
+      }
+      // Hilly/mountainous course — make sure long sessions have elevation
+      if ((intel.terrain === 'hilly' || intel.terrain === 'mountainous') && daysToRace > 14) {
+        const longSat = planState.sessions.Sat;
+        const longSun = planState.sessions.Sun;
+        const hasLongSession = (longSat && longSat.duration >= 90) || (longSun && longSun.duration >= 90);
+        if (hasLongSession) {
+          insights.push({
+            severity: 'info',
+            title: `${intel.terrain === 'mountainous' ? 'Mountainous' : 'Hilly'} course — train the climbs`,
+            simpleMessage: `Your race has serious climbing. Make sure your long sessions include hills, not just flat distance.`,
+            message: `Race terrain: ${intel.terrain}. Flat training builds aerobic engine but not the leg-strength + descending durability you'll need on race day.`,
+            suggestion: 'Route long rides/runs through your hilliest local terrain. Add a weekly hill-repeat session.',
+          });
+        }
+      }
+      // Open water swim — make sure pool isn't the only swim venue
+      if ((intel.swim === 'ocean' || intel.swim === 'river' || intel.swim === 'lake') && daysToRace <= 42 && daysToRace > 14) {
+        insights.push({
+          severity: 'info',
+          title: 'Open-water swim race',
+          simpleMessage: `Your race swim isn't in a pool. Get into open water at least 3-4 times before race day — it feels completely different.`,
+          message: `Race swim type: ${intel.swim}. Sighting, chop, wetsuit fit, and race-start chaos are skills you can only practice in open water.`,
+          suggestion: 'Swap one pool swim every other week for an open-water session once water is safe (>60°F with wetsuit).',
+        });
+      }
+      // Trail / gravel — make sure you've ridden/run on the surface
+      if ((intel.surface === 'trail' || intel.surface === 'gravel') && daysToRace > 14) {
+        insights.push({
+          severity: 'info',
+          title: `${intel.surface === 'gravel' ? 'Gravel' : 'Trail'} race — surface practice matters`,
+          simpleMessage: `Your race isn't on pavement. Schedule at least one weekly session on similar surface to build handling and ankle stability.`,
+          message: `Race surface: ${intel.surface}. Road training transfers ~70% — the rest is bike-handling, line choice, and ankle/foot strength specific to ${intel.surface}.`,
+          suggestion: `One weekly long session on similar terrain. Dial in tire/shoe choice early.`,
+        });
+      }
     }
 
     return insights;
@@ -4882,6 +5312,125 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (pgd) pgd.textContent = `${dateStr} · ${dayLabel}`;
   }
 
+  function renderCourseIntel() {
+    const card = document.getElementById('courseIntelCard');
+    if (!card) return;
+    const intel = planState.courseIntel;
+    if (!intel) {
+      // No intel yet — show a soft prompt to add it
+      card.innerHTML = `
+        <div class="card" style="padding:14px; margin-bottom:12px; border:1px dashed var(--border);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+            <div style="font-size:18px;">🗺️</div>
+            <div style="font-weight:700; font-size:14px;">Course intel not set</div>
+          </div>
+          <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-bottom:10px;">
+            Tell us about your race course (terrain, climate, swim, altitude) and the engine will tailor your training.
+          </div>
+          <button class="btn btn-secondary" style="font-size:13px; padding:8px 14px;" onclick="openCourseIntelEditor()">Add course details</button>
+        </div>`;
+      return;
+    }
+    const emphasis = deriveCourseEmphasis(intel);
+    const race = intel.raceId ? getRaceById(intel.raceId) : null;
+    const sourceLabel = intel.source === 'curated' && race
+      ? `From ${escapeHtml(race.name)}`
+      : 'Your details';
+    const attrs = [
+      { label: 'Terrain', val: intel.terrain },
+      { label: 'Surface', val: intel.surface },
+      ...(intel.swim && intel.swim !== 'none' ? [{ label: 'Swim', val: intel.swim }] : []),
+      { label: 'Climate', val: intel.climate },
+      { label: 'Altitude', val: intel.altitude === 'sea' ? 'sea level' : intel.altitude },
+    ];
+    card.innerHTML = `
+      <div class="card" style="padding:14px; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="font-size:18px;">🗺️</div>
+            <div style="font-weight:700; font-size:14px;">Course intel</div>
+          </div>
+          <button onclick="openCourseIntelEditor()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Edit</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">${sourceLabel}</div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+          ${attrs.map(a => `<span style="font-size:12px; padding:4px 10px; background:var(--bg-soft); border-radius:100px; color:var(--text);"><span style="color:var(--text-soft);">${a.label}:</span> <strong>${escapeHtml(a.val)}</strong></span>`).join('')}
+        </div>
+        ${intel.notes ? `<div style="font-size:13px; color:var(--text-soft); line-height:1.5; padding:10px; background:var(--bg-soft); border-radius:8px; margin-bottom:10px;">${escapeHtml(intel.notes)}</div>` : ''}
+        ${emphasis.length > 0 ? `
+          <div style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Training emphasis for this course</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${emphasis.map(e => `
+              <div style="display:flex; gap:10px; align-items:flex-start; padding:10px; background:var(--primary-soft); border-radius:8px;">
+                <div style="font-size:18px; line-height:1;">${e.icon}</div>
+                <div>
+                  <div style="font-weight:600; font-size:13px; margin-bottom:2px;">${escapeHtml(e.label)}</div>
+                  <div style="font-size:12px; color:var(--text-soft); line-height:1.5;">${escapeHtml(e.detail)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div style="font-size:13px; color:var(--text-soft);">Standard training plan — no course-specific adjustments needed.</div>'}
+      </div>`;
+  }
+
+  // Course intel editor modal — lets users update course details after onboarding
+  function openCourseIntelEditor() {
+    const intel = planState.courseIntel || { terrain:'rolling', surface:'road', swim:'none', climate:'temperate', altitude:'sea', notes:'', raceId:null, source:'manual' };
+    const eventName = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const matches = filterRacesByEvent(eventName);
+    const modal = document.getElementById('courseIntelModal');
+    if (!modal) return;
+    const sel = document.getElementById('cieRaceSelect');
+    if (sel) {
+      sel.innerHTML = '<option value="">— Manual entry —</option>' +
+        matches.map(r => `<option value="${r.id}" ${r.id === intel.raceId ? 'selected' : ''}>${r.name} · ${r.location}</option>`).join('');
+    }
+    setActiveChipVal('cieTerrainChips', intel.terrain);
+    setActiveChipVal('cieSurfaceChips', intel.surface);
+    setActiveChipVal('cieSwimChips', intel.swim);
+    setActiveChipVal('cieClimateChips', intel.climate);
+    setActiveChipVal('cieAltitudeChips', intel.altitude);
+    const n = document.getElementById('cieNotes');
+    if (n) n.value = intel.notes || '';
+    modal.classList.add('show');
+  }
+  function closeCourseIntelEditor() {
+    const modal = document.getElementById('courseIntelModal');
+    if (modal) modal.classList.remove('show');
+  }
+  function onCieRacePick() {
+    const id = document.getElementById('cieRaceSelect')?.value || '';
+    const race = getRaceById(id);
+    if (!race) return;
+    setActiveChipVal('cieTerrainChips', race.terrain);
+    setActiveChipVal('cieSurfaceChips', race.surface);
+    setActiveChipVal('cieSwimChips', race.swim);
+    setActiveChipVal('cieClimateChips', race.climate);
+    setActiveChipVal('cieAltitudeChips', race.altitude);
+    const n = document.getElementById('cieNotes');
+    if (n && !n.value.trim()) n.value = race.notes || '';
+  }
+  function saveCourseIntelEdit() {
+    const raceId = document.getElementById('cieRaceSelect')?.value || '';
+    const intel = {
+      raceId: raceId || null,
+      terrain: getActiveChipVal('cieTerrainChips') || 'rolling',
+      surface: getActiveChipVal('cieSurfaceChips') || 'road',
+      swim: getActiveChipVal('cieSwimChips') || 'none',
+      climate: getActiveChipVal('cieClimateChips') || 'temperate',
+      altitude: getActiveChipVal('cieAltitudeChips') || 'sea',
+      notes: document.getElementById('cieNotes')?.value.trim() || '',
+      source: raceId ? 'curated' : 'manual'
+    };
+    planState.courseIntel = intel;
+    localStorage.setItem('course-intel', JSON.stringify(intel));
+    saveUserData();
+    closeCourseIntelEditor();
+    renderAll();
+    if (typeof trackEvent === 'function') trackEvent('course_intel_updated', { source: intel.source, raceId: intel.raceId });
+  }
+
   function renderTodayGreetingAndRace() {
     const greetingDate = document.getElementById('todayGreetingDate');
     const greetingName = document.getElementById('todayGreetingName');
@@ -5036,6 +5585,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderWeekArc();
     renderBanners();
     renderInsights();
+    renderCourseIntel();
     renderReadinessPills();
   }
 
@@ -5208,10 +5758,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function startFreshOnboarding(skipConfirm) {
     if (!skipConfirm && !confirm('Start over? You\'ll rebuild your plan from scratch.')) return;
-    ['race-event','race-date','race-location','hours-per-week','training-days','tri-limiter','tri-strategy','plan-choice'].forEach(k => localStorage.removeItem(k));
+    ['race-event','race-date','race-location','hours-per-week','training-days','tri-limiter','tri-strategy','plan-choice','course-intel'].forEach(k => localStorage.removeItem(k));
     planState.raceEvent = '';
     planState.raceDate = '';
     planState.raceLocation = '';
+    planState.courseIntel = null;
     planState.injury = null;
     planState.lastChange = null;
     planState.lastCheckin = null;
@@ -5336,7 +5887,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       planState.dates = acct.data.planState.dates || planState.dates;
       planState.weekArc = acct.data.planState.weekArc || planState.weekArc;
       planState.injury = acct.data.planState.injury || null;
+      planState.courseIntel = acct.data.planState.courseIntel || null;
       planState.lastChange = null;
+    }
+    // Fallback: if account didn't carry it (older save), pull from localStorage
+    if (!planState.courseIntel) {
+      try {
+        const ci = localStorage.getItem('course-intel');
+        if (ci) planState.courseIntel = JSON.parse(ci);
+      } catch (e) {}
     }
     if (acct.data.chatMode) localStorage.setItem('chat-mode', acct.data.chatMode);
     if (acct.data.apiKey) localStorage.setItem('claude-api-key', acct.data.apiKey);
