@@ -3317,29 +3317,67 @@
     localStorage.setItem('schedule-prefs', JSON.stringify(_scheduleModalDraft));
     renderScheduleGrid();
   }
-  // Render the You-tab summary of current schedule preset
+  // Render the You-tab summary of current schedule preset.
+  // Top: 7 day-of-week pills with selected days highlighted.
+  // Bottom: list of selected (available) days only, with their disciplines.
   function renderProfileScheduleSummary() {
     const slot = document.getElementById('profileScheduleSummary');
     if (!slot) return;
     const prefs = getSchedulePrefs();
-    const rows = DAYS.map(d => {
-      const p = prefs[d];
-      const discs = (p.disciplines || []).map(id => SCHEDULE_DISCIPLINES.find(x => x.id === id)).filter(Boolean);
+    const dayShort = { Mon: 'M', Tue: 'T', Wed: 'W', Thu: 'T', Fri: 'F', Sat: 'S', Sun: 'S' };
+
+    // Top strip — 7 day pills, selected = primary green, unselected = grey outline
+    const pills = DAYS.map(d => {
+      const isOn = prefs[d].available;
       return `
-        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; padding: 6px 0; ${p.available ? '' : 'opacity: 0.45;'}">
-          <div style="font-size: 13px; font-weight: 600;">${DAY_FULL[d]}</div>
-          <div style="font-size: 12px; color: var(--text-soft); display: flex; flex-wrap: wrap; gap: 4px;">
-            ${p.available
-              ? (discs.length === SCHEDULE_DISCIPLINES.length
-                ? '<span style="color: var(--primary); font-weight: 600;">Anything</span>'
-                : discs.length === 0
-                  ? '<span style="color: var(--text-soft);">Available · no disciplines selected</span>'
-                  : discs.map(d => `<span style="background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; font-size: 11px;">${d.icon} ${d.label}</span>`).join(''))
-              : '<span style="color: var(--text-soft);">Off</span>'}
-          </div>
-        </div>`;
+        <div style="
+          flex: 1;
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 50%;
+          background: ${isOn ? 'var(--primary)' : 'transparent'};
+          color: ${isOn ? '#fff' : 'var(--text-soft)'};
+          border: 2px solid ${isOn ? 'var(--primary)' : 'var(--border)'};
+          max-width: 36px;
+        " title="${DAY_FULL[d]}${isOn ? '' : ' · off'}">${dayShort[d]}</div>`;
     }).join('');
-    slot.innerHTML = rows;
+
+    // Count summary
+    const onDays = DAYS.filter(d => prefs[d].available);
+    const summary = `<div style="font-size: 12px; color: var(--text-soft); margin-top: 10px; margin-bottom: 6px; font-weight: 600;">
+      ${onDays.length} day${onDays.length === 1 ? '' : 's'} per week selected
+    </div>`;
+
+    // Bottom — only the selected days, with disciplines
+    let detailRows;
+    if (onDays.length === 0) {
+      detailRows = '<div style="font-size: 13px; color: var(--text-soft); padding: 8px 0;">No training days selected. Tap Edit above.</div>';
+    } else {
+      detailRows = onDays.map(d => {
+        const discs = (prefs[d].disciplines || []).map(id => SCHEDULE_DISCIPLINES.find(x => x.id === id)).filter(Boolean);
+        const allFour = discs.length === SCHEDULE_DISCIPLINES.length;
+        return `
+          <div style="display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <div style="font-size: 13px; font-weight: 700; color: var(--primary);">${DAY_FULL[d]}</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+              ${allFour
+                ? '<span style="font-size: 11px; color: var(--primary-dark); font-weight: 600;">Any discipline</span>'
+                : discs.length === 0
+                  ? '<span style="font-size: 11px; color: var(--text-soft);">No disciplines picked</span>'
+                  : discs.map(disc => `<span style="background: var(--bg-soft); padding: 2px 8px; border-radius: 4px; font-size: 11px;">${disc.icon} ${disc.label}</span>`).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    slot.innerHTML = `
+      <div style="display: flex; gap: 6px; justify-content: space-between; margin-bottom: 4px;">${pills}</div>
+      ${summary}
+      ${detailRows}`;
   }
 
   function saveScheduleModal() {
