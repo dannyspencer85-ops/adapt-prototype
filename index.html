@@ -1912,12 +1912,14 @@
     </div>
     <div class="screen-inner">
       <!-- Time range selector -->
-      <div style="display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto;">
+      <div style="display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto;">
         <button class="chip" data-perf-range="7" onclick="setPerfRange(7)">Last 7 days</button>
         <button class="chip active" data-perf-range="30" onclick="setPerfRange(30)">Last 30 days</button>
+        <button class="chip" data-perf-range="60" onclick="setPerfRange(60)">Last 60 days</button>
         <button class="chip" data-perf-range="90" onclick="setPerfRange(90)">Last 90 days</button>
         <button class="chip" data-perf-range="365" onclick="setPerfRange(365)">Last year</button>
       </div>
+      <div id="perfSyncNotice" style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;"></div>
 
       <!-- Summary tiles -->
       <div class="card" id="perfSummary">
@@ -1954,6 +1956,27 @@
         <div class="card-title">By discipline</div>
         <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Tap a row to see the workouts behind it.</div>
         <div id="perfDisciplineBars"></div>
+      </div>
+
+      <!-- Progress Trends — improvement over time -->
+      <div class="card">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Progress trends</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Are you getting fitter? Each dot is one workout in this range.</div>
+        <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
+          <button class="chip active" data-trend-disc="run" onclick="setTrendDiscipline('run')">🏃 Run</button>
+          <button class="chip" data-trend-disc="bike" onclick="setTrendDiscipline('bike')">🚴 Bike</button>
+          <button class="chip" data-trend-disc="swim" onclick="setTrendDiscipline('swim')">🏊 Swim</button>
+        </div>
+        <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+          <button class="chip active" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>
+          <button class="chip" data-trend-metric="duration" onclick="setTrendMetric('duration')">Long sessions</button>
+          <button class="chip" data-trend-metric="avgHr" onclick="setTrendMetric('avgHr')">Avg HR (easy)</button>
+        </div>
+        <div id="perfTrendCallout" style="display: none; padding: 10px 12px; background: var(--primary-soft); border-radius: 10px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
+        <div id="perfTrendChart"></div>
+        <div id="perfTrendEmpty" style="display: none; font-size: 13px; color: var(--text-soft); padding: 14px; text-align: center;"></div>
       </div>
 
       <!-- Drill-down panel — populated when user taps a bar or discipline -->
@@ -2166,6 +2189,16 @@
           <div style="color: var(--text-soft); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">Triathlon focus</div>
           <div style="font-weight: 600; margin-top: 2px;" id="profileTriFocusText"></div>
         </div>
+      </div>
+
+      <!-- SCHEDULE summary — shows current preset, tap to edit -->
+      <div class="card">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Your schedule</span>
+          <button onclick="openScheduleModal()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Edit</button>
+        </div>
+        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 12px;">When you can train + which disciplines work each day. Plan adapts to changes.</div>
+        <div id="profileScheduleSummary"></div>
       </div>
 
       <div class="card">
@@ -3153,7 +3186,7 @@
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); }
   }
   function goBack() {
     if (screenHistory.length === 0) return;
@@ -3271,6 +3304,31 @@
     localStorage.setItem('schedule-prefs', JSON.stringify(_scheduleModalDraft));
     renderScheduleGrid();
   }
+  // Render the You-tab summary of current schedule preset
+  function renderProfileScheduleSummary() {
+    const slot = document.getElementById('profileScheduleSummary');
+    if (!slot) return;
+    const prefs = getSchedulePrefs();
+    const rows = DAYS.map(d => {
+      const p = prefs[d];
+      const discs = (p.disciplines || []).map(id => SCHEDULE_DISCIPLINES.find(x => x.id === id)).filter(Boolean);
+      return `
+        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; padding: 6px 0; ${p.available ? '' : 'opacity: 0.45;'}">
+          <div style="font-size: 13px; font-weight: 600;">${DAY_FULL[d]}</div>
+          <div style="font-size: 12px; color: var(--text-soft); display: flex; flex-wrap: wrap; gap: 4px;">
+            ${p.available
+              ? (discs.length === SCHEDULE_DISCIPLINES.length
+                ? '<span style="color: var(--primary); font-weight: 600;">Anything</span>'
+                : discs.length === 0
+                  ? '<span style="color: var(--text-soft);">Available · no disciplines selected</span>'
+                  : discs.map(d => `<span style="background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; font-size: 11px;">${d.icon} ${d.label}</span>`).join(''))
+              : '<span style="color: var(--text-soft);">Off</span>'}
+          </div>
+        </div>`;
+    }).join('');
+    slot.innerHTML = rows;
+  }
+
   function saveScheduleModal() {
     if (_scheduleModalDraft) {
       setSchedulePrefs(_scheduleModalDraft);
@@ -6936,7 +6994,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       setStravaMsg('✅ Authorized. Syncing activities…', 'ok');
       // Auto-sync after successful auth
       try {
-        const acts = await syncStravaActivities(30);
+        const acts = await syncStravaActivities(getDesiredSyncDays());
         setStravaMsg(`✅ Authorized as ${cfg.athleteName} · synced ${acts.length} activities.`, 'ok');
         renderAll();
       } catch (e) {
@@ -7071,13 +7129,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     return res.json();
   }
-  // Fetch last N days of activities and store on planState + localStorage
+  // Fetch last N days of activities and store on planState + localStorage.
+  // Paginated — Strava caps per_page at 200; we walk pages until we get an empty one
+  // or hit a hard cap to keep things bounded.
   async function syncStravaActivities(days) {
     const cfg = getStravaConfig();
     if (!cfg) return null;
-    const numDays = days || 30;
+    const numDays = days || 90;
     const after = Math.floor((Date.now() - numDays * 86400 * 1000) / 1000);
-    const list = await _stravaApiCall(`/athlete/activities?after=${after}&per_page=50`);
+    const list = [];
+    const PER_PAGE = 200;
+    const MAX_PAGES = 6; // covers up to 1200 activities even for very high-volume users
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const pageData = await _stravaApiCall(`/athlete/activities?after=${after}&per_page=${PER_PAGE}&page=${page}`);
+      if (!pageData || pageData.length === 0) break;
+      list.push(...pageData);
+      if (pageData.length < PER_PAGE) break; // last page
+    }
     const activities = (list || []).map(a => ({
       id: a.id,
       name: a.name,
@@ -7096,8 +7164,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }));
     planState.stravaActivities = activities;
     planState.stravaSyncedAt = Date.now();
+    planState.stravaSyncDays = numDays;
     localStorage.setItem('strava-activities', JSON.stringify(activities));
     localStorage.setItem('strava-synced-at', String(planState.stravaSyncedAt));
+    localStorage.setItem('strava-sync-days', String(numDays));
     saveUserData();
     return activities;
   }
@@ -7107,13 +7177,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (raw) planState.stravaActivities = JSON.parse(raw);
       const ts = localStorage.getItem('strava-synced-at');
       if (ts) planState.stravaSyncedAt = parseInt(ts, 10);
+      const days = localStorage.getItem('strava-sync-days');
+      if (days) planState.stravaSyncDays = parseInt(days, 10);
     } catch (e) {}
   }
+  // Pick a sync depth that covers Performance range + a buffer.
+  // Default 90 days; bumps to 365 when user has ever picked the year range.
+  function getDesiredSyncDays() {
+    const perf = parseInt(localStorage.getItem('perf-range') || '30', 10);
+    const sticky = parseInt(localStorage.getItem('strava-sync-days') || '0', 10);
+    const need = Math.max(perf + 14, 90); // always cover at least 90 days
+    return Math.max(need, sticky); // never shrink below previously synced depth
+  }
+
   // Profile-screen Sync button handler
   async function syncStravaFromProfile() {
     setStravaMsg('Syncing recent activities…', 'info');
     try {
-      const acts = await syncStravaActivities(30);
+      const acts = await syncStravaActivities(getDesiredSyncDays());
       // Auto-mark planned sessions complete based on Strava activity matches
       const marked = (typeof autoMarkSessionsFromStrava === 'function') ? autoMarkSessionsFromStrava() : 0;
       const markedSuffix = marked > 0 ? ` · Auto-marked ${marked} planned session${marked > 1 ? 's' : ''} complete.` : '';
@@ -7521,7 +7602,210 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       b.classList.toggle('active', String(b.dataset.perfRange) === String(days));
     });
     renderPerformanceTab();
+    // If the new range is deeper than what's cached, fetch the missing history in the background
+    const cached = planState.stravaSyncDays || 0;
+    if (getStravaConfig() && days > cached) {
+      const note = document.getElementById('perfSyncNotice');
+      if (note) note.innerHTML = `🔄 Pulling deeper history from Strava…`;
+      syncStravaActivities(getDesiredSyncDays())
+        .then(acts => {
+          if (note) note.innerHTML = `✅ Synced ${acts ? acts.length : 0} activities. <button onclick="renderPerformanceTab()" style="background:none; border:0; color:var(--primary); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Refresh →</button>`;
+          renderPerformanceTab();
+          setTimeout(() => { if (note) note.innerHTML = ''; }, 4000);
+        })
+        .catch(e => { if (note) note.innerHTML = `⚠ Sync failed: ${e.message}`; });
+    }
   }
+  // ──────────────────────────────────────────────────────────────────────
+  // PROGRESS TRENDS — pace, duration, HR over time per discipline
+  // ──────────────────────────────────────────────────────────────────────
+  function getTrendDiscipline() { return localStorage.getItem('trend-disc') || 'run'; }
+  function getTrendMetric() { return localStorage.getItem('trend-metric') || 'pace'; }
+  function setTrendDiscipline(d) {
+    localStorage.setItem('trend-disc', d);
+    document.querySelectorAll('[data-trend-disc]').forEach(b => b.classList.toggle('active', b.dataset.trendDisc === d));
+    renderProgressTrends();
+  }
+  function setTrendMetric(m) {
+    localStorage.setItem('trend-metric', m);
+    document.querySelectorAll('[data-trend-metric]').forEach(b => b.classList.toggle('active', b.dataset.trendMetric === m));
+    renderProgressTrends();
+  }
+  // Compute the metric value for one activity based on the metric
+  function computeTrendValue(activity, metric) {
+    if (!activity) return null;
+    if (metric === 'pace') {
+      if (!activity.distance_km || activity.distance_km < 0.5 || !activity.moving_min) return null;
+      return activity.moving_min / activity.distance_km; // minutes per km
+    }
+    if (metric === 'duration') {
+      return activity.moving_min || null;
+    }
+    if (metric === 'avgHr') {
+      // Filter to easier sessions only — duration > 30 min and not interval-style high HR
+      if (!activity.avg_hr || !activity.moving_min || activity.moving_min < 30) return null;
+      return activity.avg_hr;
+    }
+    return null;
+  }
+  function renderProgressTrends() {
+    const chartEl = document.getElementById('perfTrendChart');
+    const calloutEl = document.getElementById('perfTrendCallout');
+    const emptyEl = document.getElementById('perfTrendEmpty');
+    if (!chartEl) return;
+
+    // Reflect saved selections in the chips
+    const disc = getTrendDiscipline();
+    const metric = getTrendMetric();
+    document.querySelectorAll('[data-trend-disc]').forEach(b => b.classList.toggle('active', b.dataset.trendDisc === disc));
+    document.querySelectorAll('[data-trend-metric]').forEach(b => b.classList.toggle('active', b.dataset.trendMetric === metric));
+
+    const days = getPerfRange();
+    const acts = getActivitiesInRangeDays(days)
+      .filter(a => mapStravaTypeToSessionType(a.type) === disc);
+
+    const points = acts
+      .map(a => {
+        const v = computeTrendValue(a, metric);
+        if (v == null) return null;
+        return { date: new Date(a.start_date_local || a.start_date), value: v, activity: a };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.date - b.date);
+
+    if (points.length < 2) {
+      chartEl.innerHTML = '';
+      if (calloutEl) calloutEl.style.display = 'none';
+      if (emptyEl) {
+        emptyEl.style.display = 'block';
+        emptyEl.innerHTML = points.length === 0
+          ? `Not enough ${disc} workouts in this range to show a trend.`
+          : `Need at least 2 workouts to show a trend.`;
+      }
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    // Trend direction: linear regression slope
+    const xs = points.map((p, i) => i);
+    const ys = points.map(p => p.value);
+    const n = xs.length;
+    const sumX = xs.reduce((a, b) => a + b, 0);
+    const sumY = ys.reduce((a, b) => a + b, 0);
+    const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+    const sumXX = xs.reduce((s, x) => s + x * x, 0);
+    const slope = (n * sumXY - sumX * sumY) / Math.max(1, (n * sumXX - sumX * sumX));
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Avg of first half vs second half — for trend percent
+    const half = Math.floor(points.length / 2);
+    const firstHalfAvg = ys.slice(0, half).reduce((a, b) => a + b, 0) / Math.max(1, half);
+    const secondHalfAvg = ys.slice(half).reduce((a, b) => a + b, 0) / Math.max(1, ys.slice(half).length);
+    const change = secondHalfAvg - firstHalfAvg;
+    const pctChange = firstHalfAvg ? (change / firstHalfAvg) * 100 : 0;
+
+    // For pace + avg HR, lower is better. For duration, higher is better.
+    const lowerIsBetter = metric === 'pace' || metric === 'avgHr';
+    const trendingBetter = lowerIsBetter ? change < 0 : change > 0;
+    const trendingFlat = Math.abs(pctChange) < 2;
+
+    // Format value for display
+    const fmtValue = v => {
+      if (metric === 'pace') {
+        const m = Math.floor(v); const s = Math.round((v - m) * 60);
+        return `${m}:${String(s).padStart(2,'0')}/km`;
+      }
+      if (metric === 'duration') {
+        const h = Math.floor(v / 60); const m = Math.round(v % 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+      }
+      if (metric === 'avgHr') return `${Math.round(v)} bpm`;
+      return v;
+    };
+    const metricLabel = metric === 'pace' ? 'Pace' : metric === 'duration' ? 'Duration' : 'Avg HR';
+
+    // Callout: trend summary
+    if (calloutEl) {
+      calloutEl.style.display = 'block';
+      let icon, color, headline;
+      if (trendingFlat) {
+        icon = '↔'; color = 'var(--text-soft)'; headline = 'Holding steady';
+      } else if (trendingBetter) {
+        icon = lowerIsBetter ? '▼' : '▲';
+        color = 'var(--primary)';
+        headline = metric === 'pace' ? 'Getting faster' : metric === 'duration' ? 'Going longer' : 'HR dropping (fitter)';
+      } else {
+        icon = lowerIsBetter ? '▲' : '▼';
+        color = 'var(--secondary)';
+        headline = metric === 'pace' ? 'Slowing down' : metric === 'duration' ? 'Sessions shorter' : 'HR climbing';
+      }
+      calloutEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px; color:${color}; font-weight:800;">${icon}</span>
+          <strong>${headline}</strong>
+          <span style="color:var(--text-soft); margin-left:auto;">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">${metricLabel} avg early in window: <strong>${fmtValue(firstHalfAvg)}</strong> · later: <strong>${fmtValue(secondHalfAvg)}</strong></div>`;
+    }
+
+    // Render scatter + trend line chart
+    const w = 320, h = 160;
+    const padL = 38, padR = 8, padT = 10, padB = 22;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    const minV = Math.min(...ys);
+    const maxV = Math.max(...ys);
+    // Pad the y range
+    const pad = (maxV - minV) * 0.15 || (Math.abs(minV) * 0.1 || 1);
+    const yMin = minV - pad;
+    const yMax = maxV + pad;
+    const yRange = yMax - yMin;
+
+    const t0 = points[0].date.getTime();
+    const tN = points[points.length - 1].date.getTime();
+    const tRange = Math.max(1, tN - t0);
+
+    // For pace + avgHr, invert y so "better" is up
+    const yPos = v => {
+      const ratio = (v - yMin) / yRange;
+      const r = lowerIsBetter ? ratio : (1 - ratio);
+      return padT + r * chartH;
+    };
+    const xPos = d => padL + ((d.getTime() - t0) / tRange) * chartW;
+
+    // Y-axis ticks (3 levels)
+    const yTicks = [yMin + yRange * 0.1, yMin + yRange * 0.5, yMax - yRange * 0.1];
+    const yTickLines = yTicks.map(v => `
+      <line x1="${padL}" y1="${yPos(v).toFixed(1)}" x2="${padL + chartW}" y2="${yPos(v).toFixed(1)}" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+      <text x="${padL - 4}" y="${(yPos(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-soft)" font-weight="600">${fmtValue(v)}</text>
+    `).join('');
+
+    // X-axis ticks (start, mid, end)
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmtDate = d => `${months[d.getMonth()]} ${d.getDate()}`;
+    const xTickLabels = `
+      <text x="${padL}" y="${(padT + chartH + 14).toFixed(1)}" text-anchor="start" font-size="9" fill="var(--text-soft)" font-weight="600">${fmtDate(points[0].date)}</text>
+      <text x="${(padL + chartW).toFixed(1)}" y="${(padT + chartH + 14).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-soft)" font-weight="600">${fmtDate(points[points.length - 1].date)}</text>
+    `;
+
+    // Trend line
+    const trendY1 = intercept;
+    const trendYN = intercept + slope * (n - 1);
+    const trendLine = `<line x1="${xPos(points[0].date)}" y1="${yPos(trendY1).toFixed(1)}" x2="${xPos(points[points.length - 1].date)}" y2="${yPos(trendYN).toFixed(1)}" stroke="${trendingBetter ? 'var(--primary)' : trendingFlat ? '#888' : 'var(--secondary)'}" stroke-width="2" stroke-dasharray="4,3" opacity="0.85"/>`;
+
+    // Scatter dots
+    const dots = points.map(p => `<circle cx="${xPos(p.date).toFixed(1)}" cy="${yPos(p.value).toFixed(1)}" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" data-id="${p.activity.id}"/>`).join('');
+
+    chartEl.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:160px; display:block;" preserveAspectRatio="xMidYMid meet">
+      ${yTickLines}
+      ${trendLine}
+      ${dots}
+      ${xTickLabels}
+    </svg>
+    <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px; text-align: center;">${points.length} workouts · ${lowerIsBetter ? 'lower is better' : 'higher is better'}</div>`;
+  }
+
   // Drill-down state — { kind: 'bucket' | 'discipline', idx | id }
   let _perfDrill = null;
   let _perfBucketCache = null; // populated by renderPerformanceTab; used by selectPerfBucket
@@ -7799,6 +8083,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           ${rows}`;
       }
     }
+
+    // Progress trends (pace / duration / HR over time)
+    renderProgressTrends();
 
     // Drill-down panel
     renderPerfDrillCard(acts);
@@ -8103,13 +8390,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     loadCachedStravaActivities();
     if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderAll();
-    // If connected and last sync was >30 min ago (or never), refresh in background
+    // Always background-sync from Strava on app load — but throttle to once per 60 seconds
+    // so a quick reload doesn't double-fetch and burn the API rate limit.
     const cfg = getStravaConfig();
     if (cfg && cfg.accessToken) {
       const lastSync = planState.stravaSyncedAt || 0;
-      const stale = (Date.now() - lastSync) > 30 * 60 * 1000;
-      if (stale) {
-        syncStravaActivities(30).then(() => {
+      const fresh = (Date.now() - lastSync) < 60 * 1000;
+      if (!fresh) {
+        syncStravaActivities(getDesiredSyncDays()).then(() => {
           if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
           renderAll();
         }).catch(e => console.warn('Background Strava sync failed:', e.message));
