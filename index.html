@@ -1489,11 +1489,10 @@
             <input type="text" id="courseNotes" placeholder="e.g. river current, technical descents, prairie wind">
           </div>
 
-          <!-- Phase 3 stub: live API auto-detect -->
-          <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border:1px dashed var(--border); border-radius:10px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Coming soon</div>
-            <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">
-              <strong>Auto-detect course from race website</strong> — paste a race URL and we'll pull elevation, distance, and weather data. Requires Athlinks/Strava API keys (not yet connected).
+          <!-- Strava auto-detect (only shows if connected) -->
+          <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border-radius:10px;">
+            <div style="font-size:12px; font-weight:600; color:var(--text-soft); line-height:1.5;">
+              💡 <strong>Tip:</strong> After onboarding, connect Strava in Profile to auto-detect course data from any Strava URL.
             </div>
           </div>
         </div>
@@ -2298,8 +2297,50 @@
         <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 14px;">Apple Health pulls in your workouts, sleep, and HR. Most other devices feed into Apple Health automatically — that's why we start there.</div>
         <div id="integrationsList"></div>
         <div style="margin-top: 14px; padding: 10px 12px; background: var(--bg); border-radius: 8px; font-size: 12px; color: var(--text-soft); line-height: 1.5;">
-          <strong style="color: var(--text);">Coming later:</strong> Garmin Connect, Strava, Oura, Whoop, TrainingPeaks (direct integrations). For now, anything that syncs to Apple Health on your phone (Apple Watch, Oura, Garmin, Whoop, Zwift) is already covered.
+          <strong style="color: var(--text);">Coming later:</strong> Garmin Connect, Oura, Whoop, TrainingPeaks (direct integrations). For now, anything that syncs to Apple Health on your phone (Apple Watch, Oura, Garmin, Whoop, Zwift) is already covered.
         </div>
+      </div>
+
+      <!-- STRAVA CONNECTION -->
+      <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Strava connection</span>
+          <span id="stravaStatusPill" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg); color:var(--text-soft);">Not connected</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 12px; line-height: 1.5;">
+          Lets the Course Intel feature pull elevation + course data from any Strava activity or segment URL. Your credentials live only in this browser — never in the source code.
+        </div>
+        <div id="stravaConnected" style="display:none;">
+          <div style="font-size:13px; padding:10px 12px; background:var(--primary-soft); border-radius:8px; margin-bottom:10px;">
+            ✅ Connected as <strong id="stravaAthleteName">—</strong>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test connection</button>
+            <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
+            <button class="btn btn-ghost btn-sm" onclick="disconnectStrava()" style="flex:1; color:var(--warn); border-color:var(--warn);">Disconnect</button>
+          </div>
+        </div>
+        <div id="stravaDisconnected">
+          <div class="field" style="margin-bottom:8px;">
+            <label style="font-size:12px;">Client ID</label>
+            <input type="text" id="stravaClientId" placeholder="123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label style="font-size:12px;">Client Secret</label>
+            <input type="password" id="stravaClientSecret" placeholder="paste secret" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label style="font-size:12px;">Access Token</label>
+            <input type="password" id="stravaAccessToken" placeholder="paste access token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+          </div>
+          <div class="field" style="margin-bottom:10px;">
+            <label style="font-size:12px;">Refresh Token</label>
+            <input type="password" id="stravaRefreshToken" placeholder="paste refresh token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+          </div>
+          <button class="btn btn-primary btn-full btn-sm" onclick="saveStravaConfig()">Connect Strava</button>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get these at <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>.</div>
+        </div>
+        <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
       </div>
 
       <div id="analyticsCollapsed" style="text-align: right; padding: 4px 0; margin-bottom: 4px;">
@@ -2574,11 +2615,14 @@
         <input type="text" id="cieNotes" placeholder="e.g. river current, technical descents">
       </div>
 
-      <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border:1px dashed var(--border); border-radius:10px; margin-bottom:14px;">
-        <div style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Coming soon</div>
-        <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">
-          <strong>Auto-detect from race URL</strong> — paste your race website link and we'll fetch elevation, distance, and weather. Requires Athlinks/Strava API setup.
+      <div style="margin-top:10px; padding:12px; background:var(--primary-soft); border-radius:10px; margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:700; color:var(--primary-dark); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">⚡ Auto-detect from Strava</div>
+        <div style="font-size:12px; color:var(--text-soft); line-height:1.5; margin-bottom:8px;">
+          Paste a Strava activity or segment URL. We'll fetch elevation + distance and auto-set terrain/altitude.
         </div>
+        <input type="text" id="cieStravaUrl" placeholder="https://www.strava.com/segments/12345" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
+        <button class="btn btn-primary btn-sm btn-full" onclick="autoDetectFromStravaUrl()">Fetch course data</button>
+        <div id="cieStravaMsg" style="margin-top:8px; font-size:12px; line-height:1.5;"></div>
       </div>
 
       <div style="display: flex; gap: 8px; margin-top: 16px;">
@@ -3153,7 +3197,7 @@
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); }
   }
   function goBack() {
     if (screenHistory.length === 0) return;
@@ -5914,6 +5958,213 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       onboardingComplete: accounts[username].data?.onboardingComplete || false
     };
     saveAccounts(accounts);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // STRAVA INTEGRATION — credentials live in localStorage only, never in source
+  // ──────────────────────────────────────────────────────────────────────
+  function getStravaConfig() {
+    try { return JSON.parse(localStorage.getItem('strava-config') || 'null'); }
+    catch (e) { return null; }
+  }
+  function setStravaConfig(cfg) {
+    if (cfg) localStorage.setItem('strava-config', JSON.stringify(cfg));
+    else localStorage.removeItem('strava-config');
+    renderStravaUI();
+  }
+  function renderStravaUI() {
+    const cfg = getStravaConfig();
+    const connected = !!(cfg && cfg.accessToken);
+    const conn = document.getElementById('stravaConnected');
+    const disc = document.getElementById('stravaDisconnected');
+    const pill = document.getElementById('stravaStatusPill');
+    const nameEl = document.getElementById('stravaAthleteName');
+    if (conn) conn.style.display = connected ? 'block' : 'none';
+    if (disc) disc.style.display = connected ? 'none' : 'block';
+    if (pill) {
+      pill.textContent = connected ? 'Connected' : 'Not connected';
+      pill.style.background = connected ? 'var(--primary-soft)' : 'var(--bg)';
+      pill.style.color = connected ? 'var(--primary-dark)' : 'var(--text-soft)';
+    }
+    if (nameEl && cfg && cfg.athleteName) nameEl.textContent = cfg.athleteName;
+  }
+  function setStravaMsg(text, kind) {
+    const el = document.getElementById('stravaMsg');
+    if (!el) return;
+    if (!text) { el.innerHTML = ''; return; }
+    const colors = { ok: 'var(--primary-dark)', err: 'var(--warn)', info: 'var(--text-soft)' };
+    el.style.color = colors[kind] || 'var(--text-soft)';
+    el.textContent = text;
+  }
+  async function saveStravaConfig() {
+    const clientId = document.getElementById('stravaClientId').value.trim();
+    const clientSecret = document.getElementById('stravaClientSecret').value.trim();
+    const accessToken = document.getElementById('stravaAccessToken').value.trim();
+    const refreshToken = document.getElementById('stravaRefreshToken').value.trim();
+    if (!clientId || !accessToken) {
+      setStravaMsg('Client ID and Access Token are required.', 'err');
+      return;
+    }
+    setStravaMsg('Testing connection…', 'info');
+    const cfg = { clientId, clientSecret, accessToken, refreshToken, athleteName: '', expiresAt: 0 };
+    try {
+      const res = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          setStravaMsg('Access token rejected. Token expires every ~6 hours — grab a fresh one from strava.com/settings/api.', 'err');
+        } else {
+          setStravaMsg(`Strava returned ${res.status}. Double-check your credentials.`, 'err');
+        }
+        return;
+      }
+      const athlete = await res.json();
+      cfg.athleteName = `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim() || athlete.username || 'Strava user';
+      setStravaConfig(cfg);
+      setStravaMsg(`✅ Connected as ${cfg.athleteName}.`, 'ok');
+      // Clear inputs after save so the secrets aren't visible
+      ['stravaClientId','stravaClientSecret','stravaAccessToken','stravaRefreshToken'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      if (typeof trackEvent === 'function') trackEvent('strava_connected');
+    } catch (err) {
+      setStravaMsg(`Network error: ${err.message}. Check your internet connection.`, 'err');
+    }
+  }
+  async function testStravaConnection() {
+    const cfg = getStravaConfig();
+    if (!cfg) { setStravaMsg('Not connected.', 'err'); return; }
+    setStravaMsg('Testing…', 'info');
+    try {
+      const res = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: { 'Authorization': 'Bearer ' + cfg.accessToken }
+      });
+      if (res.status === 401) {
+        setStravaMsg('Access token expired. Click "Refresh token" to get a new one.', 'err');
+      } else if (!res.ok) {
+        setStravaMsg(`Strava returned ${res.status}.`, 'err');
+      } else {
+        const a = await res.json();
+        setStravaMsg(`✅ Working. Athlete: ${a.firstname} ${a.lastname}.`, 'ok');
+      }
+    } catch (e) { setStravaMsg(`Network error: ${e.message}`, 'err'); }
+  }
+  // Refreshes the access token using the refresh token + client credentials.
+  // NOTE: This sends the Client Secret from the browser. Acceptable for a single-user
+  // prototype; for multi-user/production this MUST move to a backend.
+  async function refreshStravaToken() {
+    const cfg = getStravaConfig();
+    if (!cfg || !cfg.refreshToken || !cfg.clientId || !cfg.clientSecret) {
+      setStravaMsg('Need Client ID + Secret + Refresh Token to refresh. Re-enter all four.', 'err');
+      return;
+    }
+    setStravaMsg('Refreshing…', 'info');
+    try {
+      const params = new URLSearchParams({
+        client_id: cfg.clientId,
+        client_secret: cfg.clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: cfg.refreshToken
+      });
+      const res = await fetch('https://www.strava.com/api/v3/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+      if (!res.ok) {
+        setStravaMsg(`Refresh failed (${res.status}). You may need to re-enter credentials.`, 'err');
+        return;
+      }
+      const j = await res.json();
+      cfg.accessToken = j.access_token;
+      cfg.refreshToken = j.refresh_token || cfg.refreshToken;
+      cfg.expiresAt = j.expires_at || 0;
+      setStravaConfig(cfg);
+      setStravaMsg(`✅ Token refreshed. Valid for ~6 hours.`, 'ok');
+    } catch (e) { setStravaMsg(`Network error: ${e.message}`, 'err'); }
+  }
+  function disconnectStrava() {
+    if (!confirm('Disconnect Strava? Your tokens will be removed from this browser.')) return;
+    setStravaConfig(null);
+    setStravaMsg('Disconnected.', 'info');
+  }
+  // Pull elevation + distance from a Strava activity or segment URL.
+  // Auto-refreshes once if access token is expired.
+  async function fetchStravaCourseData(url, isRetry) {
+    const cfg = getStravaConfig();
+    if (!cfg) throw new Error('Strava not connected. Add credentials in Profile.');
+    // Detect URL type — segments and activities both work
+    const segMatch = url.match(/strava\.com\/segments\/(\d+)/);
+    const actMatch = url.match(/strava\.com\/activities\/(\d+)/);
+    let endpoint, label;
+    if (segMatch) { endpoint = `https://www.strava.com/api/v3/segments/${segMatch[1]}`; label = 'segment'; }
+    else if (actMatch) { endpoint = `https://www.strava.com/api/v3/activities/${actMatch[1]}`; label = 'activity'; }
+    else throw new Error('URL must be a Strava segment or activity link, e.g. https://www.strava.com/segments/123456');
+    const res = await fetch(endpoint, { headers: { 'Authorization': 'Bearer ' + cfg.accessToken } });
+    if (res.status === 401 && !isRetry && cfg.refreshToken && cfg.clientSecret) {
+      // Try one auto-refresh
+      await refreshStravaToken();
+      return fetchStravaCourseData(url, true);
+    }
+    if (res.status === 404) throw new Error(`${label} not found or private. Make sure the URL is public.`);
+    if (!res.ok) throw new Error(`Strava returned ${res.status}.`);
+    const data = await res.json();
+    // Normalize fields across segments + activities
+    const distance_m = data.distance || 0;
+    const elevation_gain_m = data.total_elevation_gain || 0;
+    const distance_km = distance_m / 1000;
+    const gain_per_km = distance_km > 0 ? elevation_gain_m / distance_km : 0;
+    return {
+      kind: label,
+      name: data.name || '',
+      distance_km,
+      elevation_gain_m,
+      gain_per_km,
+      max_elevation_m: data.elevation_high || null,
+      min_elevation_m: data.elevation_low || null
+    };
+  }
+  // Map Strava elevation data to course attributes
+  function inferCourseAttrsFromStrava(stravaData) {
+    const g = stravaData.gain_per_km;
+    let terrain;
+    if (g < 5) terrain = 'flat';
+    else if (g < 15) terrain = 'rolling';
+    else if (g < 30) terrain = 'hilly';
+    else terrain = 'mountainous';
+    let altitude = 'sea';
+    if (stravaData.max_elevation_m && stravaData.max_elevation_m > 2000) altitude = 'high';
+    else if (stravaData.max_elevation_m && stravaData.max_elevation_m > 600) altitude = 'moderate';
+    return { terrain, altitude };
+  }
+  async function autoDetectFromStravaUrl() {
+    const urlEl = document.getElementById('cieStravaUrl');
+    const msg = document.getElementById('cieStravaMsg');
+    if (!urlEl || !msg) return;
+    const url = urlEl.value.trim();
+    if (!url) { msg.textContent = 'Paste a Strava URL first.'; msg.style.color = 'var(--warn)'; return; }
+    if (!getStravaConfig()) {
+      msg.innerHTML = 'Strava not connected. <a onclick="closeCourseIntelEditor(); showScreen(\'profile\');" style="color:var(--primary); cursor:pointer; text-decoration:underline;">Connect in Profile →</a>';
+      msg.style.color = 'var(--warn)';
+      return;
+    }
+    msg.textContent = 'Fetching from Strava…';
+    msg.style.color = 'var(--text-soft)';
+    try {
+      const data = await fetchStravaCourseData(url);
+      const attrs = inferCourseAttrsFromStrava(data);
+      setActiveChipVal('cieTerrainChips', attrs.terrain);
+      setActiveChipVal('cieAltitudeChips', attrs.altitude);
+      const km = data.distance_km.toFixed(1);
+      const ft = Math.round(data.elevation_gain_m * 3.28084);
+      msg.innerHTML = `✅ ${escapeHtml(data.name)} · ${km} km · ${ft} ft elevation gain → terrain set to <strong>${attrs.terrain}</strong>${attrs.altitude !== 'sea' ? ', altitude to <strong>' + attrs.altitude + '</strong>' : ''}.`;
+      msg.style.color = 'var(--primary-dark)';
+      if (typeof trackEvent === 'function') trackEvent('strava_course_imported', { terrain: attrs.terrain, distance_km: km });
+    } catch (e) {
+      msg.textContent = 'Error: ' + e.message;
+      msg.style.color = 'var(--warn)';
+    }
   }
 
   function markOnboardingComplete() {
