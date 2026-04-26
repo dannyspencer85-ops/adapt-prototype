@@ -1422,7 +1422,7 @@
 
         <!-- Phase 1: Curated race picker -->
         <div class="field">
-          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;">(optional — for course-specific training)</span></label>
+          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;" id="racePickerLabel">(optional — for course-specific training)</span></label>
           <select id="racePickerSelect" onchange="onPickCuratedRace()">
             <option value="">— I'll add details manually —</option>
           </select>
@@ -1970,111 +1970,29 @@
         </div>
       </div>
 
-      <div class="card">
+      <!-- 7-day summary — populated from Strava when available -->
+      <div class="card" id="progress7DaySummary">
         <div class="card-title">7-day summary</div>
         <div class="data-row">
-          <div class="data-cell">
-            <div class="label">Total</div>
-            <div class="value">4h 12m</div>
-          </div>
-          <div class="data-cell">
-            <div class="label">Sessions</div>
-            <div class="value">3 / 3</div>
-          </div>
-          <div class="data-cell">
-            <div class="label">Avg RPE</div>
-            <div class="value">6.3</div>
-          </div>
+          <div class="data-cell"><div class="label">Total</div><div class="value">—</div></div>
+          <div class="data-cell"><div class="label">Sessions</div><div class="value">—</div></div>
+          <div class="data-cell"><div class="label">Avg RPE</div><div class="value">—</div></div>
         </div>
       </div>
 
-      <div class="card">
+      <!-- Training load 14-day bars — populated from Strava -->
+      <div class="card" id="progressLoadCard">
         <div class="card-title">Training load · last 14 days</div>
-        <div class="bar-row">
-          <div class="bar done" style="height: 30%;"></div>
-          <div class="bar done" style="height: 65%;"></div>
-          <div class="bar" style="height: 10%;"></div>
-          <div class="bar done" style="height: 45%;"></div>
-          <div class="bar done" style="height: 80%;"></div>
-          <div class="bar" style="height: 10%;"></div>
-          <div class="bar done" style="height: 40%;"></div>
-          <div class="bar done" style="height: 50%;"></div>
-          <div class="bar" style="height: 10%;"></div>
-          <div class="bar done" style="height: 35%;"></div>
-          <div class="bar done" style="height: 75%;"></div>
-          <div class="bar done" style="height: 55%;"></div>
-          <div class="bar today" style="height: 40%;"></div>
-          <div class="bar" style="height: 10%; opacity: 0.4;"></div>
-        </div>
+        <div class="bar-row" id="progressLoadBars"></div>
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-top: 6px; font-weight: 600;">
           <span>2 weeks ago</span>
           <span>Today</span>
         </div>
-        <div style="margin-top: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;">
-          <strong style="color: var(--text);">Load trend: healthy build.</strong> Your recent training is ramping up gradually — enough to build fitness, not so fast that injury risk climbs.
-        </div>
+        <div id="progressLoadCommentary" style="margin-top: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"></div>
       </div>
 
       <div class="section-label">Recent sessions</div>
-
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <div style="padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="openSessionReport('sat_apr26')">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">Long brick ›</div>
-              <div style="color: var(--text-soft); font-size: 12px;">Sat · Apr 26</div>
-            </div>
-            <div style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">RPE 7</div>
-          </div>
-          <div class="data-row" style="margin-top: 12px;">
-            <div class="data-cell">
-              <div class="label">Duration</div>
-              <div class="value">2h 28m</div>
-            </div>
-            <div class="data-cell">
-              <div class="label">Avg HR</div>
-              <div class="value">142</div>
-            </div>
-            <div class="data-cell">
-              <div class="label">Max HR</div>
-              <div class="value">168</div>
-            </div>
-          </div>
-        </div>
-        <div style="padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="openSessionReport('sun_apr27')">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">Long easy run ›</div>
-              <div style="color: var(--text-soft); font-size: 12px;">Sun · Apr 27</div>
-            </div>
-            <div style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">RPE 5</div>
-          </div>
-          <div class="data-row" style="margin-top: 12px;">
-            <div class="data-cell">
-              <div class="label">Duration</div>
-              <div class="value">1h 18m</div>
-            </div>
-            <div class="data-cell">
-              <div class="label">Avg pace</div>
-              <div class="value">9:45</div>
-            </div>
-            <div class="data-cell">
-              <div class="label">Avg HR</div>
-              <div class="value">136</div>
-            </div>
-          </div>
-        </div>
-        <div style="padding: 14px 16px; cursor: pointer;" onclick="openSessionReport('mon_apr28')">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">Rest day ›</div>
-              <div style="color: var(--text-soft); font-size: 12px;">Mon · Apr 28</div>
-            </div>
-            <div style="color: var(--text-soft); font-size: 11px; font-weight: 700;">Recovery</div>
-          </div>
-          <div style="margin-top: 8px; font-size: 13px; color: var(--text-soft);">Morning HR 45 · Sleep 7:48</div>
-        </div>
-      </div>
+      <div class="card" id="progressRecentSessions" style="padding: 0; overflow: hidden;"></div>
 
       <div class="card" style="margin-top: 14px;">
         <div class="card-title">Trends</div>
@@ -2311,6 +2229,7 @@
             <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">↻ Sync recent activities</button>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
           <div style="display:flex; gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
             <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
@@ -2334,8 +2253,9 @@
             <label style="font-size:12px;">Refresh Token</label>
             <input type="password" id="stravaRefreshToken" placeholder="paste refresh token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
           </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="saveStravaConfig()">Connect Strava</button>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get these at <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>.</div>
+          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom: 8px;">Authorize via Strava (recommended)</button>
+          <button class="btn btn-ghost btn-full btn-sm" onclick="saveStravaConfig()">Save tokens manually</button>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.5;">Need Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>. "Authorize via Strava" handles the rest — no token copying needed.</div>
         </div>
         <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
       </div>
@@ -2842,7 +2762,7 @@
     const target = n === 0 ? 'welcome' : n === 6 ? 'building' : String(n);
     document.getElementById('onb-' + target).style.display = 'block';
     if (n === 4) populateDisciplineChips();
-    if (n === 3) updateTriFocusVisibility();
+    if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
   }
 
   // ── Integrations (Apple Health only for v1) ──
@@ -3235,13 +3155,25 @@
   function refreshRacePicker() {
     const eventName = document.getElementById('eventSelect')?.value || '';
     const sel = document.getElementById('racePickerSelect');
+    const fieldLabel = document.getElementById('racePickerLabel');
     if (!sel) return;
+    const isGeneralFitness = /general fitness/i.test(eventName);
     const matches = filterRacesByEvent(eventName);
     const current = sel.value;
     sel.innerHTML = '<option value="">— I\'ll add details manually —</option>' +
       matches.map(r => `<option value="${r.id}">${r.name} · ${r.location}</option>`).join('');
     // Restore selection if still valid
     if (matches.some(r => r.id === current)) sel.value = current;
+    // Update the label hint count
+    if (fieldLabel) {
+      if (isGeneralFitness) {
+        fieldLabel.textContent = '(no event — skip this)';
+      } else if (matches.length === 0) {
+        fieldLabel.textContent = '(no popular races match — add details manually)';
+      } else {
+        fieldLabel.textContent = `(${matches.length} popular races available — or add manually)`;
+      }
+    }
     // Re-render summary if a race is currently picked
     onPickCuratedRace();
   }
@@ -3513,58 +3445,325 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   //   notes:   short string highlighting course quirks
   // ──────────────────────────────────────────────────────────────────────
   const RACE_DATABASE = [
-    // Triathlon
-    { id: 'kona', name: 'Ironman World Championship', location: 'Kona, HI', event: 'Full Ironman', month: 'Oct',
+    // ───── FULL IRONMAN (140.6) ─────
+    { id: 'im-kona', name: 'Ironman World Championship', location: 'Kona, HI', event: 'Full Ironman', month: 'Oct',
       terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
       notes: 'Brutal heat + humidity, ocean chop, Queen K crosswinds, lava-field radiant heat on the run.' },
-    { id: 'lake-placid', name: 'Ironman Lake Placid', location: 'Lake Placid, NY', event: 'Full Ironman', month: 'Jul',
+    { id: 'im-nice', name: 'Ironman World Championship (Nice)', location: 'Nice, France', event: 'Full Ironman', month: 'Sep',
+      terrain: 'mountainous', surface: 'road', swim: 'ocean', climate: 'temperate', altitude: 'moderate',
+      notes: 'Massive climbing on the bike (Côte d\'Azur backcountry), warm Med swim, flat coastal run.' },
+    { id: 'im-lake-placid', name: 'Ironman Lake Placid', location: 'Lake Placid, NY', event: 'Full Ironman', month: 'Jul',
       terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
       notes: 'Two big climbs per bike loop, calm freshwater swim, hilly run.' },
-    { id: 'oceanside', name: 'Ironman 70.3 Oceanside', location: 'Oceanside, CA', event: 'Half Ironman', month: 'Apr',
-      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
-      notes: 'Cold ocean swim (often wetsuit-legal), rolling Camp Pendleton bike, flat run.' },
-    { id: '703-worlds', name: 'Ironman 70.3 World Championship', location: 'Varies', event: 'Half Ironman', month: 'Sep',
+    { id: 'im-wisconsin', name: 'Ironman Wisconsin', location: 'Madison, WI', event: 'Full Ironman', month: 'Sep',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Famously hilly bike (the "Three Bitches"), lake swim, two-loop run through downtown.' },
+    { id: 'im-florida', name: 'Ironman Florida', location: 'Panama City Beach, FL', event: 'Full Ironman', month: 'Nov',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'temperate', altitude: 'sea',
+      notes: 'Pancake flat — PR course. Gulf swim can be choppy. Wind is the wildcard.' },
+    { id: 'im-texas', name: 'Ironman Texas', location: 'The Woodlands, TX', event: 'Full Ironman', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Flat and fast, but Texas humidity bites. Heat acclimatization critical.' },
+    { id: 'im-coeur-dalene', name: 'Ironman Coeur d\'Alene', location: 'Coeur d\'Alene, ID', event: 'Full Ironman', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Beautiful mountain lake swim, hilly bike with stunning views, two-loop run.' },
+    { id: 'im-arizona', name: 'Ironman Arizona', location: 'Tempe, AZ', event: 'Full Ironman', month: 'Nov',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat fast course, three-loop bike, three-loop run. November = mild desert temps.' },
+    { id: 'im-maryland', name: 'Ironman Maryland', location: 'Cambridge, MD', event: 'Full Ironman', month: 'Sep',
+      terrain: 'flat', surface: 'road', swim: 'river', climate: 'temperate', altitude: 'sea',
+      notes: 'Pancake flat. Choptank River swim can have current. Eastern Shore heat possible.' },
+    { id: 'im-cozumel', name: 'Ironman Cozumel', location: 'Cozumel, Mexico', event: 'Full Ironman', month: 'Nov',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Flat and fast but tropical heat + humidity. Strong currents on the swim.' },
+    { id: 'im-mont-tremblant', name: 'Ironman Mont-Tremblant', location: 'Mont-Tremblant, Canada', event: 'Full Ironman', month: 'Aug',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Scenic Laurentians, hilly bike, calm freshwater swim, rolling run.' },
+    { id: 'im-australia', name: 'Ironman Western Australia', location: 'Busselton, Australia', event: 'Full Ironman', month: 'Dec',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'temperate', altitude: 'sea',
+      notes: 'World\'s flattest IM course. Long jetty swim. Wind can be tough.' },
+    { id: 'im-nz', name: 'Ironman New Zealand', location: 'Taupō, NZ', event: 'Full Ironman', month: 'Mar',
+      terrain: 'rolling', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Lake Taupō swim, rolling lakeside bike, flat run along the lake.' },
+    { id: 'im-cairns', name: 'Ironman Cairns', location: 'Cairns, Australia', event: 'Full Ironman', month: 'Jun',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Tropical reef swim, beautiful coastal bike, can be hot + humid.' },
+    { id: 'im-frankfurt', name: 'Ironman Frankfurt (European Champs)', location: 'Frankfurt, Germany', event: 'Full Ironman', month: 'Jun',
+      terrain: 'rolling', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Rolling bike through Taunus hills, technical urban run finish at Römerberg.' },
+    { id: 'im-hamburg', name: 'Ironman Hamburg', location: 'Hamburg, Germany', event: 'Full Ironman', month: 'Jun',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat fast course, Alster lake swim, big city run.' },
+
+    // ───── HALF IRONMAN (70.3) ─────
+    { id: 'im703-worlds', name: 'Ironman 70.3 World Championship', location: 'Varies', event: 'Half Ironman', month: 'Sep',
       terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'variable', altitude: 'moderate',
       notes: 'Course rotates each year — hilly is the safe assumption.' },
-    { id: 'nyc-tri', name: 'New York City Triathlon', location: 'New York, NY', event: 'Olympic Triathlon', month: 'Jul',
+    { id: 'im703-oceanside', name: 'Ironman 70.3 Oceanside', location: 'Oceanside, CA', event: 'Half Ironman', month: 'Apr',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
+      notes: 'Cold ocean swim (often wetsuit-legal), rolling Camp Pendleton bike, flat run.' },
+    { id: 'im703-st-george', name: 'Ironman 70.3 St. George', location: 'St. George, UT', event: 'Half Ironman', month: 'May',
+      terrain: 'mountainous', surface: 'road', swim: 'lake', climate: 'hot', altitude: 'moderate',
+      notes: 'One of the hardest 70.3s — climbs on bike + run, can be very hot.' },
+    { id: 'im703-eagleman', name: 'Ironman 70.3 Eagleman', location: 'Cambridge, MD', event: 'Half Ironman', month: 'Jun',
+      terrain: 'flat', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Pancake flat + fast. Notorious for heat + humidity.' },
+    { id: 'im703-boulder', name: 'Ironman 70.3 Boulder', location: 'Boulder, CO', event: 'Half Ironman', month: 'Aug',
+      terrain: 'rolling', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'high',
+      notes: 'Reservoir swim, rolling bike, altitude (~5,400ft) + dry heat are factors.' },
+    { id: 'im703-coeur-dalene', name: 'Ironman 70.3 Coeur d\'Alene', location: 'Coeur d\'Alene, ID', event: 'Half Ironman', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Mountain lake swim, hilly scenic bike, hot June afternoons possible.' },
+    { id: 'im703-augusta', name: 'Ironman 70.3 Augusta', location: 'Augusta, GA', event: 'Half Ironman', month: 'Sep',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Savannah River downstream swim (super fast), rolling bike, flat run.' },
+    { id: 'im703-chattanooga', name: 'Ironman 70.3 Chattanooga', location: 'Chattanooga, TN', event: 'Half Ironman', month: 'May',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Tennessee River downstream swim, rolling bike, flat scenic run.' },
+    { id: 'im703-wisconsin', name: 'Ironman 70.3 Wisconsin', location: 'Madison, WI', event: 'Half Ironman', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Hilly Wisconsin countryside, lake swim, two-loop run downtown.' },
+    { id: 'im703-steelhead', name: 'Ironman 70.3 Steelhead', location: 'Benton Harbor, MI', event: 'Half Ironman', month: 'Jun',
+      terrain: 'rolling', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Lake Michigan swim (can be choppy), rolling farm-country bike, mostly flat run.' },
+    { id: 'im703-maine', name: 'Ironman 70.3 Maine', location: 'Old Orchard Beach, ME', event: 'Half Ironman', month: 'Aug',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
+      notes: 'Cold Atlantic swim, rolling coastal bike, mostly flat beach run.' },
+    { id: 'im703-mont-tremblant', name: 'Ironman 70.3 Mont-Tremblant', location: 'Mont-Tremblant, Canada', event: 'Half Ironman', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Scenic mountain venue, hilly bike, calm lake swim.' },
+    { id: 'im703-santa-cruz', name: 'Ironman 70.3 Santa Cruz', location: 'Santa Cruz, CA', event: 'Half Ironman', month: 'Sep',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
+      notes: 'Cold Pacific swim, redwood-flanked rolling bike, mostly flat run.' },
+    { id: 'im703-indian-wells', name: 'Ironman 70.3 Indian Wells La Quinta', location: 'La Quinta, CA', event: 'Half Ironman', month: 'Dec',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat desert course, mild December temps, often a season-end PR target.' },
+    { id: 'im703-texas', name: 'Ironman 70.3 Texas', location: 'Galveston, TX', event: 'Half Ironman', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat coastal course, Galveston Bay swim, wind off the Gulf often a factor.' },
+    { id: 'im703-tampa', name: 'Ironman 70.3 Florida (Tampa)', location: 'Tampa, FL', event: 'Half Ironman', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat and fast, often a great early-season race.' },
+    { id: 'im703-cozumel', name: 'Ironman 70.3 Cozumel', location: 'Cozumel, Mexico', event: 'Half Ironman', month: 'Sep',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Flat fast course, tropical heat, gorgeous reef swim with current.' },
+    { id: 'im703-pucon', name: 'Ironman 70.3 Pucón', location: 'Pucón, Chile', event: 'Half Ironman', month: 'Jan',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'moderate',
+      notes: 'Volcano-backdrop lake swim, hilly bike through Andean foothills.' },
+    { id: 'im703-cairns', name: 'Ironman 70.3 Cairns', location: 'Cairns, Australia', event: 'Half Ironman', month: 'Jun',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Tropical reef swim, scenic coastal bike.' },
+    { id: 'im703-vichy', name: 'Ironman 70.3 Vichy', location: 'Vichy, France', event: 'Half Ironman', month: 'Aug',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'temperate', altitude: 'sea',
+      notes: 'River swim, rolling Auvergne countryside, classic French town finish.' },
+    { id: 'im703-aix', name: 'Ironman 70.3 Aix-en-Provence', location: 'Aix-en-Provence, France', event: 'Half Ironman', month: 'May',
+      terrain: 'hilly', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Tough hilly bike through Provençal countryside, lake swim.' },
+
+    // ───── OLYMPIC TRIATHLON ─────
+    { id: 'oly-nyc-tri', name: 'New York City Triathlon', location: 'New York, NY', event: 'Olympic Triathlon', month: 'Jul',
       terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
       notes: 'Hudson River current-aided swim, hilly Henry Hudson bike, hot July run in Central Park.' },
-    { id: 'escape-alcatraz', name: 'Escape from Alcatraz Triathlon', location: 'San Francisco, CA', event: 'Olympic Triathlon', month: 'Jun',
+    { id: 'oly-escape-alcatraz', name: 'Escape from Alcatraz Triathlon', location: 'San Francisco, CA', event: 'Olympic Triathlon', month: 'Jun',
       terrain: 'hilly', surface: 'road', swim: 'ocean', climate: 'cool', altitude: 'sea',
       notes: 'Cold bay swim with current, very hilly bike + run including the Sand Ladder.' },
+    { id: 'oly-chicago-tri', name: 'Chicago Triathlon', location: 'Chicago, IL', event: 'Olympic Triathlon', month: 'Aug',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat lakefront course, Lake Michigan swim, fast PR-friendly.' },
+    { id: 'oly-mooloolaba', name: 'Mooloolaba Triathlon', location: 'Mooloolaba, Australia', event: 'Olympic Triathlon', month: 'Mar',
+      terrain: 'rolling', surface: 'road', swim: 'ocean', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Tropical Sunshine Coast race, ocean swim, rolling course.' },
+    { id: 'oly-london', name: 'London Triathlon', location: 'London, UK', event: 'Olympic Triathlon', month: 'Aug',
+      terrain: 'flat', surface: 'road', swim: 'river', climate: 'cool', altitude: 'sea',
+      notes: 'Royal Victoria Dock swim, flat urban course.' },
+    { id: 'oly-age-group-worlds', name: 'World Triathlon Age Group Worlds', location: 'Varies', event: 'Olympic Triathlon', month: 'Sep',
+      terrain: 'rolling', surface: 'road', swim: 'lake', climate: 'variable', altitude: 'moderate',
+      notes: 'Course changes year-to-year — research the host city specifically.' },
+    { id: 'oly-philly-tri', name: 'Philadelphia Triathlon', location: 'Philadelphia, PA', event: 'Olympic Triathlon', month: 'Jun',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Schuylkill River swim, rolling Fairmount Park bike, hot June possible.' },
+    { id: 'oly-hyvee', name: 'Hy-Vee Triathlon', location: 'Des Moines, IA', event: 'Olympic Triathlon', month: 'Sep',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat fast course, lake swim, midwest mild September weather.' },
 
-    // Running — marathons
-    { id: 'boston', name: 'Boston Marathon', location: 'Boston, MA', event: 'Marathon', month: 'Apr',
+    // ───── SPRINT TRIATHLON ─────
+    { id: 'sprint-nyc-tri', name: 'NYC Tri (Sprint)', location: 'New York, NY', event: 'Sprint Triathlon', month: 'Jul',
+      terrain: 'rolling', surface: 'road', swim: 'river', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Same Hudson swim as Olympic distance.' },
+    { id: 'sprint-chicago', name: 'Chicago Triathlon (Sprint)', location: 'Chicago, IL', event: 'Sprint Triathlon', month: 'Aug',
+      terrain: 'flat', surface: 'road', swim: 'lake', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat fast lakefront course.' },
+    { id: 'sprint-naples', name: 'Naples Sprint Triathlon', location: 'Naples, FL', event: 'Sprint Triathlon', month: 'Mar',
+      terrain: 'flat', surface: 'road', swim: 'ocean', climate: 'temperate', altitude: 'sea',
+      notes: 'Gulf swim, flat coastal course.' },
+
+    // ───── MARATHON ─────
+    { id: 'mar-boston', name: 'Boston Marathon', location: 'Boston, MA', event: 'Marathon', month: 'Apr',
       terrain: 'hilly', surface: 'road', swim: 'none', climate: 'variable', altitude: 'sea',
       notes: 'Net downhill but quad-shredding — Newton hills (incl. Heartbreak) at mile 20.' },
-    { id: 'nyc-marathon', name: 'NYC Marathon', location: 'New York, NY', event: 'Marathon', month: 'Nov',
+    { id: 'mar-nyc', name: 'NYC Marathon', location: 'New York, NY', event: 'Marathon', month: 'Nov',
       terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
       notes: 'Five borough bridges = stealth elevation. Headwind on 1st Ave a real factor.' },
-    { id: 'chicago-marathon', name: 'Chicago Marathon', location: 'Chicago, IL', event: 'Marathon', month: 'Oct',
+    { id: 'mar-chicago', name: 'Chicago Marathon', location: 'Chicago, IL', event: 'Marathon', month: 'Oct',
       terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
       notes: 'Pancake flat — PR course. Wind off the lake is the only wildcard.' },
-    { id: 'london-marathon', name: 'London Marathon', location: 'London, UK', event: 'Marathon', month: 'Apr',
+    { id: 'mar-london', name: 'London Marathon', location: 'London, UK', event: 'Marathon', month: 'Apr',
       terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
       notes: 'Mostly flat, mild April weather, fast course.' },
+    { id: 'mar-berlin', name: 'Berlin Marathon', location: 'Berlin, Germany', event: 'Marathon', month: 'Sep',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flattest of the Majors — most world records set here. Cool weather, fast PR.' },
+    { id: 'mar-tokyo', name: 'Tokyo Marathon', location: 'Tokyo, Japan', event: 'Marathon', month: 'Mar',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Mostly flat, cool March temperatures, well-supported urban course.' },
+    { id: 'mar-paris', name: 'Paris Marathon', location: 'Paris, France', event: 'Marathon', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat fast course, scenic city tour, cobblestone sections to navigate.' },
+    { id: 'mar-valencia', name: 'Valencia Marathon', location: 'Valencia, Spain', event: 'Marathon', month: 'Dec',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'One of the fastest marathons in the world. Pancake flat, ideal December weather.' },
+    { id: 'mar-frankfurt', name: 'Frankfurt Marathon', location: 'Frankfurt, Germany', event: 'Marathon', month: 'Oct',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Fast flat European classic. Festhalle finish.' },
+    { id: 'mar-marine-corps', name: 'Marine Corps Marathon', location: 'Washington, DC', event: 'Marathon', month: 'Oct',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Rolling DC monuments course, "Hill from Hell" at mile 7.' },
+    { id: 'mar-cim', name: 'California International Marathon', location: 'Sacramento, CA', event: 'Marathon', month: 'Dec',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Net downhill, fast PR/BQ course. Folsom-to-Sacramento.' },
+    { id: 'mar-grandmas', name: 'Grandma\'s Marathon', location: 'Duluth, MN', event: 'Marathon', month: 'Jun',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Mostly flat lakeside course, cool June weather. Fast.' },
+    { id: 'mar-twin-cities', name: 'Twin Cities Marathon', location: 'Minneapolis, MN', event: 'Marathon', month: 'Oct',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Beautiful river course, late hills near the finish.' },
+    { id: 'mar-houston', name: 'Houston Marathon', location: 'Houston, TX', event: 'Marathon', month: 'Jan',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat fast course, mild January weather, BQ favorite.' },
+    { id: 'mar-philly', name: 'Philadelphia Marathon', location: 'Philadelphia, PA', event: 'Marathon', month: 'Nov',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Rolling course past historic landmarks, Schuylkill out-and-back.' },
+    { id: 'mar-big-sur', name: 'Big Sur Marathon', location: 'Carmel, CA', event: 'Marathon', month: 'Apr',
+      terrain: 'hilly', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Hurricane Point climb at mile 10. Stunning coastal views — not a PR course.' },
+    { id: 'mar-la', name: 'LA Marathon', location: 'Los Angeles, CA', event: 'Marathon', month: 'Mar',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Rolling Stadium-to-the-Sea course, can be warm. Nice shaded sections in Beverly Hills.' },
 
-    // Running — trail / ultra
-    { id: 'western-states', name: 'Western States 100', location: 'Olympic Valley, CA', event: 'Ultramarathon', month: 'Jun',
+    // ───── HALF MARATHON ─────
+    { id: 'hm-nyc-half', name: 'United NYC Half Marathon', location: 'New York, NY', event: 'Half Marathon', month: 'Mar',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Central Park to Times Square to Wall Street. Some hills early.' },
+    { id: 'hm-rnr-vegas', name: 'Rock \'n\' Roll Las Vegas Half', location: 'Las Vegas, NV', event: 'Half Marathon', month: 'Nov',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Strip-at-night course, flat and fast.' },
+    { id: 'hm-philly-half', name: 'Philadelphia Half Marathon', location: 'Philadelphia, PA', event: 'Half Marathon', month: 'Sep',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Same course as marathon\'s first half.' },
+    { id: 'hm-rnr-dc', name: 'Rock \'n\' Roll DC Half', location: 'Washington, DC', event: 'Half Marathon', month: 'Mar',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Rolling DC course, the "Calvert Hill" climb.' },
+    { id: 'hm-disney-princess', name: 'Disney Princess Half Marathon', location: 'Orlando, FL', event: 'Half Marathon', month: 'Feb',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat through Disney parks, costumed runners, super fun.' },
+    { id: 'hm-brooklyn', name: 'Brooklyn Half Marathon', location: 'Brooklyn, NY', event: 'Half Marathon', month: 'May',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat fast course ending at Coney Island.' },
+    { id: 'hm-indy-mini', name: 'Indianapolis Mini-Marathon', location: 'Indianapolis, IN', event: 'Half Marathon', month: 'May',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat course including a lap at the Indy 500 Speedway.' },
+    { id: 'hm-miami', name: 'Miami Half Marathon', location: 'Miami, FL', event: 'Half Marathon', month: 'Jan',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Flat scenic Biscayne Bay course, mild January weather.' },
+    { id: 'hm-berlin-half', name: 'Berlin Half Marathon', location: 'Berlin, Germany', event: 'Half Marathon', month: 'Apr',
+      terrain: 'flat', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat fast course, ideal for PRs.' },
+
+    // ───── 10K ─────
+    { id: '10k-peachtree', name: 'AJC Peachtree Road Race 10K', location: 'Atlanta, GA', event: '10K', month: 'Jul',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'hot-humid', altitude: 'sea',
+      notes: 'World\'s largest 10K. Cardiac Hill at mile 3. July 4th heat.' },
+    { id: '10k-boilermaker', name: 'Boilermaker 15K', location: 'Utica, NY', event: '10K', month: 'Jul',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'hot-humid', altitude: 'sea',
+      notes: 'Rolling course, July heat, great post-race party.' },
+    { id: '10k-bolder-boulder', name: 'Bolder Boulder 10K', location: 'Boulder, CO', event: '10K', month: 'May',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'high',
+      notes: 'Memorial Day classic at altitude (~5,400ft). Plan for that.' },
+    { id: '10k-bay-to-breakers', name: 'Bay to Breakers 12K', location: 'San Francisco, CA', event: '10K', month: 'May',
+      terrain: 'hilly', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Iconic SF course, big Hayes Street Hill at mile 2.' },
+
+    // ───── 5K ─────
+    { id: '5k-turkey-trot', name: 'Manchester Road Race 5-Miler', location: 'Manchester, CT', event: '5K', month: 'Nov',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Thanksgiving classic. Rolling.' },
+    { id: '5k-cooper-river', name: 'Cooper River Bridge Run 10K', location: 'Charleston, SC', event: '5K', month: 'Apr',
+      terrain: 'rolling', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Big bridge climb, fun southern destination race.' },
+
+    // ───── ULTRAMARATHON ─────
+    { id: 'ultra-western-states', name: 'Western States 100', location: 'Olympic Valley, CA', event: 'Ultramarathon', month: 'Jun',
       terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'hot', altitude: 'high',
       notes: 'Massive descent, canyon heat (often 100°F+), high-altitude start. Heat training is non-negotiable.' },
-    { id: 'utmb', name: 'UTMB (Ultra-Trail du Mont-Blanc)', location: 'Chamonix, France', event: 'Ultramarathon', month: 'Aug',
+    { id: 'ultra-utmb', name: 'UTMB (Ultra-Trail du Mont-Blanc)', location: 'Chamonix, France', event: 'Ultramarathon', month: 'Aug',
       terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
       notes: '~10,000m vert. Night running, alpine cold, technical descents.' },
+    { id: 'ultra-hardrock', name: 'Hardrock 100', location: 'Silverton, CO', event: 'Ultramarathon', month: 'Jul',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: 'Average elevation >11,000ft, ~10,000m vert. Hardest US 100.' },
+    { id: 'ultra-leadville-100', name: 'Leadville Trail 100 Run', location: 'Leadville, CO', event: 'Ultramarathon', month: 'Aug',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: 'Starts at 10,200ft, peaks at 12,600ft. Altitude defines this race.' },
+    { id: 'ultra-wasatch', name: 'Wasatch Front 100', location: 'Salt Lake City, UT', event: 'Ultramarathon', month: 'Sep',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'temperate', altitude: 'high',
+      notes: '~80% trail at altitude, ~24,000ft of climb.' },
+    { id: 'ultra-jfk-50', name: 'JFK 50 Miler', location: 'Boonsboro, MD', event: 'Ultramarathon', month: 'Nov',
+      terrain: 'rolling', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Mix of Appalachian Trail, C&O Canal towpath, country roads. Not technical.' },
+    { id: 'ultra-rocky-raccoon', name: 'Rocky Raccoon 100', location: 'Huntsville, TX', event: 'Ultramarathon', month: 'Feb',
+      terrain: 'flat', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Flat-ish East Texas pine forest, root-y, often considered a fast 100.' },
+    { id: 'ultra-cocodona-250', name: 'Cocodona 250', location: 'Black Canyon City, AZ', event: 'Ultramarathon', month: 'May',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'hot', altitude: 'high',
+      notes: 'Multi-day 250-mile desert + alpine course. Heat in the canyons, cold at altitude.' },
+    { id: 'ultra-speedgoat', name: 'Speedgoat 50K', location: 'Snowbird, UT', event: 'Ultramarathon', month: 'Jul',
+      terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: 'Brutally steep ski-resort course, ~11,000ft of climb in 50K.' },
+    { id: 'ultra-comrades', name: 'Comrades Marathon (~89K)', location: 'KZN, South Africa', event: 'Ultramarathon', month: 'Jun',
+      terrain: 'hilly', surface: 'road', swim: 'none', climate: 'temperate', altitude: 'moderate',
+      notes: 'World\'s oldest ultra. Big hills (Big Five). Direction alternates yearly.' },
 
-    // Cycling — gravel / ultra
-    { id: 'unbound', name: 'Unbound Gravel 200', location: 'Emporia, KS', event: 'Gravel Race', month: 'Jun',
+    // ───── GRAVEL / CYCLING ─────
+    { id: 'gravel-unbound', name: 'Unbound Gravel 200', location: 'Emporia, KS', event: 'Gravel Race', month: 'Jun',
       terrain: 'rolling', surface: 'gravel', swim: 'none', climate: 'hot-humid', altitude: 'sea',
       notes: 'Flint Hills chunk, mud risk, prairie heat, 12+ hour day for most.' },
-    { id: 'leadville', name: 'Leadville Trail 100 MTB', location: 'Leadville, CO', event: 'Gravel Race', month: 'Aug',
+    { id: 'gravel-leadville-mtb', name: 'Leadville Trail 100 MTB', location: 'Leadville, CO', event: 'Gravel Race', month: 'Aug',
       terrain: 'mountainous', surface: 'trail', swim: 'none', climate: 'cool', altitude: 'high',
       notes: 'Starts at 10,200ft, tops 12,400ft. Altitude is the race.' },
-    { id: 'sbt-grvl', name: 'SBT GRVL', location: 'Steamboat Springs, CO', event: 'Gravel Race', month: 'Aug',
+    { id: 'gravel-sbt', name: 'SBT GRVL', location: 'Steamboat Springs, CO', event: 'Gravel Race', month: 'Aug',
       terrain: 'hilly', surface: 'gravel', swim: 'none', climate: 'temperate', altitude: 'high',
       notes: 'Climbing-heavy, dry mountain air, rolling ranch terrain.' },
+    { id: 'gravel-bwr', name: 'Belgian Waffle Ride', location: 'San Marcos, CA', event: 'Gravel Race', month: 'Apr',
+      terrain: 'hilly', surface: 'mixed', swim: 'none', climate: 'temperate', altitude: 'sea',
+      notes: 'Mix of road, dirt, MTB sections, 13,000+ ft climbing on the long course.' },
+    { id: 'gravel-mid-south', name: 'The Mid South', location: 'Stillwater, OK', event: 'Gravel Race', month: 'Mar',
+      terrain: 'rolling', surface: 'gravel', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Red dirt Oklahoma course, often muddy. March weather is unpredictable.' },
+    { id: 'gravel-rebecca', name: 'Rebecca\'s Private Idaho', location: 'Ketchum, ID', event: 'Gravel Race', month: 'Sep',
+      terrain: 'mountainous', surface: 'gravel', swim: 'none', climate: 'cool', altitude: 'high',
+      notes: 'Big climbing in the Sawtooths, dry mountain air, altitude factor.' },
+    { id: 'gravel-crusher', name: 'Crusher in the Tushar', location: 'Beaver, UT', event: 'Gravel Race', month: 'Jul',
+      terrain: 'mountainous', surface: 'mixed', swim: 'none', climate: 'temperate', altitude: 'high',
+      notes: '70 miles, 10,000ft climb, finish at Eagle Point ski resort over 10,000ft.' },
+    { id: 'gravel-steamboat', name: 'Steamboat Gravel (SBT GRVL)', location: 'Steamboat Springs, CO', event: 'Gravel Race', month: 'Aug',
+      terrain: 'hilly', surface: 'gravel', swim: 'none', climate: 'temperate', altitude: 'high',
+      notes: 'Same race as SBT GRVL, sometimes listed separately. Dry altitude climbing.' },
+    { id: 'gravel-rasputitsa', name: 'Rasputitsa Spring Classic', location: 'Burke, VT', event: 'Gravel Race', month: 'Apr',
+      terrain: 'hilly', surface: 'gravel', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Mud-season Vermont gravel, wet/cold conditions guaranteed.' },
+    { id: 'gravel-the-rift', name: 'The Rift', location: 'Hvolsvöllur, Iceland', event: 'Gravel Race', month: 'Jul',
+      terrain: 'rolling', surface: 'gravel', swim: 'none', climate: 'cool', altitude: 'sea',
+      notes: 'Volcanic gravel through Icelandic wilderness, river crossings, wind.' },
   ];
 
   // Course intel → training adjustments. Each rule produces an emphasis the engine surfaces.
@@ -3608,22 +3807,27 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function getRaceById(id) { return RACE_DATABASE.find(r => r.id === id); }
 
+  // Strict filter: when the user picks "Half Ironman", show only Half Ironman.
+  // Sort filtered results alphabetically by name.
   function filterRacesByEvent(eventName) {
-    if (!eventName) return RACE_DATABASE;
-    // Group "Triathlon" / "Ironman" / "Marathon" loosely
-    const e = eventName.toLowerCase();
-    return RACE_DATABASE.filter(r => {
+    if (!eventName) return RACE_DATABASE.slice().sort((a,b) => a.name.localeCompare(b.name));
+    const e = eventName.toLowerCase().trim();
+    const matches = RACE_DATABASE.filter(r => {
       const re = r.event.toLowerCase();
-      if (e.includes('full ironman')) return re === 'full ironman';
-      if (e.includes('half ironman') || e.includes('70.3')) return re === 'half ironman';
-      if (e.includes('olympic')) return re === 'olympic triathlon';
-      if (e.includes('sprint')) return re === 'sprint triathlon';
-      if (e.includes('marathon') && !e.includes('half')) return re === 'marathon' || re === 'ultramarathon';
-      if (e.includes('half marathon')) return re === 'half marathon' || re === 'marathon';
-      if (e.includes('ultra')) return re === 'ultramarathon';
-      if (e.includes('gravel')) return re === 'gravel race';
+      if (e === 'full ironman' || e === 'ironman') return re === 'full ironman';
+      if (e === 'half ironman' || e === '70.3' || e.includes('70.3')) return re === 'half ironman';
+      if (e === 'olympic triathlon') return re === 'olympic triathlon';
+      if (e === 'sprint triathlon') return re === 'sprint triathlon';
+      if (e === 'marathon') return re === 'marathon';
+      if (e === 'half marathon') return re === 'half marathon';
+      if (e === '10k') return re === '10k';
+      if (e === '5k') return re === '5k';
+      if (e === 'ultramarathon' || e.includes('ultra')) return re === 'ultramarathon';
+      if (e === 'gravel race' || e.includes('gravel')) return re === 'gravel race';
+      // Fallback: exact match
       return re === e;
     });
+    return matches.sort((a,b) => a.name.localeCompare(b.name));
   }
 
   const TOOLS = [
@@ -4383,9 +4587,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return 'Today is a rest day. Recovery is the workout — the body adapts between sessions, not during them. Protect sleep and take it genuinely easy.';
     }
     const parts = [];
-    const completedDays = DAYS.filter((d, i) => i < 2 && planState.sessions[d] && (planState.sessions[d].completed || planState.sessions[d].type === 'rest')).length;
-    const totalMins = DAYS.map(d => planState.sessions[d]).filter(s => s && (s.completed || DAYS.indexOf(DAYS.find(x => planState.sessions[x] === s)) < 2)).reduce((a, s) => a + (s.duration || 0), 0);
-    const loggedMins = 252;
+    // Prefer real Strava data when available; fall back to plan-state heuristic
+    let completedDays, loggedMins;
+    if (planState.stravaActivities && planState.stravaActivities.length > 0 && typeof getStravaWeekStats === 'function') {
+      const ws = getStravaWeekStats();
+      completedDays = ws.sessionCount;
+      loggedMins = ws.totalMins;
+    } else {
+      completedDays = DAYS.filter((d, i) => i < 2 && planState.sessions[d] && (planState.sessions[d].completed || planState.sessions[d].type === 'rest')).length;
+      loggedMins = 252; // demo fallback
+    }
     parts.push(`You've logged ${formatMins(loggedMins)} across ${completedDays} sessions this week.`);
     const injury = planState.injury;
     if (injury && injury.severity !== 'low') {
@@ -5624,6 +5835,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderLogSession();
     renderWeekSessions();
     renderRecentStravaSessions();
+    renderProgressTab();
     renderWeekArc();
     renderBanners();
     renderInsights();
@@ -6099,6 +6311,97 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setStravaConfig(null);
     setStravaMsg('Disconnected.', 'info');
   }
+  // Proper OAuth flow — gets a token with activity:read_all scope.
+  // The Strava API page hands out tokens with `read` scope only, which can't list activities.
+  function startStravaAuth() {
+    const cfg = getStravaConfig();
+    let clientId = (cfg && cfg.clientId) || document.getElementById('stravaClientId')?.value.trim();
+    let clientSecret = (cfg && cfg.clientSecret) || document.getElementById('stravaClientSecret')?.value.trim();
+    if (!clientId || !clientSecret) {
+      setStravaMsg('Enter Client ID and Client Secret first, then click Re-authorize.', 'err');
+      return;
+    }
+    // Save credentials before redirecting so we can complete the exchange when we come back
+    setStravaConfig({
+      clientId,
+      clientSecret,
+      accessToken: cfg ? cfg.accessToken : '',
+      refreshToken: cfg ? cfg.refreshToken : '',
+      athleteName: cfg ? cfg.athleteName : '',
+      expiresAt: 0
+    });
+    const redirect = window.location.origin + window.location.pathname;
+    const url = `https://www.strava.com/oauth/authorize`
+      + `?client_id=${encodeURIComponent(clientId)}`
+      + `&response_type=code`
+      + `&redirect_uri=${encodeURIComponent(redirect)}`
+      + `&approval_prompt=force`
+      + `&scope=read,activity:read_all,profile:read_all`;
+    window.location.href = url;
+  }
+  // Handle the redirect back from Strava — exchange auth code for tokens.
+  async function handleStravaAuthCallback(code) {
+    const cfg = getStravaConfig();
+    if (!cfg || !cfg.clientId || !cfg.clientSecret) {
+      console.warn('Strava OAuth callback: no client credentials saved.');
+      return;
+    }
+    try {
+      const params = new URLSearchParams({
+        client_id: cfg.clientId,
+        client_secret: cfg.clientSecret,
+        code,
+        grant_type: 'authorization_code'
+      });
+      const res = await fetch('https://www.strava.com/api/v3/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        setStravaMsg(`Authorization failed (${res.status}): ${body.slice(0, 120)}`, 'err');
+        return;
+      }
+      const j = await res.json();
+      cfg.accessToken = j.access_token;
+      cfg.refreshToken = j.refresh_token;
+      cfg.expiresAt = j.expires_at || 0;
+      if (j.athlete) {
+        cfg.athleteName = `${j.athlete.firstname || ''} ${j.athlete.lastname || ''}`.trim() || j.athlete.username || 'Strava user';
+      }
+      setStravaConfig(cfg);
+      setStravaMsg('✅ Authorized. Syncing activities…', 'ok');
+      // Auto-sync after successful auth
+      try {
+        const acts = await syncStravaActivities(30);
+        setStravaMsg(`✅ Authorized as ${cfg.athleteName} · synced ${acts.length} activities.`, 'ok');
+        renderAll();
+      } catch (e) {
+        setStravaMsg('Authorized, but sync failed: ' + e.message, 'err');
+      }
+    } catch (e) {
+      setStravaMsg('Authorization error: ' + e.message, 'err');
+    }
+  }
+  // Called on app boot — if URL has ?code= we just came back from Strava
+  function checkStravaOAuthCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const err = params.get('error');
+    if (err) {
+      console.warn('Strava OAuth declined:', err);
+      // Clean the URL
+      history.replaceState({}, '', window.location.origin + window.location.pathname);
+      return;
+    }
+    if (!code) return;
+    // Clean the URL immediately so a refresh doesn't re-trigger
+    history.replaceState({}, '', window.location.origin + window.location.pathname);
+    // Make sure Profile is visible so the user sees the result message
+    if (typeof showScreen === 'function') showScreen('profile');
+    handleStravaAuthCallback(code);
+  }
   // Pull elevation + distance from a Strava activity or segment URL.
   // Auto-refreshes once if access token is expired.
   async function fetchStravaCourseData(url, isRetry) {
@@ -6190,7 +6493,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       await refreshStravaToken();
       return _stravaApiCall(path, true);
     }
-    if (!res.ok) throw new Error(`Strava ${res.status}`);
+    if (res.status === 401) {
+      throw new Error('Token rejected. Click "Re-authorize Strava" to grant the right permissions.');
+    }
+    if (res.status === 403) {
+      // Try to read body for scope hint
+      let detail = '';
+      try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
+      throw new Error(`Permission denied — your token is missing activity:read_all scope. Click "Re-authorize Strava". ${detail}`);
+    }
+    if (!res.ok) {
+      let body = '';
+      try { body = await res.text(); } catch (e) {}
+      throw new Error(`Strava ${res.status}: ${body.slice(0, 100)}`);
+    }
     return res.json();
   }
   // Fetch last N days of activities and store on planState + localStorage
@@ -6236,7 +6552,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setStravaMsg('Syncing recent activities…', 'info');
     try {
       const acts = await syncStravaActivities(30);
-      setStravaMsg(`✅ Synced ${acts.length} activities from the last 30 days.`, 'ok');
+      // Auto-mark planned sessions complete based on Strava activity matches
+      const marked = (typeof autoMarkSessionsFromStrava === 'function') ? autoMarkSessionsFromStrava() : 0;
+      const markedSuffix = marked > 0 ? ` · Auto-marked ${marked} planned session${marked > 1 ? 's' : ''} complete.` : '';
+      setStravaMsg(`✅ Synced ${acts.length} activities from the last 30 days.${markedSuffix}`, 'ok');
       renderAll();
       renderStravaUI();
     } catch (e) {
@@ -6311,6 +6630,300 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     `;
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // STRAVA DATA HELPERS — used by Progress tab, Today, and auto-mark
+  // ──────────────────────────────────────────────────────────────────────
+  function _isoDate(d) { return d.toISOString().slice(0, 10); }
+  function _startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+  function _startOfCurrentWeek() {
+    // Week starts Monday — match planState.sessions key order Mon..Sun
+    const t = _startOfDay(new Date());
+    const dow = t.getDay(); // 0=Sun
+    const diff = (dow === 0 ? 6 : dow - 1);
+    t.setDate(t.getDate() - diff);
+    return t;
+  }
+  function _activitiesBetween(start, end) {
+    const acts = planState.stravaActivities || [];
+    return acts.filter(a => {
+      const t = new Date(a.start_date_local || a.start_date);
+      return t >= start && t < end;
+    });
+  }
+  // Returns daily total minutes for the last `numDays` days, indexed [oldest..today]
+  function getStravaDailyMins(numDays) {
+    const n = numDays || 14;
+    const today = _startOfDay(new Date());
+    const buckets = new Array(n).fill(0);
+    const acts = planState.stravaActivities || [];
+    for (const a of acts) {
+      const t = _startOfDay(new Date(a.start_date_local || a.start_date));
+      const diff = Math.round((today - t) / 86400000);
+      if (diff >= 0 && diff < n) {
+        buckets[n - 1 - diff] += (a.moving_min || 0);
+      }
+    }
+    return buckets;
+  }
+  // Returns stats for the current week (Mon..Sun)
+  function getStravaWeekStats() {
+    const start = _startOfCurrentWeek();
+    const end = new Date(start); end.setDate(end.getDate() + 7);
+    const acts = _activitiesBetween(start, end);
+    const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
+    const byType = {};
+    let hrSum = 0, hrCount = 0;
+    acts.forEach(a => {
+      const t = mapStravaTypeToSessionType(a.type);
+      byType[t] = (byType[t] || 0) + (a.moving_min || 0);
+      if (a.avg_hr) { hrSum += a.avg_hr; hrCount++; }
+    });
+    return {
+      totalMins,
+      sessionCount: acts.length,
+      avgHr: hrCount > 0 ? Math.round(hrSum / hrCount) : null,
+      byType,
+      activities: acts
+    };
+  }
+  // Strava activity type → planned session type taxonomy
+  function mapStravaTypeToSessionType(stravaType) {
+    const t = (stravaType || '').toLowerCase();
+    if (t.includes('run') || t.includes('jog') || t.includes('virtualrun')) return 'run';
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl') || t.includes('virtualride') || t.includes('ebike')) return 'bike';
+    if (t.includes('swim')) return 'swim';
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit') || t.includes('crosstraining')) return 'strength';
+    if (t.includes('walk') || t.includes('hike')) return 'walk';
+    if (t.includes('yoga')) return 'mobility';
+    return 'other';
+  }
+  // Find a Strava activity matching a YYYY-MM-DD date string (returns first match for that day)
+  function findStravaActivityForDate(yyyymmdd) {
+    const acts = planState.stravaActivities || [];
+    return acts.find(a => (a.start_date_local || a.start_date || '').slice(0, 10) === yyyymmdd);
+  }
+  // After a Strava sync, walk this week's planned days and mark complete + attach metrics
+  function autoMarkSessionsFromStrava() {
+    if (!planState.stravaActivities || planState.stravaActivities.length === 0) return;
+    const start = _startOfCurrentWeek();
+    let marked = 0;
+    DAYS.forEach((day, i) => {
+      const dayDate = new Date(start); dayDate.setDate(dayDate.getDate() + i);
+      const iso = _isoDate(dayDate);
+      const planned = planState.sessions[day];
+      if (!planned || planned.completed) return;
+      // Skip rest days — but if user did a workout on a rest day, surface it
+      const act = findStravaActivityForDate(iso);
+      if (!act) return;
+      const actType = mapStravaTypeToSessionType(act.type);
+      const plannedType = (planned.type || '').toLowerCase();
+      // Match: same broad type, OR brick (counts any cardio), OR rest day with logged work
+      const compat = plannedType === 'rest' || plannedType === 'brick' ||
+                     actType === plannedType ||
+                     (plannedType === 'quality' && (actType === 'run' || actType === 'bike' || actType === 'swim'));
+      if (!compat) return;
+      planned.completed = true;
+      planned.actualMins = act.moving_min;
+      planned.actualHr = act.avg_hr;
+      planned.actualWatts = act.avg_watts;
+      planned.stravaId = act.id;
+      planned.stravaName = act.name;
+      planned.stravaDistance_km = act.distance_km;
+      marked++;
+    });
+    if (marked > 0) saveUserData();
+    return marked;
+  }
+  // Pull HR/HR-time-series streams for one activity (used by Session Detail modal)
+  async function fetchStravaActivityStreams(activityId) {
+    return _stravaApiCall(`/activities/${activityId}/streams?keys=heartrate,time,distance,altitude&key_by_type=true`);
+  }
+  // Build a small inline SVG line chart for HR over time
+  function renderHrChartSVG(hrArr, timeArr) {
+    if (!hrArr || hrArr.length < 2) return '';
+    const w = 320, h = 90, pad = 4;
+    const maxHr = Math.max(...hrArr);
+    const minHr = Math.min(...hrArr);
+    const range = Math.max(20, maxHr - minHr);
+    const totalT = timeArr ? timeArr[timeArr.length - 1] : hrArr.length;
+    // Sample down to ~120 points for rendering
+    const step = Math.max(1, Math.floor(hrArr.length / 120));
+    const pts = [];
+    for (let i = 0; i < hrArr.length; i += step) {
+      const x = pad + ((timeArr ? timeArr[i] : i) / totalT) * (w - pad * 2);
+      const y = pad + (1 - (hrArr[i] - minHr) / range) * (h - pad * 2);
+      pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:90px; display:block;">
+      <polyline fill="none" stroke="var(--primary)" stroke-width="2" points="${pts.join(' ')}" />
+    </svg>`;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PROGRESS TAB — populate with real Strava data
+  // ──────────────────────────────────────────────────────────────────────
+  function renderProgressTab() {
+    const sumCard = document.getElementById('progress7DaySummary');
+    const bars = document.getElementById('progressLoadBars');
+    const commentary = document.getElementById('progressLoadCommentary');
+    const recent = document.getElementById('progressRecentSessions');
+    if (!sumCard || !bars || !commentary || !recent) return;
+
+    const acts = planState.stravaActivities || [];
+    const stravaConnected = !!getStravaConfig();
+
+    if (acts.length === 0) {
+      const cta = stravaConnected
+        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">↻ Sync from Strava</button>'
+        : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your real numbers here.';
+      sumCard.innerHTML = `<div class="card-title">7-day summary</div>
+        <div style="font-size:13px; color:var(--text-soft); padding: 6px 0;">No data yet. ${cta}</div>`;
+      bars.innerHTML = '';
+      commentary.innerHTML = '';
+      recent.innerHTML = '';
+      return;
+    }
+
+    // 7-day summary (last 7 days, not calendar week — matches "last 7 days" mental model)
+    const today = _startOfDay(new Date());
+    const sevenDaysAgo = new Date(today); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const last7 = _activitiesBetween(sevenDaysAgo, new Date(today.getTime() + 86400000));
+    const last7Mins = last7.reduce((a, x) => a + (x.moving_min || 0), 0);
+    const last7Hr = last7.filter(a => a.avg_hr).reduce((a,b) => ({s: a.s + b.avg_hr, n: a.n + 1}), {s:0,n:0});
+    const avg7Hr = last7Hr.n > 0 ? Math.round(last7Hr.s / last7Hr.n) : null;
+
+    sumCard.innerHTML = `
+      <div class="card-title">7-day summary</div>
+      <div class="data-row">
+        <div class="data-cell"><div class="label">Total</div><div class="value">${formatHM(last7Mins)}</div></div>
+        <div class="data-cell"><div class="label">Sessions</div><div class="value">${last7.length}</div></div>
+        <div class="data-cell"><div class="label">Avg HR</div><div class="value">${avg7Hr || '—'}</div></div>
+      </div>
+    `;
+
+    // 14-day load bars
+    const daily = getStravaDailyMins(14);
+    const peak = Math.max(60, ...daily); // floor at 60 so a single workout doesn't max out the bar
+    bars.innerHTML = daily.map((mins, i) => {
+      const pct = Math.max(8, Math.round((mins / peak) * 100));
+      const isToday = i === daily.length - 1;
+      const isRest = mins < 5;
+      const cls = isToday ? 'bar today' : isRest ? 'bar' : 'bar done';
+      const op = isRest ? 'opacity: 0.5;' : '';
+      return `<div class="${cls}" style="height: ${pct}%; ${op}" title="${mins} min"></div>`;
+    }).join('');
+
+    // Trend commentary
+    const last7Total = daily.slice(7).reduce((a,b)=>a+b, 0);
+    const prev7Total = daily.slice(0, 7).reduce((a,b)=>a+b, 0);
+    const change = prev7Total > 0 ? Math.round(((last7Total - prev7Total) / prev7Total) * 100) : 0;
+    let trendText, trendLabel;
+    if (prev7Total < 30 && last7Total < 30) {
+      trendLabel = 'Light week.';
+      trendText = 'Both weeks are very light. Either you\'re tapering, recovering, or it\'s time to ramp up — depending on where you are in the plan.';
+    } else if (Math.abs(change) < 10) {
+      trendLabel = 'Steady volume.';
+      trendText = `Last 7 vs. previous 7 within ${Math.abs(change)}%. Consistency builds the engine.`;
+    } else if (change > 0 && change < 25) {
+      trendLabel = 'Healthy build.';
+      trendText = `Volume up ${change}% week-over-week — ramping at a sustainable rate.`;
+    } else if (change >= 25) {
+      trendLabel = 'Sharp ramp.';
+      trendText = `Volume jumped ${change}% week-over-week. Watch for fatigue — keep one easy week up your sleeve.`;
+    } else if (change < 0 && change > -25) {
+      trendLabel = 'Easing back.';
+      trendText = `Volume down ${Math.abs(change)}% — could be a recovery week or unintentional drop.`;
+    } else {
+      trendLabel = 'Big drop.';
+      trendText = `Volume down ${Math.abs(change)}% — likely taper, illness, or schedule chaos. The engine notices.`;
+    }
+    commentary.innerHTML = `<strong style="color: var(--text);">Load trend: ${trendLabel}</strong> ${trendText}`;
+
+    // Recent sessions list
+    const recentActs = acts.slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date)).slice(0, 6);
+    recent.innerHTML = recentActs.map((a, i) => {
+      const last = i === recentActs.length - 1;
+      const km = a.distance_km > 0.1 ? a.distance_km.toFixed(1) + ' km' : '';
+      return `
+        <div style="padding: 14px 16px; ${last ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div>
+              <div style="font-weight: 700; font-size: 15px;">${iconForStravaType(a.type)} ${escapeHtml(a.name)} ›</div>
+              <div style="color: var(--text-soft); font-size: 12px;">${shortDay(a.start_date_local)}${km ? ' · ' + km : ''}</div>
+            </div>
+            ${a.suffer ? `<div style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">Suffer ${a.suffer}</div>` : ''}
+          </div>
+          <div class="data-row" style="margin-top: 12px;">
+            <div class="data-cell"><div class="label">Duration</div><div class="value">${formatHM(a.moving_min)}</div></div>
+            <div class="data-cell"><div class="label">Avg HR</div><div class="value">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
+            <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Elev'}</div><div class="value">${a.avg_watts ? Math.round(a.avg_watts) : (a.elevation_m ? Math.round(a.elevation_m * 3.28) + ' ft' : '—')}</div></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // STRAVA-BACKED SESSION REPORT — opens a Strava activity in the report modal
+  // ──────────────────────────────────────────────────────────────────────
+  async function openStravaSessionReport(activityId) {
+    const a = (planState.stravaActivities || []).find(x => String(x.id) === String(activityId));
+    if (!a) return;
+    document.getElementById('srTitle').textContent = a.name;
+    document.getElementById('srWhen').textContent = shortDay(a.start_date_local);
+
+    let html = '<div class="stat-grid" style="margin-top: 10px;">';
+    html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">${formatHM(a.moving_min)}</div>${a.distance_km > 0.1 ? `<div class="stat-sub">${a.distance_km.toFixed(2)} km</div>` : ''}</div>`;
+    html += `<div class="stat-tile"><div class="stat-label">Avg HR</div><div class="stat-value">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div>${a.max_hr ? `<div class="stat-sub">Max ${Math.round(a.max_hr)}</div>` : ''}</div>`;
+    if (a.avg_watts) {
+      html += `<div class="stat-tile"><div class="stat-label">Avg Watts</div><div class="stat-value">${Math.round(a.avg_watts)}</div>${a.kilojoules ? `<div class="stat-sub">${Math.round(a.kilojoules)} kJ</div>` : ''}</div>`;
+    } else if (a.elevation_m) {
+      html += `<div class="stat-tile"><div class="stat-label">Elevation</div><div class="stat-value">${Math.round(a.elevation_m * 3.28)} ft</div><div class="stat-sub">${Math.round(a.elevation_m)} m</div></div>`;
+    } else {
+      html += `<div class="stat-tile"><div class="stat-label">Type</div><div class="stat-value">${escapeHtml(a.type)}</div></div>`;
+    }
+    html += '</div>';
+
+    // Placeholder for HR chart while we fetch streams
+    html += `<div class="detail-section" style="margin-top: 18px;" id="srStreamsSlot">
+      <div class="detail-label">Heart rate over time</div>
+      <div style="font-size: 12px; color: var(--text-soft);">Loading from Strava…</div>
+    </div>`;
+
+    html += `<div class="detail-section" style="margin-top: 14px; font-size: 12px; color: var(--text-soft);">
+      <div>Source: Strava activity #${a.id}</div>
+      <div><a href="https://www.strava.com/activities/${a.id}" target="_blank" style="color: var(--primary);">View on Strava ↗</a></div>
+    </div>`;
+
+    document.getElementById('srBody').innerHTML = html;
+    document.getElementById('sessionReportModal').classList.add('show');
+
+    // Lazy-fetch HR streams
+    try {
+      const streams = await fetchStravaActivityStreams(a.id);
+      const hr = streams && streams.heartrate && streams.heartrate.data;
+      const t = streams && streams.time && streams.time.data;
+      const slot = document.getElementById('srStreamsSlot');
+      if (!slot) return; // modal closed
+      if (hr && hr.length > 0) {
+        slot.innerHTML = `
+          <div class="detail-label">Heart rate over time</div>
+          ${renderHrChartSVG(hr, t)}
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+            <div>Min ${Math.min(...hr)}</div>
+            <div>Max ${Math.max(...hr)}</div>
+          </div>`;
+      } else {
+        slot.innerHTML = `<div class="detail-label">Heart rate</div>
+          <div style="font-size:12px; color:var(--text-soft);">No HR data recorded for this activity.</div>`;
+      }
+    } catch (e) {
+      const slot = document.getElementById('srStreamsSlot');
+      if (slot) slot.innerHTML = `<div class="detail-label">Heart rate</div>
+        <div style="font-size:12px; color:var(--warn);">Could not load streams: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
   function markOnboardingComplete() {
     const username = currentUser();
     if (!username) return;
@@ -6335,6 +6948,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     // Load any cached Strava activities so the UI shows them immediately
     loadCachedStravaActivities();
+    if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderAll();
     // If connected and last sync was >30 min ago (or never), refresh in background
     const cfg = getStravaConfig();
@@ -6342,7 +6956,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const lastSync = planState.stravaSyncedAt || 0;
       const stale = (Date.now() - lastSync) > 30 * 60 * 1000;
       if (stale) {
-        syncStravaActivities(30).then(() => renderAll()).catch(e => console.warn('Background Strava sync failed:', e.message));
+        syncStravaActivities(30).then(() => {
+          if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
+          renderAll();
+        }).catch(e => console.warn('Background Strava sync failed:', e.message));
       }
     }
   }
@@ -6361,6 +6978,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       showScreen('auth');
     }
     renderAll();
+    // If we just came back from a Strava OAuth redirect, finish the handshake
+    if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
   });
 
   function hasApiKey() {
