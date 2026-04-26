@@ -19,6 +19,15 @@
     --border: #E5E1D4;
     --warn: #C87A3B;
     --warn-soft: #FBE7D1;
+    /* Coach insight semantic colors: good (positive trend), info (neutral fyi), caution (medium), alert (action needed) */
+    --good: #2E8B57;
+    --good-soft: #DDF0E3;
+    --caution: #C9931E;
+    --caution-soft: #FBF0D3;
+    --alert: #C44545;
+    --alert-soft: #FBDADA;
+    --info: #3973A8;
+    --info-soft: #DCEAF5;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -5342,8 +5351,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const diff = easyHr7 - easyHr21;
       if (diff <= -3) {
         out.push({
-          severity: 'info',
-          title: `Aerobic fitness improving 📉`,
+          severity: 'good',
+          title: `Aerobic fitness improving`,
           simpleMessage: `At similar easy-run effort, your heart rate is ${Math.abs(diff)} bpm lower than the prior 3 weeks. That's a clear sign you're getting fitter.`,
           message: `Easy-run avg HR last 7d: ${easyHr7} bpm. Prior 3 weeks: ${easyHr21} bpm. Lower HR at the same effort = improved aerobic efficiency (Coyle 1988). Keep the easy days truly easy to compound this.`,
         });
@@ -5415,8 +5424,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const isFlat = Math.abs(w0 - avgPrev3) / avgPrev3 < 0.08 && Math.abs(w1 - w2) / Math.max(w2, 1) < 0.08;
       if (isPositive) {
         out.push({
-          severity: 'info',
-          title: `Volume building — last 4 weeks: ${formatMins(w3)} → ${formatMins(w2)} → ${formatMins(w1)} → ${formatMins(w0)}`,
+          severity: 'good',
+          title: `Volume building sustainably`,
+          simpleMessage: `Last 4 weeks: ${formatMins(w3)} → ${formatMins(w2)} → ${formatMins(w1)} → ${formatMins(w0)}. Each week within +10% — that's how you build fitness without injury risk.`,
           message: `You're building volume sustainably (each week ≤ 10% above the prior). Bompa & Haff's classic periodization: this kind of progressive overload is exactly what builds aerobic capacity. Keep the next week within +10% to stay safe.`,
         });
       } else if (isFlat && minsLast7 >= 180) {
@@ -5539,9 +5549,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function renderInsightCard(i, idx) {
-    const tone = i.severity === 'alert' ? { color: 'var(--warn)', bg: 'var(--warn-soft)', icon: '⚠' }
-               : i.severity === 'warn'  ? { color: '#B8862E', bg: 'var(--secondary-soft)', icon: '◎' }
-               : { color: 'var(--primary)', bg: 'var(--primary-soft)', icon: '💡' };
+    // Semantic color coding:
+    //   good   = green check  → trends moving positively (HR dropping, volume building safely)
+    //   info   = blue dot     → neutral FYI, no action needed
+    //   warn   = amber circle → caution, worth investigating
+    //   alert  = red triangle → action recommended
+    const tone =
+        i.severity === 'good'  ? { color: 'var(--good)', bg: 'var(--good-soft)', icon: '✓', label: 'Good' }
+      : i.severity === 'alert' ? { color: 'var(--alert)', bg: 'var(--alert-soft)', icon: '🔺', label: 'Action' }
+      : i.severity === 'warn'  ? { color: 'var(--caution)', bg: 'var(--caution-soft)', icon: '⚠', label: 'Caution' }
+      :                          { color: 'var(--info)', bg: 'var(--info-soft)', icon: 'ℹ', label: 'FYI' };
     let fixBtn = '';
     if (i.fix) {
       const fixIdx = pendingFixes.length;
@@ -5551,19 +5568,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const mode = getComplexityMode();
     const isSimple = mode === 'simple' && i.simpleMessage;
 
+    // Small uppercase badge in the top-right makes severity instantly readable
+    const badge = `<span style="font-size:10px; font-weight:800; letter-spacing:0.6px; text-transform:uppercase; padding:2px 8px; border-radius:100px; background:${tone.color}; color:#fff;">${tone.label}</span>`;
+
     if (isSimple) {
       const expandBtn = i.message ? `<button onclick="toggleInsightDetail(this)" style="display:block; background:none; border:0; color:${tone.color}; font-weight:600; font-size:12px; cursor:pointer; padding:6px 0 0; font-family:inherit; text-align:left;">Tell me more →</button>` : '';
       const detailBlock = i.message ? `<div style="display:none; margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.04); border-radius:8px; font-size:12px; color:var(--text-soft); line-height:1.5;"><strong style="color:var(--text);">Why this matters:</strong> ${markupGlossaryTerms(i.message)}${i.suggestion ? `<br><br><em>${markupGlossaryTerms(i.suggestion)}</em>` : ''}</div>` : '';
-      return `<div style="background:${tone.bg}; border-left:3px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
-        <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+      return `<div style="background:${tone.bg}; border-left:4px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px;">
+          <div style="font-weight:700; color:${tone.color}; display:flex; align-items:center; gap:6px;"><span style="font-size:14px;">${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+          ${badge}
+        </div>
         <div style="color:var(--text);">${markupGlossaryTerms(i.simpleMessage)}</div>
         ${expandBtn}
         ${detailBlock}
         ${fixBtn}
       </div>`;
     }
-    return `<div style="background:${tone.bg}; border-left:3px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
-      <div style="font-weight:700; color:${tone.color}; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+    return `<div style="background:${tone.bg}; border-left:4px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.5;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px;">
+        <div style="font-weight:700; color:${tone.color}; display:flex; align-items:center; gap:6px;"><span style="font-size:14px;">${tone.icon}</span> ${markupGlossaryTerms(i.title)}</div>
+        ${badge}
+      </div>
       <div style="color:var(--text);">${markupGlossaryTerms(i.message || i.simpleMessage)}</div>
       ${i.suggestion ? `<div style="color:var(--text-soft); margin-top:6px; font-style:italic;">→ ${markupGlossaryTerms(i.suggestion)}</div>` : ''}
       ${fixBtn}
