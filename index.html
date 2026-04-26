@@ -3053,7 +3053,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   const chatMessages = [];
 
   // ── Analytics (PostHog + console fallback) ──
-  function getAnalyticsKey() { return localStorage.getItem('posthog-key') || ''; }
+  const DEFAULT_POSTHOG_KEY = 'phc_zqNceWQkyHr4XEch57oQg3bym2DFEjVAB2t2CjJzq2Ez';
+  function getAnalyticsKey() { return localStorage.getItem('posthog-key') || DEFAULT_POSTHOG_KEY; }
   let _posthogReady = false;
   function initAnalytics() {
     const key = getAnalyticsKey();
