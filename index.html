@@ -2305,6 +2305,30 @@
   </div>
 
   <!-- SESSION REPORT (past session) MODAL -->
+  <!-- HIDE WORKOUT CONFIRMATION MODAL -->
+  <div class="modal-bg" id="hideConfirmModal">
+    <div class="modal" style="max-width: 360px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Hide this workout?</h2>
+        <button onclick="closeHideConfirm()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">It stays on Strava — we just won't show it here.</div>
+
+      <div id="hideConfirmDetails" style="margin-top: 14px; padding: 12px 14px; background: var(--bg-soft); border-radius: 12px;">
+        <!-- populated by openHideConfirm -->
+      </div>
+
+      <div style="font-size: 12px; color: var(--text-soft); margin-top: 12px; line-height: 1.5;">
+        💡 You can restore hidden workouts anytime via <strong>Settings ⚙️ → Hidden workouts</strong>.
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeHideConfirm()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1; background: var(--warn); border-color: var(--warn);" id="hideConfirmYes">Hide it</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SCHEDULE PREFERENCES MODAL — set available days + disciplines per day -->
   <div class="modal-bg" id="scheduleModal">
     <div class="modal" style="max-height: 92vh; overflow-y: auto;">
@@ -3243,12 +3267,96 @@
   function isHiddenStravaId(id) {
     return getHiddenStravaIds().includes(String(id));
   }
+  // Replaced browser confirm with a richer in-app modal that shows what's being hidden
   function hideStravaActivity(id) {
-    if (!confirm('Hide this workout? It stays on Strava — we just won\'t show it here. Restore from Settings.')) return;
+    openHideConfirm(id);
+  }
+  function openHideConfirm(id) {
+    const a = (planState.stravaActivities || []).find(x => String(x.id) === String(id));
+    if (!a) return;
+    const details = document.getElementById('hideConfirmDetails');
+    if (details) {
+      const km = a.distance_km > 0.1 ? a.distance_km.toFixed(1) + ' km' : '';
+      const dur = a.moving_min ? formatHM(a.moving_min) : '';
+      const meta = [a.type, km, dur].filter(Boolean).join(' · ');
+      details.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:36px; height:36px; border-radius:8px; background: var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px;">${iconForStravaType(a.type)}</div>
+          <div style="flex:1; min-width: 0;">
+            <div style="font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(a.name)}</div>
+            <div style="color:var(--text-soft); font-size:12px; margin-top:2px;">${shortDay(a.start_date_local)}</div>
+            ${meta ? `<div style="color:var(--text-soft); font-size:12px; margin-top:2px;">${escapeHtml(meta)}</div>` : ''}
+          </div>
+        </div>`;
+    }
+    const yesBtn = document.getElementById('hideConfirmYes');
+    if (yesBtn) yesBtn.onclick = () => confirmHideActivity(id);
+    document.getElementById('hideConfirmModal').classList.add('show');
+  }
+  function closeHideConfirm() {
+    const m = document.getElementById('hideConfirmModal');
+    if (m) m.classList.remove('show');
+  }
+  // ──────────────────────────────────────────────────────────────────────
+  // RPE editing — store user-entered RPE per Strava activity (Strava has no RPE field)
+  // ──────────────────────────────────────────────────────────────────────
+  function getRpeMap() {
+    try { return JSON.parse(localStorage.getItem('strava-rpe-map') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function setRpeMap(m) { localStorage.setItem('strava-rpe-map', JSON.stringify(m)); }
+  function getRpeForActivity(id) {
+    const m = getRpeMap();
+    return m[String(id)] || null;
+  }
+  function setRpeForActivity(id, rpe) {
+    const m = getRpeMap();
+    if (rpe == null) delete m[String(id)];
+    else m[String(id)] = rpe;
+    setRpeMap(m);
+    saveUserData();
+  }
+  // Render a 1-10 row for picking RPE — used in the session-report modal
+  function renderRpeEditor(activityId) {
+    const cur = getRpeForActivity(activityId);
+    const labels = ['Easy','','','Moderate','','','Hard','','','Max'];
+    const cells = [];
+    for (let i = 1; i <= 10; i++) {
+      const isCur = cur === i;
+      cells.push(`<button onclick="onRpeEdit('${activityId}', ${i})" style="flex:1; padding:9px 0; background:${isCur ? 'var(--primary)' : 'var(--bg-soft)'}; color:${isCur ? '#fff' : 'var(--text)'}; border:1px solid ${isCur ? 'var(--primary)' : 'var(--border)'}; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; min-width: 28px;">${i}</button>`);
+    }
+    return `
+      <div style="display: flex; gap: 4px; flex-wrap: nowrap;">${cells.join('')}</div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-top: 6px; font-weight: 600;">
+        <span>Easy</span><span>Moderate</span><span>Max</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+        <div style="font-size: 12px; color: var(--text-soft);">${cur ? 'Saved RPE: <strong style=\"color: var(--text);\">' + cur + ' / 10</strong>' : '<em>Not set yet</em>'}</div>
+        ${cur ? `<button onclick="onRpeClear('${activityId}')" style="background:none; border:0; color:var(--warn); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">Clear</button>` : ''}
+      </div>`;
+  }
+  function onRpeEdit(activityId, val) {
+    setRpeForActivity(activityId, val);
+    if (typeof trackEvent === 'function') trackEvent('strava_rpe_set', { id: activityId, rpe: val });
+    // Re-render the editor in the modal
+    const slot = document.getElementById('srRpeSlot');
+    if (slot) slot.innerHTML = `<div class="detail-label">How hard did it feel? (RPE)</div>` + renderRpeEditor(activityId);
+    // And refresh the page so it shows up in the recent rows
+    renderAll();
+  }
+  function onRpeClear(activityId) {
+    setRpeForActivity(activityId, null);
+    const slot = document.getElementById('srRpeSlot');
+    if (slot) slot.innerHTML = `<div class="detail-label">How hard did it feel? (RPE)</div>` + renderRpeEditor(activityId);
+    renderAll();
+  }
+
+  function confirmHideActivity(id) {
     const ids = getHiddenStravaIds();
     if (!ids.includes(String(id))) ids.push(String(id));
     setHiddenStravaIds(ids);
     if (typeof trackEvent === 'function') trackEvent('strava_activity_hidden', { id });
+    closeHideConfirm();
     renderAll();
   }
   function unhideAllStravaActivities() {
@@ -6908,7 +7016,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
             <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
               <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">${formatHM(a.moving_min)}</div></div>
               <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
-              <div class="data-cell"><div class="label" title="${a.avg_watts ? '' : 'Strava\\'s Relative Effort (formerly Suffer Score) — how hard your heart worked over time.'}">${a.avg_watts ? 'Avg W' : 'Effort'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
+              <div class="data-cell"><div class="label" title="${a.avg_watts ? '' : 'You-rated effort 1–10 (RPE). Tap into the workout to set/change it.'}">${a.avg_watts ? 'Avg W' : 'RPE'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (getRpeForActivity(a.id) ? (getRpeForActivity(a.id) + '/10') : '—')}</div></div>
             </div>` : ''}
           </div>
         </div>
@@ -7314,6 +7422,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       html += `<div class="stat-tile"><div class="stat-label">Type</div><div class="stat-value">${escapeHtml(a.type)}</div></div>`;
     }
     html += '</div>';
+
+    // RPE editor — user-entered, persists per activity (sits up top so it's easy to set)
+    html += `<div class="detail-section" style="margin-top: 18px;" id="srRpeSlot">
+      <div class="detail-label">How hard did it feel? (RPE)</div>
+      ${renderRpeEditor(a.id)}
+    </div>`;
 
     // Slots populated below by lazy fetches
     html += `<div class="detail-section" style="margin-top: 18px;" id="srRouteSlot">
