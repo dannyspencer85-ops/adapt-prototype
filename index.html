@@ -1977,10 +1977,11 @@
             <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfDistance">—</div>
           </div>
           <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Avg HR</div>
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;" title="Average heart rate while training (not resting HR).">Avg workout HR</div>
             <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfAvgHr">—</div>
           </div>
         </div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.4;">HR shown is your <strong>average heart rate during workouts</strong> — not resting HR. <span class="glossary-term" onclick="defineTerm('HR')">What's HR?</span></div>
       </div>
 
       <!-- Volume over time -->
@@ -4900,8 +4901,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'ACWR': { full: 'Acute:Chronic Workload Ratio', def: 'How much you\'re training this week (acute) compared to your average over the last 4 weeks (chronic). 0.8–1.3 is the sweet spot. Above 1.5 — you\'re ramping up too fast and injury risk jumps 4–5×. Below 0.7 — you\'re losing fitness.' },
     'RPE': { full: 'Rate of Perceived Exertion', def: 'How hard a workout felt on a 1–10 scale, in your own judgment. 1 = easy walk, 5 = conversational, 7 = solid, 10 = max effort. Useful because it captures fatigue, sleep, and stress that HR can\'t see.' },
     'HRV': { full: 'Heart Rate Variability', def: 'The natural variation in time between heartbeats. High = recovered & ready. Low = stressed/fatigued. Tracked overnight by most watches.' },
-    'HR': { full: 'Heart Rate', def: 'Beats per minute. The most direct measure of how hard your cardiovascular system is working.' },
+    'HR': { full: 'Heart Rate', def: 'Beats per minute. In Pulse + insights, "HR" almost always means your AVG HR DURING A WORKOUT (also called "exercise HR") — pulled from Strava\'s recorded average. This is different from RESTING HR (your morning baseline). Lower workout HR at the same effort = fitter. Lower resting HR = more recovered.' },
     'BPM': { full: 'Beats Per Minute', def: 'Unit for heart rate. Resting BPM goes down as you get fitter; max BPM is roughly 220 minus your age (give or take 10–15).' },
+    'RHR': { full: 'Resting Heart Rate', def: 'Your heart rate when fully at rest, usually measured first thing in the morning. Goes down as you get fitter; spikes 5+ bpm above your norm can signal illness, overtraining, or poor sleep.' },
     'Z1': { full: 'Zone 1 — Recovery', def: 'Very easy effort, ~50–60% max HR. Conversation flows, you could go all day. Used for recovery rides/jogs.' },
     'Z2': { full: 'Zone 2 — Aerobic Base', def: 'Easy effort, ~60–70% max HR. Conversational pace. THE most important zone — most weekly volume should live here. Builds the aerobic engine.' },
     'Z3': { full: 'Zone 3 — Tempo', def: 'Moderate-hard, ~70–80% max HR. "Comfortably hard" — talking gets choppy. Tempo runs and steady efforts.' },
@@ -5243,6 +5245,38 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Fails gracefully when Strava data is missing.
   // ──────────────────────────────────────────────────────────────────────
   // ──────────────────────────────────────────────────────────────────────
+  // TEMPERATURE-ADJUSTED HEART RATE
+  // HR rises in heat at the same effort. Without correction, fitness comparisons
+  // get muddied (a hot week makes you look detrained). Research:
+  //   - Pugh / Tipton: ~1 bpm per °C above thermoneutral (~18°C / 64°F)
+  //   - Effect is asymmetric — cold has a smaller effect, mostly via vasoconstriction
+  // We use a conservative 0.8 bpm/°C above 18°C, 0.3 bpm/°C below 10°C.
+  // ──────────────────────────────────────────────────────────────────────
+  const TEMP_BASELINE_C = 18; // mild day, the reference point
+  function tempAdjustedHr(activity) {
+    if (!activity || !activity.avg_hr) return null;
+    if (typeof activity.avg_temp_c !== 'number') return activity.avg_hr; // no temp data → just raw
+    const t = activity.avg_temp_c;
+    if (t > TEMP_BASELINE_C) return activity.avg_hr - (t - TEMP_BASELINE_C) * 0.8;
+    if (t < 10) return activity.avg_hr + (10 - t) * 0.3;
+    return activity.avg_hr;
+  }
+  // Average temperature across activities (only those that have temp recorded)
+  function avgTempForActs(acts) {
+    const tempd = (acts || []).filter(a => typeof a.avg_temp_c === 'number');
+    if (tempd.length === 0) return null;
+    const totalMins = tempd.reduce((s, a) => s + (a.moving_min || 0), 0);
+    if (totalMins === 0) return null;
+    return tempd.reduce((s, a) => s + a.avg_temp_c * (a.moving_min || 0), 0) / totalMins;
+  }
+  // What fraction of activities had temp data — for confidence indication
+  function tempCoverage(acts) {
+    if (!acts || acts.length === 0) return 0;
+    const tempd = acts.filter(a => typeof a.avg_temp_c === 'number');
+    return tempd.length / acts.length;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
   // WEEKLY FITNESS PULSE — single most actionable progression number for the home screen
   // Returns null if there isn't enough data to be honest. Otherwise:
   //   { value, valueColor, valueIcon, headline, explanation, tone }
@@ -5261,22 +5295,42 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
     if (acts21Prior.length === 0) return null; // need a comparison window
 
-    // Helper: duration-weighted easy HR (same logic as smart insights)
-    function avgHrForEasy(acts) {
+    // Helper: duration-weighted easy HR. If useTempAdj=true and temp data exists,
+    // applies tempAdjustedHr() before averaging — so a hot week doesn't masquerade as detraining.
+    function avgHrForEasy(acts, useTempAdj) {
       const easy = acts.filter(a => mapStravaTypeToSessionType(a.type) === 'run' && a.moving_min >= 30 && a.avg_hr);
       if (easy.length === 0) return null;
       const sorted = easy.slice().sort((a, b) => a.avg_hr - b.avg_hr);
       const easyOnly = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
       const totalMins = easyOnly.reduce((s, a) => s + a.moving_min, 0);
       if (totalMins === 0) return null;
-      return Math.round(easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins);
+      const value = useTempAdj
+        ? easyOnly.reduce((s, a) => s + (tempAdjustedHr(a) || a.avg_hr) * a.moving_min, 0) / totalMins
+        : easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins;
+      return Math.round(value);
     }
 
-    // Priority 1: aerobic efficiency change — most direct fitness signal
-    const easyHr7 = avgHrForEasy(acts7);
-    const easyHr21 = avgHrForEasy(acts21Prior);
-    if (easyHr7 && easyHr21) {
-      const diff = easyHr7 - easyHr21;
+    // Priority 1: aerobic efficiency change — most direct fitness signal.
+    // Use temperature-corrected HR when temp data is available (Strava average_temp).
+    // If the two windows differ significantly in temperature, the temp-corrected
+    // delta is the truer signal — call that out in the explanation.
+    const useTempAdj = tempCoverage(acts7) >= 0.5 && tempCoverage(acts21Prior) >= 0.5;
+    const easyHr7Raw = avgHrForEasy(acts7, false);
+    const easyHr21Raw = avgHrForEasy(acts21Prior, false);
+    const easyHr7Adj = useTempAdj ? avgHrForEasy(acts7, true) : easyHr7Raw;
+    const easyHr21Adj = useTempAdj ? avgHrForEasy(acts21Prior, true) : easyHr21Raw;
+
+    if (easyHr7Adj && easyHr21Adj) {
+      const diff = easyHr7Adj - easyHr21Adj;
+      const rawDiff = (easyHr7Raw && easyHr21Raw) ? easyHr7Raw - easyHr21Raw : diff;
+      const tempThis = avgTempForActs(acts7);
+      const tempPrior = avgTempForActs(acts21Prior);
+      const tempDeltaC = (tempThis != null && tempPrior != null) ? tempThis - tempPrior : null;
+      // Temp note when the correction materially changed the picture (≥3 bpm shift between raw and adjusted)
+      const tempNote = (useTempAdj && tempDeltaC != null && Math.abs(rawDiff - diff) >= 3)
+        ? ` (raw HR was ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm but it was ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'} — correcting for that)`
+        : '';
+
       if (diff <= -3) {
         return {
           value: Math.abs(diff),
@@ -5284,7 +5338,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           valueColor: 'var(--good)',
           valueIcon: '📈',
           headline: 'Aerobic fitness up',
-          explanation: `HR is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same easy effort.`,
+          explanation: `Temp-adjusted HR is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same easy effort${tempNote}.`,
           tone: 'good'
         };
       } else if (diff >= 5) {
@@ -5294,8 +5348,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           valueColor: 'var(--caution)',
           valueIcon: '↑',
           headline: 'HR drifting up',
-          explanation: `HR is ${diff} bpm higher than the prior 3 weeks at easy effort. Watch for fatigue.`,
+          explanation: `Temp-adjusted HR is ${diff} bpm higher than the prior 3 weeks at easy effort${tempNote}. Watch for fatigue.`,
           tone: 'caution'
+        };
+      } else if (Math.abs(rawDiff) >= 4 && Math.abs(diff) < 3) {
+        // Raw HR looked alarming but temperature explains it — this is genuinely useful info
+        return {
+          value: Math.abs(rawDiff),
+          unit: 'bpm',
+          valueColor: 'var(--info)',
+          valueIcon: '🌡️',
+          headline: rawDiff > 0 ? 'HR up — but it\'s the heat' : 'HR down — partly the cold',
+          explanation: `Raw HR ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm vs prior 3 weeks, but temp ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'}. Adjusted for that, fitness is essentially flat.`,
+          tone: 'info'
         };
       }
     }
@@ -5477,35 +5542,58 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
 
     // ─── 9.4 Easy-run aerobic decoupling — fitness improvement vs regression ───
-    // Compare avg HR for similar-effort easy runs in the last 7 days vs prior 21.
-    function avgHrForEasy(acts) {
+    // Compare TEMP-ADJUSTED avg HR for similar-effort easy runs in the last 7 days vs prior 21.
+    // Temperature correction (Pugh/Tipton: ~1 bpm/°C above thermoneutral) prevents
+    // false "fitness regression" signals when the user simply trained on hotter days.
+    function avgHrForEasySmart(acts, useTempAdj) {
       const easy = acts.filter(a => mapStravaTypeToSessionType(a.type) === 'run' && a.moving_min >= 30 && a.avg_hr);
       if (easy.length === 0) return null;
-      // Filter to lower 60% by intensity (avoid quality sessions)
       const sorted = easy.slice().sort((a, b) => a.avg_hr - b.avg_hr);
       const easyOnly = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
       const totalMins = easyOnly.reduce((s, a) => s + a.moving_min, 0);
       if (totalMins === 0) return null;
-      return Math.round(easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins);
+      const value = useTempAdj
+        ? easyOnly.reduce((s, a) => s + (tempAdjustedHr(a) || a.avg_hr) * a.moving_min, 0) / totalMins
+        : easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins;
+      return Math.round(value);
     }
-    const easyHr7 = avgHrForEasy(acts7);
-    const easyHr21 = avgHrForEasy(acts21Prior);
+    const useTempAdj = tempCoverage(acts7) >= 0.5 && tempCoverage(acts21Prior) >= 0.5;
+    const easyHr7Raw = avgHrForEasySmart(acts7, false);
+    const easyHr21Raw = avgHrForEasySmart(acts21Prior, false);
+    const easyHr7 = useTempAdj ? avgHrForEasySmart(acts7, true) : easyHr7Raw;
+    const easyHr21 = useTempAdj ? avgHrForEasySmart(acts21Prior, true) : easyHr21Raw;
     if (easyHr7 && easyHr21) {
       const diff = easyHr7 - easyHr21;
+      const rawDiff = (easyHr7Raw && easyHr21Raw) ? easyHr7Raw - easyHr21Raw : diff;
+      const tempThis = avgTempForActs(acts7);
+      const tempPrior = avgTempForActs(acts21Prior);
+      const tempDeltaC = (tempThis != null && tempPrior != null) ? tempThis - tempPrior : null;
+      const tempNote = (useTempAdj && tempDeltaC != null && Math.abs(rawDiff - diff) >= 3)
+        ? ` Raw HR ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm, but training was ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'hotter' : 'cooler'} on average — correcting for that gives the truer signal.`
+        : '';
+
       if (diff <= -3) {
         out.push({
           severity: 'good',
           title: `Aerobic fitness improving`,
-          simpleMessage: `At similar easy-run effort, your heart rate is ${Math.abs(diff)} bpm lower than the prior 3 weeks. That's a clear sign you're getting fitter.`,
-          message: `Easy-run avg HR last 7d: ${easyHr7} bpm. Prior 3 weeks: ${easyHr21} bpm. Lower HR at the same effort = improved aerobic efficiency (Coyle 1988). Keep the easy days truly easy to compound this.`,
+          simpleMessage: `At similar easy-run effort, your heart rate is ${Math.abs(diff)} bpm lower than the prior 3 weeks (temperature-adjusted). That's a clear sign you're getting fitter.`,
+          message: `Temp-adjusted easy-run avg HR last 7d: ${easyHr7} bpm. Prior 3 weeks: ${easyHr21} bpm. Lower HR at the same effort + temperature = improved aerobic efficiency (Coyle 1988). ${useTempAdj ? 'Heat correction applied (Pugh/Tipton: ~1 bpm/°C above 18°C).' : 'No temp data — using raw HR.'}${tempNote} Keep easy days truly easy to compound this.`,
         });
       } else if (diff >= 5) {
         out.push({
           severity: 'warn',
           title: `Easy HR drifting up — possible fatigue`,
-          simpleMessage: `At similar easy-run effort, your heart rate is ${diff} bpm higher than the prior 3 weeks. That can mean fatigue, illness, or dehydration.`,
-          message: `Easy-run avg HR last 7d: ${easyHr7} bpm vs. prior 3 weeks ${easyHr21} bpm. Cardiac drift of 5+ bpm at consistent effort is associated with accumulated fatigue (Achten & Jeukendrup 2003). Two recovery days ahead.`,
+          simpleMessage: `Even after correcting for temperature, your easy-run HR is ${diff} bpm higher than the prior 3 weeks. That can mean fatigue, illness, or dehydration.`,
+          message: `Temp-adjusted easy-run avg HR last 7d: ${easyHr7} bpm vs. prior 3 weeks ${easyHr21} bpm. ${useTempAdj ? 'Heat correction applied — ruling out hot weather as the cause.' : 'No temperature data; raw HR comparison only.'}${tempNote} Cardiac drift of 5+ bpm at consistent effort is associated with accumulated fatigue (Achten & Jeukendrup 2003). Two recovery days ahead.`,
           suggestion: 'Insert an extra rest day, prioritize sleep + hydration, see if the HR returns to baseline.'
+        });
+      } else if (useTempAdj && Math.abs(rawDiff) >= 4 && Math.abs(diff) < 3) {
+        // Raw HR drifted but temperature explains it — proactively reassure the athlete
+        out.push({
+          severity: 'info',
+          title: rawDiff > 0 ? `HR is up — but the heat explains it` : `HR is down — partly the cooler weather`,
+          simpleMessage: `Your raw HR ${rawDiff > 0 ? 'rose' : 'dropped'} ${Math.abs(rawDiff)} bpm vs the prior 3 weeks, but conditions were ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'}. Adjusted for that, fitness is essentially flat.`,
+          message: `Raw easy-HR last 7d: ${easyHr7Raw}, prior 3 weeks: ${easyHr21Raw} (delta ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm). Temp-adjusted: ${easyHr7} vs ${easyHr21} (delta ${diff > 0 ? '+' : ''}${diff} bpm). Pugh/Tipton: ~1 bpm/°C above 18°C. The heat (or cold) is doing most of the work — your aerobic engine is steady.`,
         });
       }
     }
@@ -7912,6 +8000,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       avg_watts: a.average_watts || null,
       kilojoules: a.kilojoules || null,
       suffer: a.suffer_score || null,
+      // average_temp is recorded by Strava when the device reports it (most Garmins).
+      // In Celsius. Used by tempAdjustedHr() to correct heart rate for hot/cold conditions.
+      avg_temp_c: (typeof a.average_temp === 'number') ? a.average_temp : null,
       start_date_local: a.start_date_local,
       start_date: a.start_date,
     }));
