@@ -1765,22 +1765,7 @@
       </div>
 
       <div class="section-label">Coming up</div>
-      <div class="session-row">
-        <div class="session-icon">🚴</div>
-        <div class="session-info">
-          <div class="session-day">Saturday · May 2</div>
-          <div class="session-name">Long brick</div>
-          <div class="session-meta">Bike 2:00 + Run 0:30</div>
-        </div>
-      </div>
-      <div class="session-row">
-        <div class="session-icon">🏃</div>
-        <div class="session-info">
-          <div class="session-day">Sunday · May 3</div>
-          <div class="session-name">Long easy run</div>
-          <div class="session-meta">1:15 · Zone 2</div>
-        </div>
-      </div>
+      <div id="todayComingUp"></div>
     </div>
   </div>
 
@@ -1807,9 +1792,7 @@
       <div id="planChangeBanner"></div>
       <div id="planInsights"></div>
       <div id="courseIntelCard"></div>
-      <div class="info-banner">
-        <strong>Peak week is May 18-24.</strong> Your long bike hits 2:45 and long run 1:30 — that's your dress rehearsal for race day.
-      </div>
+      <div id="planPeakBanner"></div>
 
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; margin-bottom: 8px;">
         <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
@@ -1819,39 +1802,8 @@
       <div class="week-strip" id="weekStrip"></div>
       <div id="weekStateBanner"></div>
 
-      <!-- Recent completed sessions: real Strava data when synced, fallback to demo otherwise -->
+      <!-- Recent completed sessions from Strava (only shows when synced) -->
       <div id="recentStravaSessions"></div>
-      <div id="recentDemoSessions">
-        <div class="session-row done" style="display: block;" onclick="openSessionReport('sat_apr26')">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
-            <div class="session-info">
-              <div class="session-day">Sat · Apr 26 <span style="font-size:10px; color:var(--text-soft); font-weight:500;">· demo</span></div>
-              <div class="session-name">Long brick — completed</div>
-              <div class="session-meta">Bike 2:00 + Run 0:28</div>
-            </div>
-            <div class="session-status done">Done</div>
-            <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
-          </div>
-          <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
-            <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">2h 28m</div></div>
-            <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">142</div></div>
-            <div class="data-cell"><div class="label">RPE</div><div class="value" style="font-size: 14px;">7 / 10</div></div>
-          </div>
-        </div>
-        <div class="session-row done" style="display: block;" onclick="openSessionReport('mon_apr28')">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
-            <div class="session-info">
-              <div class="session-day">Mon · Apr 28 · rest day <span style="font-size:10px; color:var(--text-soft); font-weight:500;">· demo</span></div>
-              <div class="session-name">Full rest</div>
-              <div class="session-meta">Morning HR 45 · Sleep 7:48</div>
-            </div>
-            <div class="session-status done">Done</div>
-            <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
-          </div>
-        </div>
-      </div>
       <div id="weekSessions"></div>
 
       <div class="section-label">The 6.5-week arc</div>
@@ -1939,35 +1891,7 @@
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85;">Your race</div>
         <div id="progressRaceTitle" style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-top: 4px;">Your race</div>
         <div id="progressRaceDate" style="font-size: 14px; opacity: 0.9; margin-top: 4px;"></div>
-        <div style="margin-top: 12px; padding: 10px 12px; background: rgba(255,255,255,0.15); border-radius: 10px; font-size: 13px; line-height: 1.5;">
-          <strong>Week 2 of 7</strong> · Build phase · peak week is May 18-24
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Milestones</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
-          <div style="padding: 10px; background: var(--primary-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--primary-dark); font-weight: 700; text-transform: uppercase;">✓ Hit</div>
-            <div style="font-size: 14px; font-weight: 700; margin-top: 2px;">First 2:30 brick</div>
-            <div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Sat Apr 26</div>
-          </div>
-          <div style="padding: 10px; background: var(--secondary-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: #B8862E; font-weight: 700; text-transform: uppercase;">Upcoming</div>
-            <div style="font-size: 14px; font-weight: 700; margin-top: 2px;">First 1:30 long run</div>
-            <div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Week 4 · May 20</div>
-          </div>
-          <div style="padding: 10px; background: var(--secondary-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: #B8862E; font-weight: 700; text-transform: uppercase;">Upcoming</div>
-            <div style="font-size: 14px; font-weight: 700; margin-top: 2px;">Peak week</div>
-            <div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Week 4 · May 24</div>
-          </div>
-          <div style="padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Race day</div>
-            <div style="font-size: 14px; font-weight: 700; margin-top: 2px;">Half Ironman finish</div>
-            <div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Sun Jun 7</div>
-          </div>
-        </div>
+        <div id="progressPhaseLine" style="margin-top: 12px; padding: 10px 12px; background: rgba(255,255,255,0.15); border-radius: 10px; font-size: 13px; line-height: 1.5;"></div>
       </div>
 
       <!-- 7-day summary — populated from Strava when available -->
@@ -1993,22 +1917,6 @@
 
       <div class="section-label">Recent sessions</div>
       <div class="card" id="progressRecentSessions" style="padding: 0; overflow: hidden;"></div>
-
-      <div class="card" style="margin-top: 14px;">
-        <div class="card-title">Trends</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
-          <div>
-            <div style="color: var(--text-soft); font-size: 11px; font-weight: 700; text-transform: uppercase;">Run pace @ Z2 HR</div>
-            <div style="font-size: 17px; font-weight: 700; margin-top: 2px;">9:45 /mi</div>
-            <div style="color: var(--primary); font-size: 12px; font-weight: 600;">▼ 22s faster vs. 4 weeks ago</div>
-          </div>
-          <div>
-            <div style="color: var(--text-soft); font-size: 11px; font-weight: 700; text-transform: uppercase;">Morning HR</div>
-            <div style="font-size: 17px; font-weight: 700; margin-top: 2px;">46 bpm</div>
-            <div style="color: var(--text-soft); font-size: 12px; font-weight: 600;">↔ stable baseline</div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2993,28 +2901,36 @@
     if (b) b.classList.toggle('active', which === 'B');
   }
 
+  // Builds a 6-week weekArc with real date ranges leading up to race day.
+  // Conservative (A) is ~5% lighter than aggressive (B).
+  function buildWeekArcFromRaceDate(hoursBase) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmt = d => `${months[d.getMonth()]} ${d.getDate()}`;
+    const range = (start, end) => `${fmt(start)} – ${fmt(end)}`;
+    const focuses = ['Base', 'Build', 'Build', 'Peak', 'Back-off', 'Taper'];
+    const ratios = [0.85, 1.0, 1.05, 1.15, 0.75, 0.45];
+    const startWeek = getStartOfWeekMonday();
+    const arc = [];
+    for (let i = 0; i < 6; i++) {
+      const start = new Date(startWeek); start.setDate(start.getDate() + i * 7);
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      const h = hoursBase * ratios[i];
+      arc.push({
+        dates: range(start, end),
+        hours: `${Math.floor(h)}:${String(Math.round((h - Math.floor(h)) * 60)).padStart(2,'0')}`,
+        focus: focuses[i],
+        current: i === 0
+      });
+    }
+    return arc;
+  }
   function applyChosenPlan() {
     applyTriFocusToPlan();
     const choice = localStorage.getItem('plan-choice') || 'A';
-    if (choice === 'A') {
-      planState.weekArc = [
-        { dates: 'Apr 27 – May 3', hours: '4:00', focus: 'Base' },
-        { dates: 'May 4 – 10', hours: '4:45', focus: 'Build', current: true },
-        { dates: 'May 11 – 17', hours: '5:00', focus: 'Build' },
-        { dates: 'May 18 – 24', hours: '5:15', focus: 'Peak' },
-        { dates: 'May 25 – 31', hours: '3:30', focus: 'Back-off' },
-        { dates: 'Jun 1 – 7', hours: '2:15', focus: 'Taper · Race Sun' }
-      ];
-    } else {
-      planState.weekArc = [
-        { dates: 'Apr 27 – May 3', hours: '4:00', focus: 'Base' },
-        { dates: 'May 4 – 10', hours: '5:00', focus: 'Build', current: true },
-        { dates: 'May 11 – 17', hours: '5:15', focus: 'Build' },
-        { dates: 'May 18 – 24', hours: '5:45', focus: 'Peak' },
-        { dates: 'May 25 – 31', hours: '4:00', focus: 'Back-off' },
-        { dates: 'Jun 1 – 7', hours: '2:30', focus: 'Taper · Race Sun' }
-      ];
-    }
+    const baseHours = parseFloat(localStorage.getItem('hours-per-week') || '5');
+    // A = conservative, B = aggressive (slightly more volume)
+    const adjusted = choice === 'A' ? baseHours * 0.92 : baseHours;
+    planState.weekArc = buildWeekArcFromRaceDate(adjusted);
     saveUserData();
   }
 
@@ -3229,11 +3145,13 @@
     const activeRpe = document.querySelector('#rpe .rpe-btn.active');
     const rpe = activeRpe ? parseInt(activeRpe.textContent) : null;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    const s = planState.sessions.Wed;
+    const today = getTodayDay();
+    const todayFull = DAY_FULL[today];
+    const s = planState.sessions[today];
     if (s) { s.completed = true; s.rpe = rpe; }
-    trackEvent('session_logged', { day: 'Wed', type: s ? s.type : null, rpe, name: s ? s.name : null });
-    analyzeLoggedSession('Wed', rpe);
-    setChange(`Logged Wednesday session (RPE ${rpe || '—'}). Engine reassessing week.`);
+    trackEvent('session_logged', { day: today, type: s ? s.type : null, rpe, name: s ? s.name : null });
+    analyzeLoggedSession(today, rpe);
+    setChange(`Logged ${todayFull} session (RPE ${rpe || '—'}). Engine reassessing week.`);
     showScreen('today');
     renderNotifBadge();
   }
@@ -3406,27 +3324,46 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const weeksOut = Math.ceil(days / 7);
     return Math.max(0, totalWeeks - weeksOut);
   }
-  const TODAY_IDX = 2;
+  // Use the real today index (Mon=0..Sun=6). No hardcoded constant.
+  // Computes the start of THIS week (Monday) at midnight
+  function getStartOfWeekMonday(d) {
+    const t = new Date(d || new Date());
+    t.setHours(0,0,0,0);
+    const dow = t.getDay(); // 0=Sun
+    const diff = (dow === 0 ? 6 : dow - 1);
+    t.setDate(t.getDate() - diff);
+    return t;
+  }
+  // Builds { Mon: 'Apr 20', Tue: 'Apr 21', ..., Sun: 'Apr 26' } for the current week
+  function buildWeekDateLabels() {
+    const start = getStartOfWeekMonday();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const out = {};
+    DAYS.forEach((day, i) => {
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      out[day] = `${months[d.getMonth()]} ${d.getDate()}`;
+    });
+    return out;
+  }
+  // Refreshes planState.dates to match the real current week. Called by renderAll.
+  function recomputeWeekDates() {
+    if (!planState) return;
+    planState.dates = buildWeekDateLabels();
+  }
 
   const planState = {
     sessions: {
-      Mon: { name: 'Full rest', meta: 'Recovery', duration: 0, type: 'rest', completed: true },
-      Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest', completed: true },
+      Mon: { name: 'Full rest', meta: 'Recovery', duration: 0, type: 'rest' },
+      Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Wed: { name: 'Swim + Bike intervals', meta: '60 min · Quality', duration: 60, type: 'quality' },
       Thu: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Fri: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Sat: { name: 'Long brick', meta: 'Bike 2:00 + Run 0:30', duration: 150, type: 'brick' },
       Sun: { name: 'Long easy run', meta: '1:15 · Zone 2', duration: 75, type: 'run' }
     },
-    dates: { Mon: 'Apr 27', Tue: 'Apr 28', Wed: 'Apr 29', Thu: 'Apr 30', Fri: 'May 1', Sat: 'May 2', Sun: 'May 3' },
-    weekArc: [
-      { dates: 'Apr 27 – May 3', hours: '4:00', focus: 'Base' },
-      { dates: 'May 4 – 10', hours: '5:00', focus: 'Build', current: true },
-      { dates: 'May 11 – 17', hours: '5:15', focus: 'Build' },
-      { dates: 'May 18 – 24', hours: '5:45', focus: 'Peak' },
-      { dates: 'May 25 – 31', hours: '4:00', focus: 'Back-off' },
-      { dates: 'Jun 1 – 7', hours: '2:30', focus: 'Taper · Race Sun' }
-    ],
+    // Computed from today on first render — these are placeholder strings that get overwritten
+    dates: buildWeekDateLabels(),
+    weekArc: [], // generated dynamically by generatePlanFromInputs based on race date
     injury: null,
     lastChange: null
   };
@@ -4253,11 +4190,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!el) return;
     if (viewWeekOffset !== 0) { el.innerHTML = ''; return; }
     let html = '';
+    const todayIdx = getTodayIdx();
     DAYS.forEach((day, i) => {
       const s = planState.sessions[day];
       if (!s) return;
-      const isToday = i === TODAY_IDX;
-      const isPast = i < TODAY_IDX || s.completed;
+      const isToday = i === todayIdx;
+      const isPast = i < todayIdx || s.completed;
       const icon = ICON[s.type] || '•';
       const statusText = isToday ? 'Up next' : isPast ? 'Done' : 'Planned';
       const rowClass = 'session-row' + (isToday ? ' today' : isPast ? ' done' : '');
@@ -4464,22 +4402,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const ci = planState.lastCheckin;
     const ciRecent = ci && (Date.now() - ci.when < 86400000);
     if (ciRecent) {
-      if (ci.body === 'Exhausted' && sessions.Wed && sessions.Wed.type !== 'rest' && sessions.Wed.duration > 45) {
+      const todayDay = getTodayDay();
+      const todaySession = sessions[todayDay];
+      if (ci.body === 'Exhausted' && todaySession && todaySession.type !== 'rest' && todaySession.duration > 45) {
         insights.push({
           severity: 'alert',
           title: 'Check-in flagged: you said "Exhausted"',
-          message: `You reported feeling exhausted at this morning's check-in. Today's prescribed session (${sessions.Wed.name}, ${sessions.Wed.meta}) is too much for this recovery state — you\'ll get more from an easier day.`,
+          message: `You reported feeling exhausted at this morning's check-in. Today's prescribed session (${todaySession.name}, ${todaySession.meta}) is too much for this recovery state — you\'ll get more from an easier day.`,
           suggestion: 'Cut today\'s session to easy aerobic or take full rest.',
-          fix: { label: 'Ease today to 30-min Z2', tool: 'shortenSession', input: { day: 'Wed', newMinutes: 30, newName: 'Easy aerobic', newMeta: '30 min · Z2 recovery', reason: 'morning check-in: exhausted' } }
+          fix: { label: 'Ease today to 30-min Z2', tool: 'shortenSession', input: { day: todayDay, newMinutes: 30, newName: 'Easy aerobic', newMeta: '30 min · Z2 recovery', reason: 'morning check-in: exhausted' } }
         });
       }
-      if ((ci.sleep === 'Under 5h' || ci.sleep === '5-6h') && sessions.Wed && (sessions.Wed.type === 'quality' || sessions.Wed.type === 'brick')) {
+      if ((ci.sleep === 'Under 5h' || ci.sleep === '5-6h') && todaySession && (todaySession.type === 'quality' || todaySession.type === 'brick')) {
         insights.push({
           severity: 'warn',
           title: `Check-in: ${ci.sleep} sleep + quality session`,
           message: `Research (Milewski 2014) shows training hard on <6h sleep raises injury risk 1.7×. Today's quality session should be downgraded.`,
           suggestion: 'Convert to easy aerobic, push quality to tomorrow if sleep recovers.',
-          fix: { label: 'Downgrade to easy Z2', tool: 'swapDiscipline', input: { day: 'Wed', newType: 'run', newName: 'Easy run (sleep-adjusted)', newMeta: '45 min · Z2', reason: 'insufficient sleep to handle intensity' } }
+          fix: { label: 'Downgrade to easy Z2', tool: 'swapDiscipline', input: { day: todayDay, newType: 'run', newName: 'Easy run (sleep-adjusted)', newMeta: '45 min · Z2', reason: 'insufficient sleep to handle intensity' } }
         });
       }
       if (ci.stress === 'High' && activeSessions.length > 3) {
@@ -4581,7 +4521,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function computeTodayRationale() {
-    const today = 'Wed';
+    const today = getTodayDay();
     const todaySession = planState.sessions[today];
     if (!todaySession || todaySession.type === 'rest') {
       return 'Today is a rest day. Recovery is the workout — the body adapts between sessions, not during them. Protect sleep and take it genuinely easy.';
@@ -5562,6 +5502,40 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (pgt) pgt.textContent = title;
     const pgd = document.getElementById('profileGoalDate');
     if (pgd) pgd.textContent = `${dateStr} · ${dayLabel}`;
+
+    // Plan tab peak banner — derived from the actual weekArc
+    const peak = document.getElementById('planPeakBanner');
+    if (peak) {
+      const arc = planState.weekArc || [];
+      const peakIdx = arc.findIndex(w => /peak/i.test(w.focus || ''));
+      const currentIdx = getCurrentWeekIdx();
+      if (days < 0 || arc.length === 0) {
+        peak.innerHTML = '';
+      } else if (peakIdx >= 0 && peakIdx > currentIdx) {
+        const weeksAway = peakIdx - currentIdx;
+        peak.innerHTML = `<div class="info-banner"><strong>Peak week is ${weeksAway} week${weeksAway > 1 ? 's' : ''} out.</strong> That's your dress rehearsal — biggest volume, race-pace work.</div>`;
+      } else if (peakIdx === currentIdx) {
+        peak.innerHTML = `<div class="info-banner"><strong>This is peak week.</strong> Highest volume of the cycle. Sleep + fuel matter most right now.</div>`;
+      } else if (currentIdx === arc.length - 1) {
+        peak.innerHTML = `<div class="info-banner"><strong>Race week.</strong> Volume drops, intensity stays sharp. Your job is to arrive fresh.</div>`;
+      } else {
+        peak.innerHTML = '';
+      }
+    }
+
+    // Progress tab phase line
+    const phase = document.getElementById('progressPhaseLine');
+    if (phase) {
+      const arc = planState.weekArc || [];
+      const cur = arc[getCurrentWeekIdx()] || arc[0];
+      if (days < 0) {
+        phase.textContent = 'Race complete. Time to plan the next goal.';
+      } else if (arc.length > 0 && cur) {
+        phase.innerHTML = `<strong>Week ${getCurrentWeekIdx() + 1} of ${arc.length}</strong> · ${escapeHtml(cur.focus || 'Build phase')}`;
+      } else {
+        phase.textContent = '';
+      }
+    }
   }
 
   function renderCourseIntel() {
@@ -5827,11 +5801,50 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       why.textContent = w;
     }
   }
+  // Render the "Coming up" section on Today tab — next 2 non-rest sessions
+  function renderTodayComingUp() {
+    const slot = document.getElementById('todayComingUp');
+    if (!slot) return;
+    const todayIdx = getTodayIdx();
+    const upcoming = [];
+    for (let offset = 1; offset <= 6 && upcoming.length < 2; offset++) {
+      const i = (todayIdx + offset) % 7;
+      const day = DAYS[i];
+      const s = planState.sessions[day];
+      if (s && s.type !== 'rest' && s.duration > 0) {
+        upcoming.push({ day, s });
+      }
+    }
+    if (upcoming.length === 0) {
+      slot.innerHTML = '<div style="font-size:13px; color:var(--text-soft); padding:6px 0;">No more sessions this week.</div>';
+      return;
+    }
+    slot.innerHTML = upcoming.map(({ day, s }) => `
+      <div class="session-row">
+        <div class="session-icon">${ICON[s.type] || '•'}</div>
+        <div class="session-info">
+          <div class="session-day">${DAY_FULL[day]} · ${planState.dates[day] || ''}</div>
+          <div class="session-name">${escapeHtml(s.name)}</div>
+          <div class="session-meta">${escapeHtml(s.meta)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  // Render the rationale text on Today tab dynamically
+  function renderTodayRationaleSlot() {
+    const slot = document.getElementById('todayRationale');
+    if (!slot) return;
+    slot.textContent = computeTodayRationale();
+  }
+
   function renderAll() {
+    recomputeWeekDates();
     renderTodayGreetingAndRace();
     renderRaceMeta();
     restoreCheckinSummaryIfSaved();
     renderTodayHero();
+    renderTodayComingUp();
+    renderTodayRationaleSlot();
     renderLogSession();
     renderWeekSessions();
     renderRecentStravaSessions();
@@ -6609,7 +6622,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">↻ Sync</button>
       </div>
       ${recent.map(a => `
-        <div class="session-row done" style="display: block;">
+        <div class="session-row done" style="display: block; cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
           <div style="display: flex; align-items: center; gap: 12px;">
             <div class="session-icon" style="background: var(--primary); color: #fff;">${iconForStravaType(a.type)}</div>
             <div class="session-info">
@@ -6736,7 +6749,81 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   // Pull HR/HR-time-series streams for one activity (used by Session Detail modal)
   async function fetchStravaActivityStreams(activityId) {
-    return _stravaApiCall(`/activities/${activityId}/streams?keys=heartrate,time,distance,altitude&key_by_type=true`);
+    return _stravaApiCall(`/activities/${activityId}/streams?keys=heartrate,time,distance,altitude,latlng&key_by_type=true`);
+  }
+  // Fetch the full detailed activity (basic list response doesn't include the polyline / splits)
+  async function fetchStravaActivityFull(activityId) {
+    return _stravaApiCall(`/activities/${activityId}`);
+  }
+  // Decode Google's encoded polyline format → array of [lat, lng]
+  function decodePolyline(encoded) {
+    if (!encoded) return [];
+    const points = [];
+    let index = 0, lat = 0, lng = 0;
+    while (index < encoded.length) {
+      let b, shift = 0, result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+      shift = 0; result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+    return points;
+  }
+  // Build an inline SVG of the route from a list of [lat, lng] points
+  function renderRouteSVG(latlngs) {
+    if (!latlngs || latlngs.length < 2) return '';
+    const lats = latlngs.map(p => p[0]);
+    const lngs = latlngs.map(p => p[1]);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const w = 320, h = 180, pad = 8;
+    const dLat = Math.max(0.0001, maxLat - minLat);
+    const dLng = Math.max(0.0001, maxLng - minLng);
+    // Equirectangular projection (close enough at city scale)
+    const aspect = dLng / dLat;
+    const drawW = w - pad * 2, drawH = h - pad * 2;
+    const useW = aspect > drawW / drawH ? drawW : drawH * aspect;
+    const useH = aspect > drawW / drawH ? drawW / aspect : drawH;
+    const offX = (w - useW) / 2;
+    const offY = (h - useH) / 2;
+    const pts = latlngs.map(([la, lo]) => {
+      const x = offX + ((lo - minLng) / dLng) * useW;
+      const y = offY + (1 - (la - minLat) / dLat) * useH;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    const start = pts[0].split(',');
+    const end = pts[pts.length - 1].split(',');
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:180px; display:block; background:var(--bg-soft); border-radius:8px;">
+      <polyline fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${pts.join(' ')}" />
+      <circle cx="${start[0]}" cy="${start[1]}" r="5" fill="#fff" stroke="var(--primary)" stroke-width="2"/>
+      <circle cx="${end[0]}" cy="${end[1]}" r="5" fill="var(--primary)" stroke="#fff" stroke-width="2"/>
+    </svg>`;
+  }
+  // Build an SVG elevation profile from altitude stream
+  function renderElevationSVG(alt, dist) {
+    if (!alt || alt.length < 5) return '';
+    const w = 320, h = 60, pad = 4;
+    const minA = Math.min(...alt), maxA = Math.max(...alt);
+    const range = Math.max(5, maxA - minA);
+    const totalD = dist ? dist[dist.length - 1] : alt.length;
+    const step = Math.max(1, Math.floor(alt.length / 200));
+    const pts = [];
+    for (let i = 0; i < alt.length; i += step) {
+      const x = pad + ((dist ? dist[i] : i) / totalD) * (w - pad * 2);
+      const y = pad + (1 - (alt[i] - minA) / range) * (h - pad * 2);
+      pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    // Closed area for filled chart
+    const lastX = pts[pts.length - 1].split(',')[0];
+    const firstX = pts[0].split(',')[0];
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:60px; display:block;">
+      <polygon fill="var(--primary-soft)" stroke="none" points="${firstX},${h-pad} ${pts.join(' ')} ${lastX},${h-pad}"/>
+      <polyline fill="none" stroke="var(--primary)" stroke-width="1.5" points="${pts.join(' ')}" />
+    </svg>`;
   }
   // Build a small inline SVG line chart for HR over time
   function renderHrChartSVG(hrArr, timeArr) {
@@ -6865,6 +6952,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ──────────────────────────────────────────────────────────────────────
   // STRAVA-BACKED SESSION REPORT — opens a Strava activity in the report modal
+  // Fetches the full activity (for polyline + splits) and streams (HR, elevation)
   // ──────────────────────────────────────────────────────────────────────
   async function openStravaSessionReport(activityId) {
     const a = (planState.stravaActivities || []).find(x => String(x.id) === String(activityId));
@@ -6884,11 +6972,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     html += '</div>';
 
-    // Placeholder for HR chart while we fetch streams
-    html += `<div class="detail-section" style="margin-top: 18px;" id="srStreamsSlot">
-      <div class="detail-label">Heart rate over time</div>
-      <div style="font-size: 12px; color: var(--text-soft);">Loading from Strava…</div>
+    // Slots populated below by lazy fetches
+    html += `<div class="detail-section" style="margin-top: 18px;" id="srRouteSlot">
+      <div class="detail-label">Route</div>
+      <div style="font-size: 12px; color: var(--text-soft);">Loading map…</div>
     </div>`;
+    html += `<div class="detail-section" style="margin-top: 14px;" id="srElevSlot"></div>`;
+    html += `<div class="detail-section" style="margin-top: 14px;" id="srStreamsSlot">
+      <div class="detail-label">Heart rate over time</div>
+      <div style="font-size: 12px; color: var(--text-soft);">Loading…</div>
+    </div>`;
+    html += `<div class="detail-section" style="margin-top: 14px;" id="srSplitsSlot"></div>`;
 
     html += `<div class="detail-section" style="margin-top: 14px; font-size: 12px; color: var(--text-soft);">
       <div>Source: Strava activity #${a.id}</div>
@@ -6898,30 +6992,108 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.getElementById('srBody').innerHTML = html;
     document.getElementById('sessionReportModal').classList.add('show');
 
-    // Lazy-fetch HR streams
-    try {
-      const streams = await fetchStravaActivityStreams(a.id);
-      const hr = streams && streams.heartrate && streams.heartrate.data;
-      const t = streams && streams.time && streams.time.data;
-      const slot = document.getElementById('srStreamsSlot');
-      if (!slot) return; // modal closed
-      if (hr && hr.length > 0) {
-        slot.innerHTML = `
-          <div class="detail-label">Heart rate over time</div>
-          ${renderHrChartSVG(hr, t)}
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
-            <div>Min ${Math.min(...hr)}</div>
-            <div>Max ${Math.max(...hr)}</div>
-          </div>`;
-      } else {
-        slot.innerHTML = `<div class="detail-label">Heart rate</div>
-          <div style="font-size:12px; color:var(--text-soft);">No HR data recorded for this activity.</div>`;
+    // Lazy-fetch full activity (polyline + splits) in parallel with streams
+    Promise.allSettled([
+      fetchStravaActivityFull(a.id),
+      fetchStravaActivityStreams(a.id)
+    ]).then(([fullRes, streamsRes]) => {
+      const full = fullRes.status === 'fulfilled' ? fullRes.value : null;
+      const streams = streamsRes.status === 'fulfilled' ? streamsRes.value : null;
+
+      // 1. Route map — prefer full.map.summary_polyline, fall back to streams.latlng
+      const routeSlot = document.getElementById('srRouteSlot');
+      if (routeSlot) {
+        let latlngs = null;
+        if (full && full.map && full.map.summary_polyline) {
+          latlngs = decodePolyline(full.map.summary_polyline);
+        } else if (streams && streams.latlng && streams.latlng.data) {
+          latlngs = streams.latlng.data;
+        }
+        if (latlngs && latlngs.length > 1) {
+          const startPt = latlngs[0];
+          routeSlot.innerHTML = `
+            <div class="detail-label">Route</div>
+            ${renderRouteSVG(latlngs)}
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+              <div>○ Start</div>
+              <div>${a.distance_km.toFixed(2)} km total</div>
+              <div>● Finish</div>
+            </div>`;
+        } else {
+          routeSlot.innerHTML = `<div class="detail-label">Route</div>
+            <div style="font-size:12px; color:var(--text-soft);">No GPS data recorded for this activity.</div>`;
+        }
       }
-    } catch (e) {
-      const slot = document.getElementById('srStreamsSlot');
-      if (slot) slot.innerHTML = `<div class="detail-label">Heart rate</div>
-        <div style="font-size:12px; color:var(--warn);">Could not load streams: ${escapeHtml(e.message)}</div>`;
-    }
+
+      // 2. Elevation profile
+      const elevSlot = document.getElementById('srElevSlot');
+      if (elevSlot && streams && streams.altitude && streams.altitude.data) {
+        const alt = streams.altitude.data;
+        const dist = streams.distance && streams.distance.data;
+        const minA = Math.round(Math.min(...alt) * 3.28);
+        const maxA = Math.round(Math.max(...alt) * 3.28);
+        elevSlot.innerHTML = `
+          <div class="detail-label">Elevation</div>
+          ${renderElevationSVG(alt, dist)}
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+            <div>Low ${minA} ft</div>
+            <div>${Math.round(a.elevation_m * 3.28)} ft total gain</div>
+            <div>High ${maxA} ft</div>
+          </div>`;
+      } else if (elevSlot) {
+        elevSlot.innerHTML = '';
+      }
+
+      // 3. HR chart
+      const hrSlot = document.getElementById('srStreamsSlot');
+      if (hrSlot) {
+        const hr = streams && streams.heartrate && streams.heartrate.data;
+        const t = streams && streams.time && streams.time.data;
+        if (hr && hr.length > 0) {
+          hrSlot.innerHTML = `
+            <div class="detail-label">Heart rate over time</div>
+            ${renderHrChartSVG(hr, t)}
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+              <div>Min ${Math.min(...hr)}</div>
+              <div>Avg ${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div>
+              <div>Max ${Math.max(...hr)}</div>
+            </div>`;
+        } else {
+          hrSlot.innerHTML = `<div class="detail-label">Heart rate</div>
+            <div style="font-size:12px; color:var(--text-soft);">No HR data recorded.</div>`;
+        }
+      }
+
+      // 4. Splits (km splits)
+      const splitsSlot = document.getElementById('srSplitsSlot');
+      if (splitsSlot && full && full.splits_metric && full.splits_metric.length > 0) {
+        const splits = full.splits_metric.slice(0, 12); // cap to first 12 km
+        const fastestPace = Math.min(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
+        const slowestPace = Math.max(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
+        splitsSlot.innerHTML = `
+          <div class="detail-label">Splits (per km)</div>
+          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+            ${splits.map((s, i) => {
+              const paceSec = s.elapsed_time / (s.distance / 1000);
+              const pmin = Math.floor(paceSec / 60);
+              const psec = Math.round(paceSec % 60);
+              const pct = ((paceSec - fastestPace) / Math.max(1, slowestPace - fastestPace));
+              const barW = Math.max(8, Math.round((1 - pct) * 100));
+              return `
+                <div style="display: grid; grid-template-columns: 30px 1fr 60px; gap: 8px; align-items: center;">
+                  <div style="color: var(--text-soft); font-weight: 600;">${i + 1}</div>
+                  <div style="height: 6px; background: var(--bg-soft); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${barW}%; background: var(--primary);"></div>
+                  </div>
+                  <div style="text-align: right; font-weight: 600; font-feature-settings: 'tnum';">${pmin}:${String(psec).padStart(2,'0')}</div>
+                </div>`;
+            }).join('')}
+          </div>
+          ${full.splits_metric.length > 12 ? `<div style="font-size:11px; color:var(--text-soft); margin-top:6px;">Showing first 12 of ${full.splits_metric.length} splits.</div>` : ''}`;
+      } else if (splitsSlot) {
+        splitsSlot.innerHTML = '';
+      }
+    });
   }
 
   function markOnboardingComplete() {
