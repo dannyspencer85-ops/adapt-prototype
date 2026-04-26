@@ -2386,6 +2386,20 @@
     </div>
   </div>
 
+  <!-- RESCHEDULE PICKER MODAL -->
+  <div class="modal-bg" id="rescheduleModal">
+    <div class="modal">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Reschedule</h2>
+        <button onclick="closeRescheduleModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">Move <strong id="rescheduleSession"></strong> from <strong id="rescheduleFromDay"></strong> to which day?</div>
+      <div class="chip-row" id="rescheduleDayChips" style="margin-top: 14px; margin-bottom: 14px;"></div>
+      <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 14px;">If the day already has a session, the two will swap. Plan re-evaluates after.</div>
+      <button class="btn btn-ghost btn-full" onclick="closeRescheduleModal()">Cancel</button>
+    </div>
+  </div>
+
   <!-- SORENESS UNDERSTOOD MODAL -->
   <div class="modal-bg" id="sorenessModal">
     <div class="modal" style="max-height: 85vh; overflow-y: auto;">
@@ -6292,21 +6306,54 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
   }
 
   function quickMarkDone() {
+    const today = getTodayDay();
+    const s = planState.sessions[today];
+    if (!s || s.type === 'rest') { alert("Today is a rest day — nothing to mark done."); return; }
+    if (s.completed) { alert("Today's session is already marked done."); return; }
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('completeSession', { day: 'Wed' });
+    executeTool('completeSession', { day: today });
   }
   function quickReschedule() {
-    const next = prompt('Move to which day? (Mon, Tue, Thu, Fri, Sat, Sun)');
-    if (!next) return;
-    const day = next.charAt(0).toUpperCase() + next.slice(1, 3).toLowerCase();
-    if (!['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].includes(day)) return;
-    lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('moveSession', { fromDay: 'Wed', toDay: day, reason: 'rescheduled via quick action' });
+    const today = getTodayDay();
+    const s = planState.sessions[today];
+    if (!s || s.type === 'rest') { alert("Today is a rest day — nothing to reschedule."); return; }
+    openReschedulePicker(today);
   }
   function quickSkip() {
-    if (!confirm('Skip today\'s session? Plan will adapt.')) return;
+    const today = getTodayDay();
+    const s = planState.sessions[today];
+    if (!s || s.type === 'rest') { alert("Today is a rest day — nothing to skip."); return; }
+    if (!confirm(`Skip today's ${s.name}? Plan will adapt.`)) return;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('skipSession', { day: 'Wed' });
+    executeTool('skipSession', { day: today });
+  }
+
+  function openReschedulePicker(fromDay) {
+    const modal = document.getElementById('rescheduleModal');
+    if (!modal) return;
+    modal.dataset.fromDay = fromDay;
+    const s = planState.sessions[fromDay];
+    document.getElementById('rescheduleSession').textContent = s ? `${s.name} (${s.meta})` : 'today\'s session';
+    document.getElementById('rescheduleFromDay').textContent = fromDay;
+    const chipRow = document.getElementById('rescheduleDayChips');
+    chipRow.innerHTML = DAYS.filter(d => d !== fromDay).map(d => {
+      const target = planState.sessions[d];
+      const targetIsRest = !target || target.type === 'rest';
+      const tag = targetIsRest ? '<span style="color:var(--text-soft); font-size:11px;"> (rest)</span>' : `<span style="color:var(--warn); font-size:11px;"> (will swap)</span>`;
+      return `<button class="chip" onclick="applyReschedule('${d}')">${d}${tag}</button>`;
+    }).join('');
+    modal.classList.add('show');
+  }
+  function applyReschedule(toDay) {
+    const modal = document.getElementById('rescheduleModal');
+    const fromDay = modal.dataset.fromDay;
+    modal.classList.remove('show');
+    if (!fromDay) return;
+    lastSnapshot = JSON.parse(JSON.stringify(planState));
+    executeTool('moveSession', { fromDay, toDay, reason: 'rescheduled via quick action' });
+  }
+  function closeRescheduleModal() {
+    document.getElementById('rescheduleModal').classList.remove('show');
   }
 
   function applyCrunch() {
