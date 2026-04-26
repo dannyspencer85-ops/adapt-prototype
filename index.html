@@ -1819,42 +1819,37 @@
       <div class="week-strip" id="weekStrip"></div>
       <div id="weekStateBanner"></div>
 
-      <div class="session-row done" style="display: block;" onclick="openSessionReport('sat_apr26')">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
-          <div class="session-info">
-            <div class="session-day">Sat · Apr 26</div>
-            <div class="session-name">Long brick — completed</div>
-            <div class="session-meta">Bike 2:00 + Run 0:28</div>
+      <!-- Recent completed sessions: real Strava data when synced, fallback to demo otherwise -->
+      <div id="recentStravaSessions"></div>
+      <div id="recentDemoSessions">
+        <div class="session-row done" style="display: block;" onclick="openSessionReport('sat_apr26')">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
+            <div class="session-info">
+              <div class="session-day">Sat · Apr 26 <span style="font-size:10px; color:var(--text-soft); font-weight:500;">· demo</span></div>
+              <div class="session-name">Long brick — completed</div>
+              <div class="session-meta">Bike 2:00 + Run 0:28</div>
+            </div>
+            <div class="session-status done">Done</div>
+            <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
           </div>
-          <div class="session-status done">Done</div>
-          <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
-        </div>
-        <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
-          <div class="data-cell">
-            <div class="label">Duration</div>
-            <div class="value" style="font-size: 14px;">2h 28m</div>
-          </div>
-          <div class="data-cell">
-            <div class="label">Avg HR</div>
-            <div class="value" style="font-size: 14px;">142</div>
-          </div>
-          <div class="data-cell">
-            <div class="label">RPE</div>
-            <div class="value" style="font-size: 14px;">7 / 10</div>
+          <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
+            <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">2h 28m</div></div>
+            <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">142</div></div>
+            <div class="data-cell"><div class="label">RPE</div><div class="value" style="font-size: 14px;">7 / 10</div></div>
           </div>
         </div>
-      </div>
-      <div class="session-row done" style="display: block;" onclick="openSessionReport('mon_apr28')">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
-          <div class="session-info">
-            <div class="session-day">Mon · Apr 28 · rest day</div>
-            <div class="session-name">Full rest</div>
-            <div class="session-meta">Morning HR 45 · Sleep 7:48</div>
+        <div class="session-row done" style="display: block;" onclick="openSessionReport('mon_apr28')">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="session-icon" style="background: var(--primary); color: #fff;">✓</div>
+            <div class="session-info">
+              <div class="session-day">Mon · Apr 28 · rest day <span style="font-size:10px; color:var(--text-soft); font-weight:500;">· demo</span></div>
+              <div class="session-name">Full rest</div>
+              <div class="session-meta">Morning HR 45 · Sleep 7:48</div>
+            </div>
+            <div class="session-status done">Done</div>
+            <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
           </div>
-          <div class="session-status done">Done</div>
-          <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
         </div>
       </div>
       <div id="weekSessions"></div>
@@ -2313,9 +2308,11 @@
         <div id="stravaConnected" style="display:none;">
           <div style="font-size:13px; padding:10px 12px; background:var(--primary-soft); border-radius:8px; margin-bottom:10px;">
             ✅ Connected as <strong id="stravaAthleteName">—</strong>
+            <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
           </div>
+          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">↻ Sync recent activities</button>
           <div style="display:flex; gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test connection</button>
+            <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
             <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
             <button class="btn btn-ghost btn-sm" onclick="disconnectStrava()" style="flex:1; color:var(--warn); border-color:var(--warn);">Disconnect</button>
           </div>
@@ -5626,6 +5623,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderTodayHero();
     renderLogSession();
     renderWeekSessions();
+    renderRecentStravaSessions();
     renderWeekArc();
     renderBanners();
     renderInsights();
@@ -5987,6 +5985,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       pill.style.color = connected ? 'var(--primary-dark)' : 'var(--text-soft)';
     }
     if (nameEl && cfg && cfg.athleteName) nameEl.textContent = cfg.athleteName;
+    const syncEl = document.getElementById('stravaSyncStatus');
+    if (syncEl) {
+      const ts = planState.stravaSyncedAt;
+      const count = (planState.stravaActivities || []).length;
+      if (!ts) {
+        syncEl.textContent = 'No activities synced yet — tap Sync below.';
+      } else {
+        const mins = Math.round((Date.now() - ts) / 60000);
+        const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
+        syncEl.textContent = `${count} activities · last synced ${ago}`;
+      }
+    }
   }
   function setStravaMsg(text, kind) {
     const el = document.getElementById('stravaMsg');
@@ -6167,6 +6177,140 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // STRAVA ACTIVITY SYNC — pulls recent activities and uses them in the UI
+  // ──────────────────────────────────────────────────────────────────────
+  async function _stravaApiCall(path, isRetry) {
+    const cfg = getStravaConfig();
+    if (!cfg) throw new Error('Strava not connected.');
+    const res = await fetch('https://www.strava.com/api/v3' + path, {
+      headers: { 'Authorization': 'Bearer ' + cfg.accessToken }
+    });
+    if (res.status === 401 && !isRetry && cfg.refreshToken && cfg.clientSecret) {
+      await refreshStravaToken();
+      return _stravaApiCall(path, true);
+    }
+    if (!res.ok) throw new Error(`Strava ${res.status}`);
+    return res.json();
+  }
+  // Fetch last N days of activities and store on planState + localStorage
+  async function syncStravaActivities(days) {
+    const cfg = getStravaConfig();
+    if (!cfg) return null;
+    const numDays = days || 30;
+    const after = Math.floor((Date.now() - numDays * 86400 * 1000) / 1000);
+    const list = await _stravaApiCall(`/athlete/activities?after=${after}&per_page=50`);
+    const activities = (list || []).map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,                            // 'Run', 'Ride', 'Swim', 'WeightTraining', etc.
+      distance_km: (a.distance || 0) / 1000,
+      moving_min: Math.round((a.moving_time || 0) / 60),
+      elapsed_min: Math.round((a.elapsed_time || 0) / 60),
+      elevation_m: a.total_elevation_gain || 0,
+      avg_hr: a.average_heartrate || null,
+      max_hr: a.max_heartrate || null,
+      avg_watts: a.average_watts || null,
+      kilojoules: a.kilojoules || null,
+      suffer: a.suffer_score || null,
+      start_date_local: a.start_date_local,
+      start_date: a.start_date,
+    }));
+    planState.stravaActivities = activities;
+    planState.stravaSyncedAt = Date.now();
+    localStorage.setItem('strava-activities', JSON.stringify(activities));
+    localStorage.setItem('strava-synced-at', String(planState.stravaSyncedAt));
+    saveUserData();
+    return activities;
+  }
+  function loadCachedStravaActivities() {
+    try {
+      const raw = localStorage.getItem('strava-activities');
+      if (raw) planState.stravaActivities = JSON.parse(raw);
+      const ts = localStorage.getItem('strava-synced-at');
+      if (ts) planState.stravaSyncedAt = parseInt(ts, 10);
+    } catch (e) {}
+  }
+  // Profile-screen Sync button handler
+  async function syncStravaFromProfile() {
+    setStravaMsg('Syncing recent activities…', 'info');
+    try {
+      const acts = await syncStravaActivities(30);
+      setStravaMsg(`✅ Synced ${acts.length} activities from the last 30 days.`, 'ok');
+      renderAll();
+      renderStravaUI();
+    } catch (e) {
+      setStravaMsg(`Sync failed: ${e.message}`, 'err');
+    }
+  }
+  // Strava activity → display icon
+  function iconForStravaType(type) {
+    const t = (type || '').toLowerCase();
+    if (t.includes('run')) return '🏃';
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return '🚴';
+    if (t.includes('swim')) return '🏊';
+    if (t.includes('weight') || t.includes('strength')) return '🏋️';
+    if (t.includes('walk') || t.includes('hike')) return '🥾';
+    if (t.includes('yoga')) return '🧘';
+    return '✓';
+  }
+  function formatHM(mins) {
+    if (!mins || mins < 1) return '—';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m} min`;
+  }
+  function shortDay(isoStr) {
+    const d = new Date(isoStr);
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${days[d.getDay()]} · ${months[d.getMonth()]} ${d.getDate()}`;
+  }
+  // Render real recent activities on the Plan tab
+  function renderRecentStravaSessions() {
+    const slot = document.getElementById('recentStravaSessions');
+    const demoSlot = document.getElementById('recentDemoSessions');
+    if (!slot) return;
+    const acts = (planState.stravaActivities || []).slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date));
+    if (acts.length === 0) {
+      slot.innerHTML = '';
+      if (demoSlot) demoSlot.style.display = 'block';
+      return;
+    }
+    if (demoSlot) demoSlot.style.display = 'none'; // hide hardcoded demo when real data is available
+
+    // Show last 5 completed sessions
+    const recent = acts.slice(0, 5);
+    const syncedMins = planState.stravaSyncedAt ? Math.round((Date.now() - planState.stravaSyncedAt) / 60000) : null;
+    const syncedLabel = syncedMins == null ? '' : syncedMins < 1 ? 'just now' : syncedMins < 60 ? `${syncedMins} min ago` : `${Math.round(syncedMins/60)}h ago`;
+
+    slot.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px;">
+        <div style="font-size:11px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">From Strava ${syncedLabel ? '· synced ' + syncedLabel : ''}</div>
+        <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">↻ Sync</button>
+      </div>
+      ${recent.map(a => `
+        <div class="session-row done" style="display: block;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="session-icon" style="background: var(--primary); color: #fff;">${iconForStravaType(a.type)}</div>
+            <div class="session-info">
+              <div class="session-day">${shortDay(a.start_date_local)}</div>
+              <div class="session-name">${escapeHtml(a.name)}</div>
+              <div class="session-meta">${a.type}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}${a.elevation_m > 10 ? ' · ' + Math.round(a.elevation_m) + ' m up' : ''}</div>
+            </div>
+            <div class="session-status done">Done</div>
+          </div>
+          ${(a.moving_min || a.avg_hr || a.avg_watts) ? `
+          <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
+            <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">${formatHM(a.moving_min)}</div></div>
+            <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
+            <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Suffer'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
+          </div>` : ''}
+        </div>
+      `).join('')}
+    `;
+  }
+
   function markOnboardingComplete() {
     const username = currentUser();
     if (!username) return;
@@ -6189,7 +6333,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       goHome();
       setTimeout(startTour, 600);
     }
+    // Load any cached Strava activities so the UI shows them immediately
+    loadCachedStravaActivities();
     renderAll();
+    // If connected and last sync was >30 min ago (or never), refresh in background
+    const cfg = getStravaConfig();
+    if (cfg && cfg.accessToken) {
+      const lastSync = planState.stravaSyncedAt || 0;
+      const stale = (Date.now() - lastSync) > 30 * 60 * 1000;
+      if (stale) {
+        syncStravaActivities(30).then(() => renderAll()).catch(e => console.warn('Background Strava sync failed:', e.message));
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
