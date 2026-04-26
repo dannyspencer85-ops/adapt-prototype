@@ -1952,7 +1952,21 @@
       <!-- Discipline breakdown -->
       <div class="card">
         <div class="card-title">By discipline</div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Tap a row to see the workouts behind it.</div>
         <div id="perfDisciplineBars"></div>
+      </div>
+
+      <!-- Drill-down panel — populated when user taps a bar or discipline -->
+      <div id="perfDrillCard" class="card" style="display: none; border-left: 3px solid var(--primary);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;" id="perfDrillKicker">Drill down</div>
+            <div style="font-size: 16px; font-weight: 700; margin-top: 2px;" id="perfDrillTitle">—</div>
+          </div>
+          <button onclick="clearPerfDrill()" style="background:none; border:0; font-size:22px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+        </div>
+        <div id="perfDrillSummary" style="font-size: 13px; color: var(--text-soft); margin-bottom: 10px;"></div>
+        <div id="perfDrillList"></div>
       </div>
 
       <!-- Recent sessions in range -->
@@ -7458,6 +7472,95 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
     renderPerformanceTab();
   }
+  // Drill-down state — { kind: 'bucket' | 'discipline', idx | id }
+  let _perfDrill = null;
+  let _perfBucketCache = null; // populated by renderPerformanceTab; used by selectPerfBucket
+  function selectPerfBucket(idx) {
+    if (_perfDrill && _perfDrill.kind === 'bucket' && _perfDrill.idx === idx) {
+      _perfDrill = null; // toggle off
+    } else {
+      _perfDrill = { kind: 'bucket', idx };
+    }
+    renderPerformanceTab();
+  }
+  function selectPerfDiscipline(id) {
+    if (_perfDrill && _perfDrill.kind === 'discipline' && _perfDrill.id === id) {
+      _perfDrill = null;
+    } else {
+      _perfDrill = { kind: 'discipline', id };
+    }
+    renderPerformanceTab();
+  }
+  function clearPerfDrill() {
+    _perfDrill = null;
+    renderPerformanceTab();
+  }
+  function renderPerfDrillCard(rangeActs) {
+    const card = document.getElementById('perfDrillCard');
+    const titleEl = document.getElementById('perfDrillTitle');
+    const kickerEl = document.getElementById('perfDrillKicker');
+    const summaryEl = document.getElementById('perfDrillSummary');
+    const listEl = document.getElementById('perfDrillList');
+    if (!card) return;
+    if (!_perfDrill) { card.style.display = 'none'; return; }
+
+    let title = '', kicker = '', filtered = [];
+    if (_perfDrill.kind === 'bucket' && _perfBucketCache) {
+      const bucket = _perfBucketCache.buckets[_perfDrill.idx];
+      if (!bucket) { card.style.display = 'none'; return; }
+      kicker = _perfBucketCache.bucketSize === 'day' ? 'Day' : _perfBucketCache.bucketSize === 'week' ? 'Week of' : 'Month of';
+      title = bucket.label;
+      // Activities that fall in this bucket
+      filtered = rangeActs.filter(a => {
+        const t = new Date(a.start_date_local || a.start_date); t.setHours(0,0,0,0);
+        if (_perfBucketCache.bucketSize === 'day') {
+          return t.toISOString().slice(0,10) === bucket.key;
+        } else if (_perfBucketCache.bucketSize === 'week') {
+          const x = new Date(t); const dow = x.getDay(); const diff = dow === 0 ? 6 : dow - 1; x.setDate(x.getDate() - diff);
+          return x.toISOString().slice(0,10) === bucket.key;
+        } else {
+          return `${t.getFullYear()}-${t.getMonth()}` === bucket.key;
+        }
+      });
+    } else if (_perfDrill.kind === 'discipline') {
+      const labels = { run: 'Run', bike: 'Bike', swim: 'Swim', strength: 'Strength', walk: 'Walk / Hike', mobility: 'Yoga / Mobility', other: 'Other' };
+      kicker = 'Discipline';
+      title = labels[_perfDrill.id] || _perfDrill.id;
+      filtered = rangeActs.filter(a => mapStravaTypeToSessionType(a.type) === _perfDrill.id);
+    }
+
+    card.style.display = 'block';
+    if (kickerEl) kickerEl.textContent = kicker;
+    if (titleEl) titleEl.textContent = title;
+
+    if (filtered.length === 0) {
+      if (summaryEl) summaryEl.textContent = 'No workouts.';
+      if (listEl) listEl.innerHTML = '';
+      return;
+    }
+    const totalMins = filtered.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const totalDist = filtered.reduce((s, a) => s + (a.distance_km || 0), 0);
+    if (summaryEl) {
+      summaryEl.textContent = `${filtered.length} workout${filtered.length === 1 ? '' : 's'} · ${formatHM(totalMins)}${totalDist > 0.5 ? ' · ' + totalDist.toFixed(1) + ' km' : ''}`;
+    }
+
+    // Sort newest first within the drill
+    const sorted = filtered.slice().sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    if (listEl) {
+      listEl.innerHTML = sorted.map((a, i) => `
+        <div onclick="openStravaSessionReport('${a.id}')" style="display: flex; align-items: center; gap: 10px; padding: 10px 0; ${i === sorted.length - 1 ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;">
+          <div style="width: 30px; height: 30px; border-radius: 6px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;">${iconForStravaType(a.type)}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(a.name)}</div>
+            <div style="font-size: 11px; color: var(--text-soft); margin-top: 1px;">${shortDay(a.start_date_local)}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}</div>
+          </div>
+          <div style="font-size: 13px; font-weight: 700; flex-shrink: 0;">${formatHM(a.moving_min)}</div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+      `).join('');
+    }
+  }
+
   // Activities filtered by user-chosen window
   function getActivitiesInRangeDays(days) {
     const cutoff = Date.now() - days * 86400000;
@@ -7572,12 +7675,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Volume buckets
     const { buckets, bucketSize, bucketLabel } = bucketActivities(acts, days);
-    if (volTitle) volTitle.textContent = `Volume · ${bucketLabel}`;
+    if (volTitle) volTitle.textContent = `Volume · ${bucketLabel} (tap a bar)`;
     const peakMins = Math.max(60, ...buckets.map(b => b.mins));
-    bars.innerHTML = buckets.map(b => {
+    // Stash buckets for drill-down lookups
+    _perfBucketCache = { buckets, bucketSize, activities: acts };
+    bars.innerHTML = buckets.map((b, idx) => {
       const pct = b.mins > 0 ? Math.max(8, Math.round((b.mins / peakMins) * 100)) : 6;
       const isEmpty = b.mins < 1;
-      return `<div class="bar ${isEmpty ? '' : 'done'}" style="height: ${pct}%; ${isEmpty ? 'opacity: 0.4;' : ''}" title="${b.label}: ${formatHM(b.mins)}"></div>`;
+      const isSelected = _perfDrill && _perfDrill.kind === 'bucket' && _perfDrill.idx === idx;
+      const baseStyle = `height: ${pct}%; cursor: pointer;`;
+      const selectedStyle = isSelected ? 'box-shadow: 0 0 0 2px var(--primary); transform: scaleY(1.04); transform-origin: bottom;' : '';
+      const opacity = isEmpty ? 'opacity: 0.4;' : '';
+      return `<div class="bar ${isEmpty ? '' : 'done'}" onclick="selectPerfBucket(${idx})" style="${baseStyle} ${opacity} ${selectedStyle}" title="${b.label}: ${formatHM(b.mins)}"></div>`;
     }).join('');
 
     // X-axis labels — show start, middle, end (or first / last few for short ranges)
@@ -7608,24 +7717,41 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     ];
     const discTotal = Object.values(byDisc).reduce((a, b) => a + b, 0);
     if (discBars) {
-      const rows = discOrder
-        .filter(d => (byDisc[d.id] || 0) > 0)
-        .map(d => {
+      const present = discOrder.filter(d => (byDisc[d.id] || 0) > 0);
+      if (present.length === 0) {
+        discBars.innerHTML = '<div style="font-size:13px; color:var(--text-soft);">No data.</div>';
+      } else {
+        // Single stacked bar showing the mix (not progress toward a target)
+        const stackedSegments = present.map(d => {
+          const pct = (byDisc[d.id] / discTotal) * 100;
+          return `<div style="height: 100%; width: ${pct}%; background: ${d.color}; flex-shrink: 0;" title="${d.label}: ${formatHM(byDisc[d.id])}"></div>`;
+        }).join('');
+        // Legend rows — labels + numbers, color dot, no per-row bar
+        const rows = present.map(d => {
           const m = byDisc[d.id];
-          const pct = discTotal > 0 ? Math.round((m / discTotal) * 100) : 0;
+          const pct = Math.round((m / discTotal) * 100);
+          const isSelected = _perfDrill && _perfDrill.kind === 'discipline' && _perfDrill.id === d.id;
           return `
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
-                <span><span style="margin-right: 6px;">${d.icon}</span><strong>${d.label}</strong></span>
-                <span style="color: var(--text-soft);">${formatHM(m)} · ${pct}%</span>
+            <div onclick="selectPerfDiscipline('${d.id}')" style="display: flex; align-items: center; gap: 10px; padding: 8px; margin-left: -8px; margin-right: -8px; border-radius: 8px; cursor: pointer; ${isSelected ? 'background: var(--primary-soft);' : ''}">
+              <div style="width: 12px; height: 12px; border-radius: 3px; background: ${d.color}; flex-shrink: 0;"></div>
+              <div style="font-size: 13px; flex: 1;">
+                <span style="margin-right: 4px;">${d.icon}</span><strong>${d.label}</strong>
               </div>
-              <div style="height: 8px; background: var(--bg-soft); border-radius: 4px; overflow: hidden;">
-                <div style="height: 100%; width: ${pct}%; background: ${d.color};"></div>
+              <div style="text-align: right;">
+                <div style="font-weight: 700; font-size: 14px;">${formatHM(m)}</div>
+                <div style="color: var(--text-soft); font-size: 11px;">${pct}% of mix</div>
               </div>
+              <div style="color: var(--text-soft); margin-left: 4px;">›</div>
             </div>`;
         }).join('');
-      discBars.innerHTML = rows || '<div style="font-size:13px; color:var(--text-soft);">No data.</div>';
+        discBars.innerHTML = `
+          <div style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-bottom: 14px; background: var(--bg-soft);">${stackedSegments}</div>
+          ${rows}`;
+      }
     }
+
+    // Drill-down panel
+    renderPerfDrillCard(acts);
 
     // Top sessions in range — biggest by duration
     if (topSess) {
