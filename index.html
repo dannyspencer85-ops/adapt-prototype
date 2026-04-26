@@ -2389,6 +2389,7 @@
       <div class="card" id="hiddenActivitiesCard" style="display: none;">
         <div class="card-title">Hidden workouts</div>
         <div style="font-size: 13px; color: var(--text-soft); margin-bottom: 10px;" id="hiddenActivitiesCount">—</div>
+        <div id="hiddenActivitiesList" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;"></div>
         <button class="btn btn-ghost btn-sm btn-full" onclick="unhideAllStravaActivities()">Restore all hidden workouts</button>
       </div>
 
@@ -3230,13 +3231,50 @@
     // Reflect current chip selections
     if (typeof renderComplexityProfileUI === 'function') renderComplexityProfileUI();
     if (typeof renderThemeProfileUI === 'function') renderThemeProfileUI();
-    // Show / populate the hidden-workouts card
-    const hidden = getHiddenStravaIds();
+    renderHiddenActivitiesPanel();
+    modal.classList.add('show');
+  }
+  // Renders the hidden workouts panel inside the Settings modal —
+  // list of individual rows with Restore buttons + restore-all at bottom.
+  function renderHiddenActivitiesPanel() {
     const card = document.getElementById('hiddenActivitiesCard');
     const count = document.getElementById('hiddenActivitiesCount');
-    if (card) card.style.display = hidden.length > 0 ? 'block' : 'none';
-    if (count) count.textContent = `${hidden.length} workout${hidden.length === 1 ? '' : 's'} hidden from view. They\'re still on Strava.`;
-    modal.classList.add('show');
+    const list = document.getElementById('hiddenActivitiesList');
+    if (!card) return;
+    const hiddenIds = getHiddenStravaIds();
+    if (hiddenIds.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+    if (count) count.textContent = `${hiddenIds.length} workout${hiddenIds.length === 1 ? '' : 's'} hidden — pick which to restore. They\'re still on Strava.`;
+    // Build the list — match each ID against the synced activities
+    const allActs = planState.stravaActivities || [];
+    const rows = hiddenIds.map(id => {
+      const a = allActs.find(x => String(x.id) === String(id));
+      const labelMain = a ? a.name : `Workout #${id}`;
+      const labelSub = a
+        ? `${shortDay(a.start_date_local)} · ${a.type}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}`
+        : 'Activity not in current sync';
+      const icon = a ? iconForStravaType(a.type) : '?';
+      return `
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
+          <div style="width:28px; height:28px; border-radius:6px; background: var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px;">${icon}</div>
+          <div style="flex:1; min-width: 0;">
+            <div style="font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(labelMain)}</div>
+            <div style="color:var(--text-soft); font-size:11px; margin-top:1px;">${escapeHtml(labelSub)}</div>
+          </div>
+          <button onclick="unhideOneStravaActivity('${id}')" style="background:none; border:1px solid var(--border); color:var(--primary); padding:5px 10px; border-radius:6px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Restore</button>
+        </div>`;
+    }).join('');
+    if (list) list.innerHTML = rows;
+  }
+  function unhideOneStravaActivity(id) {
+    const ids = getHiddenStravaIds().filter(x => String(x) !== String(id));
+    setHiddenStravaIds(ids);
+    if (typeof trackEvent === 'function') trackEvent('strava_activity_unhidden', { id });
+    renderHiddenActivitiesPanel();
+    renderAll();
   }
   function closeSettings() {
     const modal = document.getElementById('settingsModal');
