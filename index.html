@@ -1692,6 +1692,9 @@
       <div id="todayInjuryBanner"></div>
       <div id="todayChangeBanner"></div>
 
+      <!-- Fitness pulse card — shows the most actionable weekly fitness signal -->
+      <div id="todayFitnessPulse" style="display: none;"></div>
+
       <div id="todayRaceBanner" style="background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: #fff; padding: 16px 18px; border-radius: 14px; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 14px;">
           <div id="raceDaysCount" style="background: rgba(255,255,255,0.22); width: 48px; height: 48px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">47</div>
@@ -5239,6 +5242,146 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Each insight cites a numeric metric + research-backed threshold.
   // Fails gracefully when Strava data is missing.
   // ──────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────
+  // WEEKLY FITNESS PULSE — single most actionable progression number for the home screen
+  // Returns null if there isn't enough data to be honest. Otherwise:
+  //   { value, valueColor, valueIcon, headline, explanation, tone }
+  // tone: 'good' | 'caution' | 'info' | 'flat'
+  // ──────────────────────────────────────────────────────────────────────
+  function computeWeeklyFitnessPulse() {
+    const visible = (typeof getVisibleStravaActivities === 'function') ? getVisibleStravaActivities() : [];
+    if (visible.length < 4) return null;
+
+    const now = Date.now();
+    const dayMs = 86400000;
+    const acts7 = visible.filter(a => (now - new Date(a.start_date_local || a.start_date).getTime()) < 7 * dayMs);
+    const acts21Prior = visible.filter(a => {
+      const ageMs = now - new Date(a.start_date_local || a.start_date).getTime();
+      return ageMs >= 7 * dayMs && ageMs < 28 * dayMs;
+    });
+    if (acts21Prior.length === 0) return null; // need a comparison window
+
+    // Helper: duration-weighted easy HR (same logic as smart insights)
+    function avgHrForEasy(acts) {
+      const easy = acts.filter(a => mapStravaTypeToSessionType(a.type) === 'run' && a.moving_min >= 30 && a.avg_hr);
+      if (easy.length === 0) return null;
+      const sorted = easy.slice().sort((a, b) => a.avg_hr - b.avg_hr);
+      const easyOnly = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
+      const totalMins = easyOnly.reduce((s, a) => s + a.moving_min, 0);
+      if (totalMins === 0) return null;
+      return Math.round(easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins);
+    }
+
+    // Priority 1: aerobic efficiency change — most direct fitness signal
+    const easyHr7 = avgHrForEasy(acts7);
+    const easyHr21 = avgHrForEasy(acts21Prior);
+    if (easyHr7 && easyHr21) {
+      const diff = easyHr7 - easyHr21;
+      if (diff <= -3) {
+        return {
+          value: Math.abs(diff),
+          unit: 'bpm',
+          valueColor: 'var(--good)',
+          valueIcon: '📈',
+          headline: 'Aerobic fitness up',
+          explanation: `HR is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same easy effort.`,
+          tone: 'good'
+        };
+      } else if (diff >= 5) {
+        return {
+          value: diff,
+          unit: 'bpm',
+          valueColor: 'var(--caution)',
+          valueIcon: '↑',
+          headline: 'HR drifting up',
+          explanation: `HR is ${diff} bpm higher than the prior 3 weeks at easy effort. Watch for fatigue.`,
+          tone: 'caution'
+        };
+      }
+    }
+
+    // Priority 2: volume trend — building, holding, dropping
+    const minsLast7 = acts7.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const minsPrior21 = acts21Prior.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const priorAvg = minsPrior21 / 3;
+    if (minsLast7 > 0 && priorAvg > 0) {
+      const pct = ((minsLast7 - priorAvg) / priorAvg) * 100;
+      if (pct >= 5 && pct <= 15) {
+        return {
+          value: '+' + Math.round(pct) + '%',
+          unit: '',
+          valueColor: 'var(--good)',
+          valueIcon: '📈',
+          headline: 'Volume building safely',
+          explanation: `Last 7 days ${formatHM(minsLast7)} vs ${formatHM(Math.round(priorAvg))}/week recent average. Within the 10% rule.`,
+          tone: 'good'
+        };
+      } else if (pct > 15) {
+        return {
+          value: '+' + Math.round(pct) + '%',
+          unit: '',
+          valueColor: 'var(--caution)',
+          valueIcon: '⚠',
+          headline: 'Workload jumped',
+          explanation: `Last 7 days are ${Math.round(pct)}% above your recent average. Big jumps raise injury risk.`,
+          tone: 'caution'
+        };
+      } else if (pct <= -25) {
+        return {
+          value: Math.round(pct) + '%',
+          unit: '',
+          valueColor: 'var(--info)',
+          valueIcon: '↓',
+          headline: 'Lighter week',
+          explanation: `${formatHM(minsLast7)} this week vs ${formatHM(Math.round(priorAvg))}/week recent average. Could be intentional rest.`,
+          tone: 'info'
+        };
+      } else if (Math.abs(pct) < 5) {
+        return {
+          value: '↔',
+          unit: '',
+          valueColor: 'var(--info)',
+          valueIcon: '↔',
+          headline: 'Holding steady',
+          explanation: `${formatHM(minsLast7)} this week, in line with your ${formatHM(Math.round(priorAvg))}/week average. Consolidation phase.`,
+          tone: 'flat'
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // Render the Fitness Pulse card on the Today screen
+  function renderFitnessPulse() {
+    const slot = document.getElementById('todayFitnessPulse');
+    if (!slot) return;
+    const pulse = computeWeeklyFitnessPulse();
+    if (!pulse) {
+      slot.style.display = 'none';
+      slot.innerHTML = '';
+      return;
+    }
+    slot.style.display = 'block';
+    const value = String(pulse.value);
+    slot.innerHTML = `
+      <div class="card" style="cursor: pointer; padding: 14px 16px; margin-bottom: 14px;" onclick="showScreen('data')">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-soft);">Pulse · last 7 days</div>
+          <div style="font-size: 12px; color: var(--primary); font-weight: 600;">See more →</div>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="font-size: 32px; font-weight: 800; color: ${pulse.valueColor}; line-height: 1; min-width: 60px; text-align: center;">${escapeHtml(value)}<span style="font-size: 12px; font-weight: 700; color: var(--text-soft); margin-left: 2px;">${escapeHtml(pulse.unit || '')}</span></div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; font-size: 15px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+              <span>${pulse.valueIcon}</span>${escapeHtml(pulse.headline)}
+            </div>
+            <div style="font-size: 12px; color: var(--text-soft); margin-top: 2px; line-height: 1.4;">${escapeHtml(pulse.explanation)}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function computeSmartStravaInsights() {
     const out = [];
     const visible = (typeof getVisibleStravaActivities === 'function') ? getVisibleStravaActivities() : [];
@@ -7036,6 +7179,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Re-aggregate today's view from current visible (non-hidden) activities
     if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderTodayHero();
+    renderFitnessPulse();
     renderTodayComingUp();
     renderTodayRationaleSlot();
     renderLogSession();
