@@ -1412,7 +1412,12 @@
         </div>
         <div class="field">
           <label>Event date</label>
-          <input type="date" value="2026-06-07">
+          <input type="date" id="eventDate">
+        </div>
+
+        <div class="field">
+          <label>Race location <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
+          <input type="text" id="eventLocation" placeholder="City, state">
         </div>
         <div class="field">
           <label>What's your goal?</label>
@@ -1710,7 +1715,7 @@
       </button>
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <div class="greeting">Week 2 of 7 · Half Ironman</div>
+          <div class="greeting" id="planGreeting">Your plan</div>
           <div class="title">Your plan</div>
         </div>
         <div class="readiness-pill" onclick="openReadinessModal()" id="rp-plan" style="display:none;">
@@ -2258,7 +2263,7 @@
         </div>
       </div>
 
-      <button class="btn btn-primary btn-full" onclick="if(confirm('Start over? You\'ll rebuild your plan from scratch.')) { showScreen('onboard'); onbStep(0); }" style="margin-top: 14px;">Start over with a new plan</button>
+      <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 14px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--warn); border-color: var(--warn);">Log out</button>
     </div>
   </div>
@@ -2758,8 +2763,11 @@
   function finishOnboard() {
     trackEvent('onboarding_complete');
     const event = document.getElementById('eventSelect')?.value || 'Half Ironman';
-    const eventDateEl = document.querySelector('#onb-3 input[type="date"]');
-    const eventDate = eventDateEl ? eventDateEl.value : '2026-06-07';
+    const eventDateEl = document.getElementById('eventDate');
+    const eventDate = eventDateEl && eventDateEl.value ? eventDateEl.value : '';
+    const eventLocation = document.getElementById('eventLocation')?.value.trim() || '';
+    localStorage.setItem('race-location', eventLocation);
+    planState.raceLocation = eventLocation;
     const activeHours = document.querySelector('#hoursChips .chip.active');
     const hours = activeHours ? parseFloat(activeHours.dataset.hours) : 5;
     const activeDays = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent);
@@ -4852,8 +4860,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderRaceMeta() {
     const days = getDaysToRace();
     const title = getRaceTitle();
+    const eventOnly = (planState && planState.raceEvent) || localStorage.getItem('race-event') || 'Your race';
     const dateStr = formatRaceDate();
     const dayLabel = days < 0 ? `${Math.abs(days)} days ago — race complete` : days === 0 ? 'race day' : `${days} day${days !== 1 ? 's' : ''} away`;
+    const planGreet = document.getElementById('planGreeting');
+    if (planGreet) {
+      const weekIdx = getCurrentWeekIdx();
+      const arc = (planState.weekArc || []);
+      planGreet.textContent = days < 0 ? `Race complete · ${eventOnly}` : days === 0 ? `Race day · ${eventOnly}` : arc.length > 0 ? `Week ${weekIdx + 1} of ${arc.length} · ${eventOnly}` : eventOnly;
+    }
 
     const pg = document.getElementById('progressGreeting');
     if (pg) pg.textContent = days < 0 ? 'Race complete' : days === 0 ? 'Race day' : `${days} days to ${title.split('·')[0].trim().toLowerCase()}`;
@@ -5188,6 +5203,22 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function startOverFresh() {
     if (!confirm('Rebuild your plan from scratch? Your current plan resets and you go through onboarding again.')) return;
+    startFreshOnboarding(true);
+  }
+
+  function startFreshOnboarding(skipConfirm) {
+    if (!skipConfirm && !confirm('Start over? You\'ll rebuild your plan from scratch.')) return;
+    ['race-event','race-date','race-location','hours-per-week','training-days','tri-limiter','tri-strategy','plan-choice'].forEach(k => localStorage.removeItem(k));
+    planState.raceEvent = '';
+    planState.raceDate = '';
+    planState.raceLocation = '';
+    planState.injury = null;
+    planState.lastChange = null;
+    planState.lastCheckin = null;
+    planState.notifications = [];
+    document.querySelectorAll('#onb-1 .chip, #onb-2 .chip, #onb-3 .chip, #onb-4 .chip, #hoursChips .chip, #daysChips .chip, #discChips .chip, #complexityChips .chip, #themeChips .chip, #ciBody .chip, #ciSleep .chip, #ciStress .chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginUsername','loginPassword','signupUsername','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
+    if (document.getElementById('ciNotes')) document.getElementById('ciNotes').value = '';
     showScreen('onboard');
     onbStep(0);
   }
