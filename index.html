@@ -235,14 +235,31 @@
   .signal-trend.good { color: var(--secondary); }
   .signal-trend.warn { color: var(--warn); }
   .signal-trend.neutral { color: var(--text-soft); }
+  /* Section heading — used between content blocks. Looks like a real heading,
+     not a tiny caption. Mixed-case + dark text + 16px so it reads as a divider.
+     Includes a small primary-color dot accent for visual organization. */
   .section-label {
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 700;
-    color: var(--text-soft);
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: -0.2px;
     margin: 22px 2px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
+  .section-label::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 16px;
+    background: var(--primary);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  /* Variant for sections without the accent (used inside cards/modals) */
+  .section-label.plain::before { display: none; }
   /* Plan screen */
   .week-strip {
     display: grid;
@@ -1724,6 +1741,7 @@
       </div>
 
       <!-- Smart summary — answers 'what's today, where's my body, what's next' in 3 lines -->
+      <div class="section-label" style="margin-top: 4px;">Here's your day</div>
       <div id="todaySmartSummary" class="card" style="padding: 12px 14px; margin-bottom: 14px; display: none;"></div>
 
       <!-- 2. Today's workout — THE primary "what do I do" answer, full hero -->
@@ -1854,7 +1872,7 @@
       <!-- 1. CALENDAR — the visual anchor of the Plan tab -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
         <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
-        <div class="section-label" id="weekViewLabel" style="margin: 0;">This week</div>
+        <div class="section-label plain" id="weekViewLabel" style="margin: 0;">This week</div>
         <button onclick="navWeek(1)" id="weekNextBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Next ›</button>
       </div>
       <div class="week-strip" id="weekStrip"></div>
@@ -1912,7 +1930,7 @@
         <div style="color: var(--text-soft); margin-top: 4px;" id="logSessionMeta">60 min · Planned</div>
       </div>
 
-      <div class="section-label">How did it feel?</div>
+      <div class="section-label plain">How did it feel?</div>
       <div class="card">
         <div style="font-size: 14px; color: var(--text-soft); margin-bottom: 4px;">Rate of Perceived Exertion (1-10)</div>
         <div class="rpe-row" id="rpe">
@@ -1934,7 +1952,7 @@
         </div>
       </div>
 
-      <div class="section-label">Completion</div>
+      <div class="section-label plain">Completion</div>
       <div class="card">
         <div class="chip-row" style="margin-top: 0;">
           <button class="chip active" onclick="singleChip(this)">Finished as prescribed</button>
@@ -1943,7 +1961,7 @@
         </div>
       </div>
 
-      <div class="section-label">Notes (optional)</div>
+      <div class="section-label plain">Notes (optional)</div>
       <textarea rows="3" placeholder="Legs felt heavy from Saturday, kept swim easy..."></textarea>
 
       <button class="btn btn-primary btn-full btn-lg" style="margin-top: 18px;" onclick="saveLoggedSession()">Save session</button>
@@ -5632,7 +5650,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     slot.style.display = 'block';
     slot.innerHTML = `
-      <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.6px; color: var(--text-soft); text-transform: uppercase; margin-bottom: 8px;">Here's your day</div>
       <div onclick="${todayClick}" style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer;">
         <span style="font-size: 16px; flex-shrink: 0;">🏃</span>
         <div style="flex: 1; min-width: 0;">
