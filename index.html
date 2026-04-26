@@ -6445,6 +6445,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function ensureDemoAccount() {
     const accounts = getAccounts();
+    let dirty = false;
+    // Create demo account if missing
     if (!accounts.demo) {
       accounts.demo = {
         password: 'demo',
@@ -6456,8 +6458,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           onboardingComplete: true
         }
       };
-      saveAccounts(accounts);
+      dirty = true;
     }
+    // Self-heal: always reset the demo password to 'demo' (in case corruption happened)
+    if (accounts.demo.password !== 'demo') {
+      accounts.demo.password = 'demo';
+      dirty = true;
+    }
+    // Self-heal: ensure required data fields exist
+    if (!accounts.demo.data) {
+      accounts.demo.data = {
+        planState: JSON.parse(JSON.stringify(planState)),
+        chatMode: 'rule',
+        apiKey: null,
+        onboardingComplete: true
+      };
+      dirty = true;
+    }
+    if (dirty) saveAccounts(accounts);
   }
 
   function switchAuthTab(which) {
