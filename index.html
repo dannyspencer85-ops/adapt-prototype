@@ -1648,9 +1648,14 @@
         <div class="greeting" id="todayGreetingDate">Today</div>
         <div class="title" id="todayGreetingName">Good morning</div>
       </div>
-      <div class="readiness-pill" onclick="openReadinessModal()" id="rp-today" style="display:none;">
-        <div class="dot"></div>
-        <div><div class="score"></div><div class="rlabel"></div></div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <div class="readiness-pill" onclick="openReadinessModal()" id="rp-today" style="display:none;">
+          <div class="dot"></div>
+          <div><div class="score"></div><div class="rlabel"></div></div>
+        </div>
       </div>
     </div>
     <div class="screen-inner">
@@ -1756,9 +1761,14 @@
           <div class="greeting" id="planGreeting">Your plan</div>
           <div class="title">Your plan</div>
         </div>
-        <div class="readiness-pill" onclick="openReadinessModal()" id="rp-plan" style="display:none;">
-          <div class="dot"></div>
-          <div><div class="score"></div><div class="rlabel"></div></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <div class="readiness-pill" onclick="openReadinessModal()" id="rp-plan" style="display:none;">
+            <div class="dot"></div>
+            <div><div class="score"></div><div class="rlabel"></div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1776,6 +1786,9 @@
         <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
         <div class="section-label" id="weekViewLabel" style="margin: 0;">This week</div>
         <button onclick="navWeek(1)" id="weekNextBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Next ›</button>
+      </div>
+      <div style="text-align: right; margin-bottom: 6px;">
+        <button onclick="openScheduleModal()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">📅 Edit schedule</button>
       </div>
       <div class="week-strip" id="weekStrip"></div>
       <div id="weekStateBanner"></div>
@@ -2137,42 +2150,10 @@
         <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
       </div>
 
-      <div id="analyticsCollapsed" style="text-align: right; padding: 4px 0; margin-bottom: 4px;">
-        <button onclick="toggleAnalyticsCard()" style="background:none; border:0; color:var(--text-soft); font-size:11px; font-weight:500; cursor:pointer; padding:2px 6px; font-family:inherit;" id="analyticsToggleBtn">Advanced ›</button>
-      </div>
-      <div class="card" id="analyticsCard" style="display:none;">
-        <div class="card-title">Analytics</div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Tracking is on by default. Paste a different PostHog project key to override. Leave blank to use the default. Events also log to browser console.</div>
-        <input type="text" id="posthogKeyInput" placeholder="phc_xxxxxxxxxxxx" style="width:100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
-        <div style="display: flex; gap: 6px;">
-          <button class="btn btn-primary btn-sm" onclick="savePosthogKey()" style="flex:1;">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Reset to default</button>
-        </div>
-        <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get a free key at <a href="https://posthog.com" target="_blank" style="color: var(--primary);">posthog.com</a> if you want a separate dashboard.</div>
-      </div>
+      <!-- Analytics moved into Settings modal (gear icon) -->
 
-      <!-- Settings collapsed under one expander to keep Profile lean -->
-      <details style="margin-top: 10px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">⚙️ Settings</summary>
-        <div class="card" style="margin-top: 6px;">
-          <div class="card-title">Coaching detail level</div>
-          <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 10px;">How much explanation do you want with insights and warnings.</div>
-          <div class="chip-row" id="complexityProfileChips">
-            <button class="chip" data-mode="simple" onclick="setComplexityMode('simple')">Simple</button>
-            <button class="chip" data-mode="detailed" onclick="setComplexityMode('detailed')">Detailed</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Color theme</div>
-          <div class="chip-row" id="themeProfileChips">
-            <button class="chip" data-theme="forest" onclick="setTheme('forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
-            <button class="chip" data-theme="ocean" onclick="setTheme('ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
-            <button class="chip" data-theme="sunset" onclick="setTheme('sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
-            <button class="chip" data-theme="berry" onclick="setTheme('berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
-            <button class="chip" data-theme="slate" onclick="setTheme('slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
-          </div>
-        </div>
-      </details>
+
+      <!-- Settings now lives in the gear (⚙️) button at the top of every screen -->
 
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 14px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--warn); border-color: var(--warn);">Log out</button>
@@ -2310,6 +2291,85 @@
   </div>
 
   <!-- SESSION REPORT (past session) MODAL -->
+  <!-- SCHEDULE PREFERENCES MODAL — set available days + disciplines per day -->
+  <div class="modal-bg" id="scheduleModal">
+    <div class="modal" style="max-height: 92vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Schedule</h2>
+        <button onclick="closeScheduleModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">Tell us when you can train and what each day looks like. Plan adapts around it.</div>
+
+      <div id="scheduleGrid" style="margin-top: 16px;"></div>
+
+      <div style="font-size: 12px; color: var(--text-soft); margin-top: 14px; line-height: 1.5; padding: 10px 12px; background: var(--bg-soft); border-radius: 8px;">
+        💡 Toggle the <strong>day</strong> to set availability. Tap the discipline chips under each day to enable / disable. Example: keep Sunday for long runs only by leaving Run on and turning Swim/Bike off.
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 18px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeScheduleModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveScheduleModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL (accessed via gear icon on every screen) -->
+  <div class="modal-bg" id="settingsModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">Settings</h2>
+        <button onclick="closeSettings()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">App preferences — your goal, race details, and Strava live in <strong>You</strong>.</div>
+
+      <div class="card" style="margin-top: 14px;">
+        <div class="card-title">Coaching detail level</div>
+        <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 10px;">How much explanation do you want with insights and warnings.</div>
+        <div class="chip-row" id="complexityProfileChips">
+          <button class="chip" data-mode="simple" onclick="setComplexityMode('simple')">Simple</button>
+          <button class="chip" data-mode="detailed" onclick="setComplexityMode('detailed')">Detailed</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Color theme</div>
+        <div class="chip-row" id="themeProfileChips">
+          <button class="chip" data-theme="forest" onclick="setTheme('forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
+          <button class="chip" data-theme="ocean" onclick="setTheme('ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
+          <button class="chip" data-theme="sunset" onclick="setTheme('sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
+          <button class="chip" data-theme="berry" onclick="setTheme('berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
+          <button class="chip" data-theme="slate" onclick="setTheme('slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Schedule</div>
+        <div style="font-size: 13px; color: var(--text-soft); margin-bottom: 10px; line-height: 1.5;">Set when you can train and which disciplines work each day. Plan adapts around it.</div>
+        <button class="btn btn-secondary btn-full btn-sm" onclick="closeSettings(); openScheduleModal();">Edit schedule</button>
+      </div>
+
+      <div class="card" id="hiddenActivitiesCard" style="display: none;">
+        <div class="card-title">Hidden workouts</div>
+        <div style="font-size: 13px; color: var(--text-soft); margin-bottom: 10px;" id="hiddenActivitiesCount">—</div>
+        <button class="btn btn-ghost btn-sm btn-full" onclick="unhideAllStravaActivities()">Restore all hidden workouts</button>
+      </div>
+
+      <details style="margin-top: 8px;">
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Analytics (advanced)</summary>
+        <div class="card" style="margin-top: 6px;">
+          <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Tracking is on by default. Paste a different PostHog project key to override. Leave blank to use the default.</div>
+          <input type="text" id="posthogKeyInputModal" placeholder="phc_xxxxxxxxxxxx" style="width:100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-primary btn-sm" onclick="savePosthogKeyFromModal()" style="flex:1;">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Reset to default</button>
+          </div>
+        </div>
+      </details>
+
+      <button class="btn btn-ghost btn-full" onclick="closeSettings()" style="margin-top: 14px;">Close</button>
+    </div>
+  </div>
+
   <div class="modal-bg" id="sessionReportModal">
     <div class="modal" style="max-height: 90vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -3022,6 +3082,172 @@
     [...c.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === val));
   }
   // Toggle the morning check-in card open/closed on Today screen
+  // ──────────────────────────────────────────────────────────────────────
+  // SCHEDULE PREFERENCES — per-day availability + allowed disciplines
+  // Default: all 7 days available, all 4 disciplines allowed.
+  // ──────────────────────────────────────────────────────────────────────
+  const SCHEDULE_DISCIPLINES = [
+    { id: 'run', label: 'Run', icon: '🏃' },
+    { id: 'bike', label: 'Bike', icon: '🚴' },
+    { id: 'swim', label: 'Swim', icon: '🏊' },
+    { id: 'strength', label: 'Strength', icon: '🏋️' },
+  ];
+  function defaultSchedulePrefs() {
+    const out = {};
+    DAYS.forEach(d => {
+      out[d] = { available: true, disciplines: SCHEDULE_DISCIPLINES.map(x => x.id) };
+    });
+    return out;
+  }
+  function getSchedulePrefs() {
+    try {
+      const raw = localStorage.getItem('schedule-prefs');
+      if (!raw) return defaultSchedulePrefs();
+      const parsed = JSON.parse(raw);
+      // Merge with defaults in case keys are missing
+      const def = defaultSchedulePrefs();
+      DAYS.forEach(d => { if (!parsed[d]) parsed[d] = def[d]; });
+      return parsed;
+    } catch (e) { return defaultSchedulePrefs(); }
+  }
+  function setSchedulePrefs(prefs) {
+    localStorage.setItem('schedule-prefs', JSON.stringify(prefs));
+    saveUserData();
+  }
+  // Render the schedule editor grid into #scheduleGrid
+  function renderScheduleGrid() {
+    const grid = document.getElementById('scheduleGrid');
+    if (!grid) return;
+    const prefs = getSchedulePrefs();
+    grid.innerHTML = DAYS.map(d => {
+      const p = prefs[d];
+      return `
+        <div style="border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; ${p.available ? '' : 'opacity: 0.55;'}">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: ${p.available ? '10px' : '0'};">
+            <div style="font-weight: 700; font-size: 15px;">${DAY_FULL[d]}</div>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <span style="font-size: 12px; color: var(--text-soft); font-weight: 600;">${p.available ? 'Available' : 'Off'}</span>
+              <span class="toggle-pill" data-day="${d}" onclick="toggleScheduleDay('${d}')" style="display: inline-block; width: 36px; height: 20px; border-radius: 100px; background: ${p.available ? 'var(--primary)' : 'var(--border)'}; position: relative; transition: background 0.15s;">
+                <span style="position: absolute; top: 2px; left: ${p.available ? '18px' : '2px'}; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.15);"></span>
+              </span>
+            </label>
+          </div>
+          ${p.available ? `
+            <div class="chip-row" style="gap: 6px;">
+              ${SCHEDULE_DISCIPLINES.map(disc => {
+                const on = p.disciplines.includes(disc.id);
+                return `<button type="button" class="chip${on ? ' active' : ''}" data-day="${d}" data-disc="${disc.id}" onclick="toggleScheduleDiscipline('${d}', '${disc.id}')" style="font-size: 12px; padding: 5px 10px;">${disc.icon} ${disc.label}</button>`;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>`;
+    }).join('');
+  }
+  // In-modal state mirror so changes don't persist until Save is tapped
+  let _scheduleModalDraft = null;
+  function openScheduleModal() {
+    _scheduleModalDraft = JSON.parse(JSON.stringify(getSchedulePrefs()));
+    renderScheduleGrid();
+    document.getElementById('scheduleModal').classList.add('show');
+  }
+  function closeScheduleModal() {
+    _scheduleModalDraft = null;
+    document.getElementById('scheduleModal').classList.remove('show');
+  }
+  function toggleScheduleDay(day) {
+    if (!_scheduleModalDraft) _scheduleModalDraft = getSchedulePrefs();
+    _scheduleModalDraft[day].available = !_scheduleModalDraft[day].available;
+    // Stash the draft into the visible state so re-render shows it
+    localStorage.setItem('schedule-prefs', JSON.stringify(_scheduleModalDraft));
+    renderScheduleGrid();
+  }
+  function toggleScheduleDiscipline(day, disc) {
+    if (!_scheduleModalDraft) _scheduleModalDraft = getSchedulePrefs();
+    const arr = _scheduleModalDraft[day].disciplines;
+    const idx = arr.indexOf(disc);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(disc);
+    localStorage.setItem('schedule-prefs', JSON.stringify(_scheduleModalDraft));
+    renderScheduleGrid();
+  }
+  function saveScheduleModal() {
+    if (_scheduleModalDraft) {
+      setSchedulePrefs(_scheduleModalDraft);
+      // Update legacy training-days list so plan-generation logic stays in sync
+      const availableDayNames = DAYS.filter(d => _scheduleModalDraft[d].available);
+      localStorage.setItem('training-days', JSON.stringify(availableDayNames));
+    }
+    closeScheduleModal();
+    if (typeof generatePlanFromInputs === 'function') generatePlanFromInputs();
+    renderAll();
+    if (typeof trackEvent === 'function') trackEvent('schedule_updated');
+  }
+
+  // Settings modal — accessed via gear icon on Today/Plan headers
+  function openSettings() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal) return;
+    // Pre-fill posthog input from localStorage
+    const phInput = document.getElementById('posthogKeyInputModal');
+    if (phInput) phInput.value = localStorage.getItem('posthog-user-key') || '';
+    // Reflect current chip selections
+    if (typeof renderComplexityProfileUI === 'function') renderComplexityProfileUI();
+    if (typeof renderThemeProfileUI === 'function') renderThemeProfileUI();
+    // Show / populate the hidden-workouts card
+    const hidden = getHiddenStravaIds();
+    const card = document.getElementById('hiddenActivitiesCard');
+    const count = document.getElementById('hiddenActivitiesCount');
+    if (card) card.style.display = hidden.length > 0 ? 'block' : 'none';
+    if (count) count.textContent = `${hidden.length} workout${hidden.length === 1 ? '' : 's'} hidden from view. They\'re still on Strava.`;
+    modal.classList.add('show');
+  }
+  function closeSettings() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.remove('show');
+  }
+  // Adapter for the Settings-modal posthog input
+  function savePosthogKeyFromModal() {
+    const v = (document.getElementById('posthogKeyInputModal') || {}).value || '';
+    if (!v.trim()) {
+      localStorage.removeItem('posthog-user-key');
+      alert('Reverted to default analytics key.');
+      return;
+    }
+    localStorage.setItem('posthog-user-key', v.trim());
+    alert('Saved your PostHog key.');
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // HIDE / UNHIDE STRAVA ACTIVITIES (e.g. accidentally-recorded watch starts)
+  // ──────────────────────────────────────────────────────────────────────
+  function getHiddenStravaIds() {
+    try { return JSON.parse(localStorage.getItem('strava-hidden-ids') || '[]'); }
+    catch (e) { return []; }
+  }
+  function setHiddenStravaIds(arr) {
+    localStorage.setItem('strava-hidden-ids', JSON.stringify(arr));
+  }
+  function isHiddenStravaId(id) {
+    return getHiddenStravaIds().includes(String(id));
+  }
+  function hideStravaActivity(id) {
+    if (!confirm('Hide this workout? It stays on Strava — we just won\'t show it here. Restore from Settings.')) return;
+    const ids = getHiddenStravaIds();
+    if (!ids.includes(String(id))) ids.push(String(id));
+    setHiddenStravaIds(ids);
+    if (typeof trackEvent === 'function') trackEvent('strava_activity_hidden', { id });
+    renderAll();
+  }
+  function unhideAllStravaActivities() {
+    if (!confirm('Show all hidden activities again?')) return;
+    setHiddenStravaIds([]);
+    renderAll();
+  }
+  // Filter helper used by render functions
+  function getVisibleStravaActivities() {
+    const hidden = getHiddenStravaIds();
+    return (planState.stravaActivities || []).filter(a => !hidden.includes(String(a.id)));
+  }
+
   function toggleCheckin() {
     const card = document.getElementById('todayCheckin');
     if (!card) return;
@@ -6564,7 +6790,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const slot = document.getElementById('recentStravaSessions');
     const demoSlot = document.getElementById('recentDemoSessions');
     if (!slot) return;
-    const acts = (planState.stravaActivities || []).slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date));
+    const acts = getVisibleStravaActivities().slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date));
     if (acts.length === 0) {
       slot.innerHTML = '';
       if (demoSlot) demoSlot.style.display = 'block';
@@ -6583,22 +6809,26 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">↻ Sync</button>
       </div>
       ${recent.map(a => `
-        <div class="session-row done" style="display: block; cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="session-icon" style="background: var(--primary); color: #fff;">${iconForStravaType(a.type)}</div>
-            <div class="session-info">
-              <div class="session-day">${shortDay(a.start_date_local)}</div>
-              <div class="session-name">${escapeHtml(a.name)}</div>
-              <div class="session-meta">${a.type}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}${a.elevation_m > 10 ? ' · ' + Math.round(a.elevation_m) + ' m up' : ''}</div>
+        <div class="session-row done" style="display: block; position: relative;">
+          <button onclick="event.stopPropagation(); hideStravaActivity('${a.id}')" aria-label="Hide workout" title="Hide this workout"
+            style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.04); border: 0; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; color: var(--text-soft); font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0;">×</button>
+          <div style="cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
+            <div style="display: flex; align-items: center; gap: 12px; padding-right: 30px;">
+              <div class="session-icon" style="background: var(--primary); color: #fff;">${iconForStravaType(a.type)}</div>
+              <div class="session-info">
+                <div class="session-day">${shortDay(a.start_date_local)}</div>
+                <div class="session-name">${escapeHtml(a.name)}</div>
+                <div class="session-meta">${a.type}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}${a.elevation_m > 10 ? ' · ' + Math.round(a.elevation_m) + ' m up' : ''}</div>
+              </div>
+              <div class="session-status done">Done</div>
             </div>
-            <div class="session-status done">Done</div>
+            ${(a.moving_min || a.avg_hr || a.avg_watts) ? `
+            <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
+              <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">${formatHM(a.moving_min)}</div></div>
+              <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
+              <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Suffer'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
+            </div>` : ''}
           </div>
-          ${(a.moving_min || a.avg_hr || a.avg_watts) ? `
-          <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
-            <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">${formatHM(a.moving_min)}</div></div>
-            <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
-            <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Suffer'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
-          </div>` : ''}
         </div>
       `).join('')}
     `;
@@ -6884,9 +7114,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bars = document.getElementById('progressLoadBars');
     const commentary = document.getElementById('progressLoadCommentary');
     const recent = document.getElementById('progressRecentSessions');
-    if (!sumCard || !bars || !commentary || !recent) return;
+    if (!sumCard || !bars || !commentary) return;
 
-    const acts = planState.stravaActivities || [];
+    const acts = getVisibleStravaActivities();
     const stravaConnected = !!getStravaConfig();
 
     if (acts.length === 0) {
@@ -6897,7 +7127,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="font-size:13px; color:var(--text-soft); padding: 6px 0;">No data yet. ${cta}</div>`;
       bars.innerHTML = '';
       commentary.innerHTML = '';
-      recent.innerHTML = '';
+      if (recent) recent.innerHTML = '';
       return;
     }
 
@@ -6956,7 +7186,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     commentary.innerHTML = `<strong style="color: var(--text);">Load trend: ${trendLabel}</strong> ${trendText}`;
 
-    // Recent sessions list
+    // Recent sessions list (only renders if the container exists)
+    if (!recent) return;
     const recentActs = acts.slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date)).slice(0, 6);
     recent.innerHTML = recentActs.map((a, i) => {
       const last = i === recentActs.length - 1;
