@@ -1811,24 +1811,21 @@
       <div id="recentStravaSessions"></div>
       <div id="weekSessions"></div>
 
-      <!-- Progress block (formerly its own tab) — at-a-glance stats -->
-      <div class="section-label" style="margin-top: 18px;">Your progress</div>
-      <div class="card" id="progress7DaySummary">
-        <div class="card-title">7-day summary</div>
+      <!-- Compact 7-day summary kept on Plan tab — full history lives in Performance tab -->
+      <div class="card" id="progress7DaySummary" style="margin-top: 18px;">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>This week</span>
+          <button onclick="showScreen('data')" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">Full history →</button>
+        </div>
         <div class="data-row">
           <div class="data-cell"><div class="label">Total</div><div class="value">—</div></div>
           <div class="data-cell"><div class="label">Sessions</div><div class="value">—</div></div>
           <div class="data-cell"><div class="label">Avg HR</div><div class="value">—</div></div>
         </div>
       </div>
-      <div class="card" id="progressLoadCard">
-        <div class="card-title">Training load · last 14 days</div>
-        <div class="bar-row" id="progressLoadBars"></div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-top: 6px; font-weight: 600;">
-          <span>2 weeks ago</span>
-          <span>Today</span>
-        </div>
-        <div id="progressLoadCommentary" style="margin-top: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"></div>
+      <!-- The 14-day load card was redundant with Performance tab — keep only an empty stub for the renderer -->
+      <div style="display:none;">
+        <div id="progressLoadCard"><div class="bar-row" id="progressLoadBars"></div><div id="progressLoadCommentary"></div></div>
       </div>
 
       <!-- 6.5-week arc as a quiet expander -->
@@ -1896,23 +1893,71 @@
     </div>
   </div>
 
-  <!-- PROGRESS screen merged into Plan tab. This stub remains only to satisfy any deep links. -->
+  <!-- PERFORMANCE — aggregate history over a user-selected time range -->
   <div id="screen-data" class="screen">
     <div class="header">
       <button class="back-btn" onclick="goBack()" id="back-data" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         Back
       </button>
-      <div>
-        <div class="greeting" id="progressGreeting">Progress</div>
-        <div class="title">Your progress</div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <div class="greeting" id="progressGreeting">Performance</div>
+          <div class="title">Your training history</div>
+        </div>
+        <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
     </div>
     <div class="screen-inner">
-      <div style="padding: 16px;">
-        <div style="font-size: 14px; color: var(--text-soft); margin-bottom: 14px;">Progress now lives at the bottom of the Plan tab.</div>
-        <button class="btn btn-primary btn-full" onclick="showScreen('plan')">Go to Plan →</button>
+      <!-- Time range selector -->
+      <div style="display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto;">
+        <button class="chip" data-perf-range="7" onclick="setPerfRange(7)">Last 7 days</button>
+        <button class="chip active" data-perf-range="30" onclick="setPerfRange(30)">Last 30 days</button>
+        <button class="chip" data-perf-range="90" onclick="setPerfRange(90)">Last 90 days</button>
+        <button class="chip" data-perf-range="365" onclick="setPerfRange(365)">Last year</button>
       </div>
+
+      <!-- Summary tiles -->
+      <div class="card" id="perfSummary">
+        <div class="card-title" id="perfSummaryTitle">Block summary</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Total time</div>
+            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfTotalTime">—</div>
+          </div>
+          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Sessions</div>
+            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfSessions">—</div>
+          </div>
+          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Distance</div>
+            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfDistance">—</div>
+          </div>
+          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Avg HR</div>
+            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfAvgHr">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume over time -->
+      <div class="card">
+        <div class="card-title" id="perfVolumeTitle">Volume</div>
+        <div class="bar-row" id="perfVolumeBars" style="min-height: 100px;"></div>
+        <div id="perfVolumeAxis" style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-soft); margin-top: 6px; font-weight: 600;"></div>
+      </div>
+
+      <!-- Discipline breakdown -->
+      <div class="card">
+        <div class="card-title">By discipline</div>
+        <div id="perfDisciplineBars"></div>
+      </div>
+
+      <!-- Recent sessions in range -->
+      <div class="section-label">Top sessions in this range</div>
+      <div class="card" id="perfTopSessions" style="padding: 0; overflow: hidden;"></div>
     </div>
   </div>
 
@@ -2183,6 +2228,10 @@
     <button class="nav-btn" data-screen="plan" onclick="showScreen('plan')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
       Plan
+    </button>
+    <button class="nav-btn" data-screen="data" onclick="showScreen('data')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18c4-8 8-2 12-8 2 3 4 5 6 5"/><path d="M3 21h18"/></svg>
+      Performance
     </button>
     <button class="nav-btn" data-screen="profile" onclick="showScreen('profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -6257,6 +6306,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderTodayGreetingAndRace();
     renderRaceMeta();
     restoreCheckinSummaryIfSaved();
+    // Re-aggregate today's view from current visible (non-hidden) activities
+    if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderTodayHero();
     renderTodayComingUp();
     renderTodayRationaleSlot();
@@ -6264,6 +6315,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderWeekSessions();
     renderRecentStravaSessions();
     renderProgressTab();
+    renderPerformanceTab();
     renderWeekArc();
     renderBanners();
     renderInsights();
@@ -7152,33 +7204,74 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const acts = planState.stravaActivities || [];
     return acts.find(a => (a.start_date_local || a.start_date || '').slice(0, 10) === yyyymmdd);
   }
-  // After a Strava sync, walk this week's planned days and mark complete + attach metrics
+  // After a Strava sync, walk this week's planned days and mark complete + attach
+  // aggregated metrics. Skips hidden activities. If multiple activities matched in
+  // one day (e.g. morning swim + evening run), they're summed together.
   function autoMarkSessionsFromStrava() {
     if (!planState.stravaActivities || planState.stravaActivities.length === 0) return;
+    const visible = getVisibleStravaActivities();
     const start = _startOfCurrentWeek();
     let marked = 0;
     DAYS.forEach((day, i) => {
       const dayDate = new Date(start); dayDate.setDate(dayDate.getDate() + i);
       const iso = _isoDate(dayDate);
       const planned = planState.sessions[day];
-      if (!planned || planned.completed) return;
-      // Skip rest days — but if user did a workout on a rest day, surface it
-      const act = findStravaActivityForDate(iso);
-      if (!act) return;
-      const actType = mapStravaTypeToSessionType(act.type);
+      if (!planned) return;
+      // ALL non-hidden activities for this day
+      const acts = visible.filter(a =>
+        (a.start_date_local || a.start_date || '').slice(0, 10) === iso
+      );
+      if (acts.length === 0) {
+        // If we previously auto-marked this day from now-hidden activity, clear it
+        if (planned.stravaId || planned.stravaIds) {
+          planned.completed = false;
+          planned.actualMins = null;
+          planned.actualHr = null;
+          planned.actualWatts = null;
+          planned.stravaId = null;
+          planned.stravaIds = null;
+          planned.stravaName = null;
+          planned.stravaDistance_km = null;
+        }
+        return;
+      }
       const plannedType = (planned.type || '').toLowerCase();
-      // Match: same broad type, OR brick (counts any cardio), OR rest day with logged work
-      const compat = plannedType === 'rest' || plannedType === 'brick' ||
-                     actType === plannedType ||
-                     (plannedType === 'quality' && (actType === 'run' || actType === 'bike' || actType === 'swim'));
-      if (!compat) return;
+      const compatActs = acts.filter(a => {
+        const t = mapStravaTypeToSessionType(a.type);
+        return plannedType === 'rest' || plannedType === 'brick' ||
+          t === plannedType ||
+          (plannedType === 'quality' && (t === 'run' || t === 'bike' || t === 'swim'));
+      });
+      if (compatActs.length === 0) return;
+
+      // Aggregate metrics across all matching activities
+      const totalMins = compatActs.reduce((s, a) => s + (a.moving_min || 0), 0);
+      const totalDist = compatActs.reduce((s, a) => s + (a.distance_km || 0), 0);
+      // Duration-weighted HR average
+      const hrActs = compatActs.filter(a => a.avg_hr && a.moving_min);
+      const totalHrMins = hrActs.reduce((s, a) => s + a.moving_min, 0);
+      const avgHr = totalHrMins > 0
+        ? Math.round(hrActs.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalHrMins)
+        : null;
+      // Duration-weighted watts (cycling)
+      const wActs = compatActs.filter(a => a.avg_watts && a.moving_min);
+      const totalWMins = wActs.reduce((s, a) => s + a.moving_min, 0);
+      const avgWatts = totalWMins > 0
+        ? Math.round(wActs.reduce((s, a) => s + a.avg_watts * a.moving_min, 0) / totalWMins)
+        : null;
+
       planned.completed = true;
-      planned.actualMins = act.moving_min;
-      planned.actualHr = act.avg_hr;
-      planned.actualWatts = act.avg_watts;
-      planned.stravaId = act.id;
-      planned.stravaName = act.name;
-      planned.stravaDistance_km = act.distance_km;
+      planned.actualMins = totalMins;
+      planned.actualHr = avgHr;
+      planned.actualWatts = avgWatts;
+      planned.stravaIds = compatActs.map(a => a.id);
+      // Pick the longest activity as the "primary" for single-link viewing
+      const primary = compatActs.slice().sort((a, b) => (b.moving_min || 0) - (a.moving_min || 0))[0];
+      planned.stravaId = primary.id;
+      planned.stravaName = compatActs.length === 1
+        ? primary.name
+        : `${compatActs.length} workouts · ${compatActs.map(a => mapStravaTypeToSessionType(a.type)).join(' + ')}`;
+      planned.stravaDistance_km = totalDist > 0.05 ? totalDist : null;
       marked++;
     });
     if (marked > 0) saveUserData();
@@ -7350,6 +7443,205 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ${avgLine}
       ${xAxis}
     </svg>`;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PERFORMANCE TAB — aggregated history over user-selected range
+  // ──────────────────────────────────────────────────────────────────────
+  function getPerfRange() {
+    return parseInt(localStorage.getItem('perf-range') || '30', 10);
+  }
+  function setPerfRange(days) {
+    localStorage.setItem('perf-range', String(days));
+    document.querySelectorAll('[data-perf-range]').forEach(b => {
+      b.classList.toggle('active', String(b.dataset.perfRange) === String(days));
+    });
+    renderPerformanceTab();
+  }
+  // Activities filtered by user-chosen window
+  function getActivitiesInRangeDays(days) {
+    const cutoff = Date.now() - days * 86400000;
+    return getVisibleStravaActivities().filter(a => {
+      const t = new Date(a.start_date_local || a.start_date).getTime();
+      return t >= cutoff;
+    });
+  }
+  // Bucket activities into time periods (daily / weekly / monthly depending on range)
+  function bucketActivities(activities, days) {
+    let bucketSize, bucketLabel;
+    if (days <= 7) { bucketSize = 'day'; bucketLabel = 'Daily'; }
+    else if (days <= 90) { bucketSize = 'week'; bucketLabel = 'Weekly'; }
+    else { bucketSize = 'month'; bucketLabel = 'Monthly'; }
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const buckets = [];
+
+    if (bucketSize === 'day') {
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today); d.setDate(d.getDate() - i);
+        buckets.push({ key: d.toISOString().slice(0,10), label: `${months[d.getMonth()]} ${d.getDate()}`, mins: 0, count: 0, start: d });
+      }
+    } else if (bucketSize === 'week') {
+      // Align start to Monday-of-week containing the cutoff
+      const numWeeks = Math.ceil(days / 7);
+      const startOfThisWeek = (function(){
+        const x = new Date(today); const dow = x.getDay(); const diff = dow === 0 ? 6 : dow - 1; x.setDate(x.getDate() - diff); return x;
+      })();
+      for (let i = numWeeks - 1; i >= 0; i--) {
+        const ws = new Date(startOfThisWeek); ws.setDate(ws.getDate() - i * 7);
+        buckets.push({ key: ws.toISOString().slice(0,10), label: `${months[ws.getMonth()]} ${ws.getDate()}`, mins: 0, count: 0, start: ws });
+      }
+    } else {
+      // Monthly buckets — last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: months[d.getMonth()], mins: 0, count: 0, start: d });
+      }
+    }
+
+    activities.forEach(a => {
+      const t = new Date(a.start_date_local || a.start_date);
+      let idx = -1;
+      if (bucketSize === 'day') {
+        const k = t.toISOString().slice(0,10);
+        idx = buckets.findIndex(b => b.key === k);
+      } else if (bucketSize === 'week') {
+        const x = new Date(t); x.setHours(0,0,0,0);
+        const dow = x.getDay(); const diff = dow === 0 ? 6 : dow - 1;
+        x.setDate(x.getDate() - diff);
+        const k = x.toISOString().slice(0,10);
+        idx = buckets.findIndex(b => b.key === k);
+      } else {
+        idx = buckets.findIndex(b => b.key === `${t.getFullYear()}-${t.getMonth()}`);
+      }
+      if (idx >= 0) {
+        buckets[idx].mins += (a.moving_min || 0);
+        buckets[idx].count++;
+      }
+    });
+
+    return { buckets, bucketSize, bucketLabel };
+  }
+  function renderPerformanceTab() {
+    // Sync the range chips with the saved selection
+    const savedRange = getPerfRange();
+    document.querySelectorAll('[data-perf-range]').forEach(b => {
+      b.classList.toggle('active', String(b.dataset.perfRange) === String(savedRange));
+    });
+    const sumTitle = document.getElementById('perfSummaryTitle');
+    const totalEl = document.getElementById('perfTotalTime');
+    const sessionsEl = document.getElementById('perfSessions');
+    const distanceEl = document.getElementById('perfDistance');
+    const avgHrEl = document.getElementById('perfAvgHr');
+    const bars = document.getElementById('perfVolumeBars');
+    const axis = document.getElementById('perfVolumeAxis');
+    const volTitle = document.getElementById('perfVolumeTitle');
+    const discBars = document.getElementById('perfDisciplineBars');
+    const topSess = document.getElementById('perfTopSessions');
+    if (!totalEl || !bars) return;
+
+    const days = getPerfRange();
+    const rangeLabels = { 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last year' };
+    const acts = getActivitiesInRangeDays(days);
+
+    if (sumTitle) sumTitle.textContent = `${rangeLabels[days] || days + ' days'} summary`;
+
+    if (acts.length === 0) {
+      const stravaConnected = !!getStravaConfig();
+      const cta = stravaConnected
+        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">↻ Sync from Strava</button>'
+        : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
+      [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
+      bars.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding: 12px;">No activities in this range. ${cta}</div>`;
+      if (axis) axis.innerHTML = '';
+      if (discBars) discBars.innerHTML = '';
+      if (topSess) topSess.innerHTML = '';
+      return;
+    }
+
+    // Summary tiles
+    const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
+    const totalDistKm = acts.reduce((a, x) => a + (x.distance_km || 0), 0);
+    const hrActs = acts.filter(a => a.avg_hr);
+    const avgHr = hrActs.length > 0 ? Math.round(hrActs.reduce((a, x) => a + x.avg_hr, 0) / hrActs.length) : null;
+    if (totalEl) totalEl.textContent = formatHM(totalMins);
+    if (sessionsEl) sessionsEl.textContent = acts.length;
+    if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : '—';
+    if (avgHrEl) avgHrEl.textContent = avgHr ? avgHr + ' bpm' : '—';
+
+    // Volume buckets
+    const { buckets, bucketSize, bucketLabel } = bucketActivities(acts, days);
+    if (volTitle) volTitle.textContent = `Volume · ${bucketLabel}`;
+    const peakMins = Math.max(60, ...buckets.map(b => b.mins));
+    bars.innerHTML = buckets.map(b => {
+      const pct = b.mins > 0 ? Math.max(8, Math.round((b.mins / peakMins) * 100)) : 6;
+      const isEmpty = b.mins < 1;
+      return `<div class="bar ${isEmpty ? '' : 'done'}" style="height: ${pct}%; ${isEmpty ? 'opacity: 0.4;' : ''}" title="${b.label}: ${formatHM(b.mins)}"></div>`;
+    }).join('');
+
+    // X-axis labels — show start, middle, end (or first / last few for short ranges)
+    if (axis) {
+      const labels = [];
+      if (buckets.length <= 7) {
+        labels.push(...buckets.map(b => b.label));
+      } else {
+        labels.push(buckets[0].label, buckets[Math.floor(buckets.length / 2)].label, buckets[buckets.length - 1].label);
+      }
+      axis.innerHTML = labels.map(l => `<span>${escapeHtml(l)}</span>`).join('');
+    }
+
+    // Discipline breakdown
+    const byDisc = {};
+    acts.forEach(a => {
+      const d = mapStravaTypeToSessionType(a.type);
+      byDisc[d] = (byDisc[d] || 0) + (a.moving_min || 0);
+    });
+    const discOrder = [
+      { id: 'run', label: 'Run', icon: '🏃', color: 'var(--primary)' },
+      { id: 'bike', label: 'Bike', icon: '🚴', color: '#5DA985' },
+      { id: 'swim', label: 'Swim', icon: '🏊', color: '#2980B9' },
+      { id: 'strength', label: 'Strength', icon: '🏋️', color: '#D9A94A' },
+      { id: 'walk', label: 'Walk / Hike', icon: '🥾', color: '#A89878' },
+      { id: 'mobility', label: 'Yoga / Mobility', icon: '🧘', color: '#8E44AD' },
+      { id: 'other', label: 'Other', icon: '✓', color: '#888' },
+    ];
+    const discTotal = Object.values(byDisc).reduce((a, b) => a + b, 0);
+    if (discBars) {
+      const rows = discOrder
+        .filter(d => (byDisc[d.id] || 0) > 0)
+        .map(d => {
+          const m = byDisc[d.id];
+          const pct = discTotal > 0 ? Math.round((m / discTotal) * 100) : 0;
+          return `
+            <div style="margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                <span><span style="margin-right: 6px;">${d.icon}</span><strong>${d.label}</strong></span>
+                <span style="color: var(--text-soft);">${formatHM(m)} · ${pct}%</span>
+              </div>
+              <div style="height: 8px; background: var(--bg-soft); border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: ${pct}%; background: ${d.color};"></div>
+              </div>
+            </div>`;
+        }).join('');
+      discBars.innerHTML = rows || '<div style="font-size:13px; color:var(--text-soft);">No data.</div>';
+    }
+
+    // Top sessions in range — biggest by duration
+    if (topSess) {
+      const top = acts.slice().sort((a, b) => (b.moving_min || 0) - (a.moving_min || 0)).slice(0, 5);
+      topSess.innerHTML = top.map((a, i) => `
+        <div style="padding: 14px 16px; ${i === top.length - 1 ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div>
+              <div style="font-weight: 700; font-size: 15px;">${iconForStravaType(a.type)} ${escapeHtml(a.name)} ›</div>
+              <div style="color: var(--text-soft); font-size: 12px;">${shortDay(a.start_date_local)}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}</div>
+            </div>
+            <div style="font-weight: 700; font-size: 15px;">${formatHM(a.moving_min)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────
