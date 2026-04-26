@@ -1724,23 +1724,37 @@
       <div class="section-label" id="heroSectionLabel">Today's workout</div>
       <div class="card hero-card" id="heroCard">
         <div id="heroAdjustedBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.22); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ WORKOUT ADJUSTED</div>
+        <div id="heroDoneBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.25); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ COMPLETED</div>
         <div class="card-title" id="heroLabel">Wednesday · Quality day</div>
         <div class="workout-name" id="heroName">Swim + Bike intervals</div>
         <div class="workout-duration" id="heroDuration">60 min · Moderate-Hard</div>
         <div class="why" id="heroWhy">
           3 days out from Saturday's long brick — today is the right day for sharpness. Pool for 30 min, then bike 6×2-min hard on the trainer.
         </div>
-        <div style="font-size: 12px; opacity: 0.85; margin-top: 12px; line-height: 1.5;">
+        <div id="heroDoneStats" style="display:none; margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
+          <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">What you actually did</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 13px;">
+            <div><div style="opacity:0.75; font-size: 11px;">Duration</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDuration">—</div></div>
+            <div><div style="opacity:0.75; font-size: 11px;">Avg HR</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneHr">—</div></div>
+            <div><div style="opacity:0.75; font-size: 11px;">Distance</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDistance">—</div></div>
+          </div>
+        </div>
+        <div style="font-size: 12px; opacity: 0.85; margin-top: 12px; line-height: 1.5;" id="heroSyncNote">
           Your watch will sync automatically when you're done. Log RPE + notes after to sharpen tomorrow's recommendation.
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px;">
+        <!-- Action row: shown when not yet completed -->
+        <div id="heroActionsPending" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px;">
           <button onclick="quickMarkDone()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✓ Done</button>
           <button onclick="quickReschedule()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">⟲ Reschedule</button>
           <button onclick="quickSkip()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✕ Skip</button>
         </div>
-        <div class="hero-actions">
+        <div class="hero-actions" id="heroLogActions">
           <button class="btn btn-on-hero" onclick="showScreen('log')">Log session</button>
           <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust today</button>
+        </div>
+        <!-- Action row: shown when completed -->
+        <div id="heroActionsDone" style="display: none; margin-top: 14px;">
+          <button id="heroViewDetails" onclick="" class="btn btn-on-hero" style="width: 100%;">View workout details →</button>
         </div>
       </div>
 
@@ -5949,16 +5963,33 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const name = document.getElementById('heroName');
     const duration = document.getElementById('heroDuration');
     const why = document.getElementById('heroWhy');
-    const badge = document.getElementById('heroAdjustedBadge');
+    const adjBadge = document.getElementById('heroAdjustedBadge');
+    const doneBadge = document.getElementById('heroDoneBadge');
     const sectionLabel = document.getElementById('heroSectionLabel');
     const heroCard = document.getElementById('heroCard');
+    const actionsPending = document.getElementById('heroActionsPending');
+    const actionsDone = document.getElementById('heroActionsDone');
+    const logActions = document.getElementById('heroLogActions');
+    const syncNote = document.getElementById('heroSyncNote');
+    const doneStats = document.getElementById('heroDoneStats');
 
     const todayFull = DAY_FULL[todayDay];
     const adjusted = !!planState.lastChange && new RegExp(todayDay + '|' + todayFull, 'i').test(planState.lastChange);
-    if (badge) badge.style.display = adjusted ? 'block' : 'none';
-    if (sectionLabel) sectionLabel.textContent = adjusted ? 'Your updated workout' : 'Today\'s workout';
+    const completed = !!s.completed;
+
+    // Toggle the badges
+    if (adjBadge) adjBadge.style.display = (adjusted && !completed) ? 'block' : 'none';
+    if (doneBadge) doneBadge.style.display = completed ? 'block' : 'none';
+
+    // Section label adapts
+    if (sectionLabel) sectionLabel.textContent = completed ? 'Today · Done' : adjusted ? 'Your updated workout' : 'Today\'s workout';
+
+    // Card color: completed = muted/dark green, adjusted = gold, default = primary green
     if (heroCard) {
-      if (adjusted) {
+      if (completed) {
+        heroCard.style.background = 'linear-gradient(135deg, var(--primary-dark), var(--primary))';
+        heroCard.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+      } else if (adjusted) {
         heroCard.style.background = 'linear-gradient(135deg, #D9A94A, #E8B961)';
         heroCard.style.boxShadow = '0 4px 16px rgba(217, 169, 74, 0.3)';
       } else {
@@ -5967,12 +5998,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    if (label) label.textContent = `${todayFull} · ${s.type === 'rest' ? 'Rest day' : s.type === 'quality' || s.type === 'brick' ? 'Quality day' : s.type === 'strength' ? 'Strength' : 'Easy'}`;
-    if (name) name.textContent = s.name;
-    if (duration) duration.textContent = s.meta;
+    // Header text
+    if (label) label.textContent = completed
+      ? `${todayFull} · Logged via Strava`
+      : `${todayFull} · ${s.type === 'rest' ? 'Rest day' : s.type === 'quality' || s.type === 'brick' ? 'Quality day' : s.type === 'strength' ? 'Strength' : 'Easy'}`;
+
+    // Name + duration: show actual workout when completed, prescribed when not
+    if (name) name.textContent = completed && s.stravaName ? s.stravaName : s.name;
+    if (duration) {
+      if (completed && s.actualMins) {
+        const dh = Math.floor(s.actualMins / 60);
+        const dm = s.actualMins % 60;
+        const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
+        duration.textContent = `${dStr}${s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : ''}`;
+      } else {
+        duration.textContent = s.meta;
+      }
+    }
+
+    // Why-text
     if (why) {
       let w = '';
-      if (adjusted) {
+      if (completed) {
+        w = `You already trained today — nice work. Plan stays as-is; today's box is locked.`;
+      } else if (adjusted) {
         w = `Adjusted from your original session: ${planState.lastChange}. Engine confirmed this still fits your week's balance.`;
       } else if (s.type === 'rest') {
         w = 'Full rest today. Recovery is the workout — the body adapts between sessions, not during them.';
@@ -5980,12 +6029,45 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         w = `Short session (${s.duration} min). Quality over quantity: hit the intent in the window you have.`;
       } else if (s.type === 'quality' || s.type === 'brick') {
         w = `Quality session today. Controlled-hard, not all-out — leaves enough in the tank for the rest of the week.`;
-      } else if (s.type === 'brick') {
-        w = `Big day. This is your race-specific session — execute with discipline, fuel well, recover hard tonight.`;
       } else {
         w = `Easy aerobic work. Conversational pace, HR in Zone 2.`;
       }
       why.textContent = w;
+    }
+
+    // Actually-did stats — populate the small grid
+    if (doneStats) {
+      if (completed) {
+        doneStats.style.display = 'block';
+        const dh = Math.floor((s.actualMins || 0) / 60);
+        const dm = (s.actualMins || 0) % 60;
+        const dStr = (s.actualMins || 0) > 0 ? (dh > 0 ? `${dh}h ${dm}m` : `${dm} min`) : '—';
+        const hr = s.actualHr ? Math.round(s.actualHr) : '—';
+        const dist = s.stravaDistance_km ? s.stravaDistance_km.toFixed(1) + ' km' : '—';
+        const dur = document.getElementById('heroDoneDuration'); if (dur) dur.textContent = dStr;
+        const hrEl = document.getElementById('heroDoneHr'); if (hrEl) hrEl.textContent = hr;
+        const distEl = document.getElementById('heroDoneDistance'); if (distEl) distEl.textContent = dist;
+      } else {
+        doneStats.style.display = 'none';
+      }
+    }
+
+    // Toggle action rows: pending vs done
+    if (actionsPending) actionsPending.style.display = completed ? 'none' : 'grid';
+    if (logActions) logActions.style.display = completed ? 'none' : 'flex';
+    if (syncNote) syncNote.style.display = completed ? 'none' : 'block';
+    if (actionsDone) actionsDone.style.display = completed ? 'block' : 'none';
+
+    // Wire the "View details" button to the Strava session report (if we have an ID)
+    const viewBtn = document.getElementById('heroViewDetails');
+    if (viewBtn) {
+      if (completed && s.stravaId) {
+        viewBtn.onclick = () => openStravaSessionReport(s.stravaId);
+        viewBtn.style.display = 'block';
+      } else if (completed) {
+        viewBtn.onclick = () => showScreen('plan');
+        viewBtn.textContent = 'See your week →';
+      }
     }
   }
   // Render the "Coming up" section on Today tab — next 2 non-rest sessions
@@ -6826,7 +6908,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
             <div class="data-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(59, 137, 104, 0.15);">
               <div class="data-cell"><div class="label">Duration</div><div class="value" style="font-size: 14px;">${formatHM(a.moving_min)}</div></div>
               <div class="data-cell"><div class="label">Avg HR</div><div class="value" style="font-size: 14px;">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
-              <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Suffer'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
+              <div class="data-cell"><div class="label" title="${a.avg_watts ? '' : 'Strava\\'s Relative Effort (formerly Suffer Score) — how hard your heart worked over time.'}">${a.avg_watts ? 'Avg W' : 'Effort'}</div><div class="value" style="font-size: 14px;">${a.avg_watts ? Math.round(a.avg_watts) : (a.suffer || '—')}</div></div>
             </div>` : ''}
           </div>
         </div>
@@ -7199,7 +7281,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
               <div style="font-weight: 700; font-size: 15px;">${iconForStravaType(a.type)} ${escapeHtml(a.name)} ›</div>
               <div style="color: var(--text-soft); font-size: 12px;">${shortDay(a.start_date_local)}${km ? ' · ' + km : ''}</div>
             </div>
-            ${a.suffer ? `<div style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">Suffer ${a.suffer}</div>` : ''}
+            ${a.suffer ? `<div title="Strava's Relative Effort (formerly Suffer Score)" style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">Effort ${a.suffer}</div>` : ''}
           </div>
           <div class="data-row" style="margin-top: 12px;">
             <div class="data-cell"><div class="label">Duration</div><div class="value">${formatHM(a.moving_min)}</div></div>
