@@ -73,11 +73,11 @@
   }
   .screen.active { display: flex; }
   .screen-inner {
-    padding: 16px 20px 100px;
+    padding: 14px 20px 100px;
     flex: 1;
   }
   .header {
-    padding: 8px 20px 16px;
+    padding: 14px 20px 18px;
     position: relative;
   }
   .back-btn {
@@ -96,55 +96,74 @@
   }
   .back-btn:hover { color: var(--primary); }
   .back-btn svg { width: 16px; height: 16px; }
+  /* ─── Typography scale (used across the app) ───────────────────────────
+     greeting → small overline above title (e.g. "Saturday, April 26")
+     title    → large page headline (e.g. "Good morning, Danny")
+     card-title → uppercase label inside cards
+     section-label → uppercase label between cards
+     ──────────────────────────────────────────────────────────────────── */
   .greeting {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-soft);
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
   }
   .title {
     font-size: 26px;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.5px;
-    margin-top: 2px;
+    margin-top: 4px;
+    line-height: 1.15;
+  }
+  /* Optional smaller subtitle beneath a title */
+  .subtitle {
+    font-size: 14px;
+    color: var(--text-soft);
+    font-weight: 500;
+    margin-top: 4px;
   }
   .card {
     background: var(--card);
-    border-radius: 20px;
-    padding: 18px;
-    margin-bottom: 14px;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
     border: 1px solid var(--border);
   }
   .card-title {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     color: var(--text-soft);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
   }
   .hero-card {
     background: linear-gradient(135deg, var(--primary), var(--primary-light));
     color: #fff;
-    padding: 22px;
+    padding: 20px;
     border: 0;
   }
   .hero-card .card-title {
     color: rgba(255,255,255,0.85);
+    margin-bottom: 6px;
   }
   .hero-card .workout-name {
     font-size: 22px;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.2;
-    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+    margin-bottom: 4px;
   }
   .hero-card .workout-duration {
     font-size: 14px;
+    font-weight: 500;
     opacity: 0.9;
   }
   .hero-card .why {
     font-size: 14px;
     margin-top: 14px;
-    line-height: 1.5;
+    line-height: 1.55;
     opacity: 0.95;
   }
   .hero-actions {
@@ -217,12 +236,12 @@
   .signal-trend.warn { color: var(--warn); }
   .signal-trend.neutral { color: var(--text-soft); }
   .section-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text-soft);
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin: 18px 2px 10px;
+    letter-spacing: 0.7px;
+    margin: 22px 2px 10px;
   }
   /* Plan screen */
   .week-strip {
@@ -485,7 +504,8 @@
     font-weight: 700;
     margin-bottom: 4px;
   }
-  .modal .sub { font-size: 14px; color: var(--text-soft); margin-bottom: 18px; }
+  /* General sub text — used in modals + onboarding paragraphs */
+  .sub, .modal .sub { font-size: 14px; color: var(--text-soft); margin-bottom: 18px; line-height: 1.55; }
   .time-options {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -1675,8 +1695,8 @@
   <div id="screen-today" class="screen">
     <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start;">
       <div>
-        <div class="greeting" id="todayGreetingName">Good morning</div>
-        <div class="title" id="todayGreetingDate" style="font-size: 14px; color: var(--text-soft); font-weight: 500;">Today</div>
+        <div class="greeting" id="todayGreetingDate">Today</div>
+        <div class="title" id="todayGreetingName">Good morning</div>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
