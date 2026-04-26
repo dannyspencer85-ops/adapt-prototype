@@ -1743,8 +1743,7 @@
         </div>
       </div>
 
-      <!-- 3. Fitness Pulse — one-line weekly progression -->
-      <div id="todayFitnessPulse" style="display: none;"></div>
+      <!-- (Fitness Pulse removed from Home — duplicates the Body row in Smart Summary above) -->
 
       <!-- 4. Coach insights — categorized, collapsible -->
       <div id="todayInsights"></div>
@@ -1827,54 +1826,52 @@
       </div>
     </div>
     <div class="screen-inner">
+      <!-- Banners (only show when relevant) -->
       <div id="planInjuryBanner"></div>
       <div id="planChangeBanner"></div>
-      <div id="planInsights"></div>
       <div id="planPeakBanner"></div>
-      <details>
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Course intel</summary>
-        <div id="courseIntelCard"></div>
-      </details>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; margin-bottom: 8px;">
+      <!-- 1. CALENDAR — the visual anchor of the Plan tab -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
         <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
         <div class="section-label" id="weekViewLabel" style="margin: 0;">This week</div>
         <button onclick="navWeek(1)" id="weekNextBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Next ›</button>
       </div>
-      <div style="text-align: right; margin-bottom: 6px;">
-        <button onclick="openScheduleModal()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">📅 Edit schedule</button>
-      </div>
       <div class="week-strip" id="weekStrip"></div>
+      <div style="text-align: center; font-size: 11px; color: var(--text-soft); margin-top: 4px; margin-bottom: 6px;">Tap a day to see details or swap in a different workout</div>
       <div id="weekStateBanner"></div>
 
-      <!-- Recent completed sessions from Strava (only shows when synced) -->
-      <div id="recentStravaSessions"></div>
+      <!-- 2. THIS WEEK'S SESSIONS — the substance -->
       <div id="weekSessions"></div>
 
-      <!-- Compact 7-day summary kept on Plan tab — full history lives in Performance tab -->
-      <div class="card" id="progress7DaySummary" style="margin-top: 18px;">
-        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>This week</span>
-          <button onclick="showScreen('data')" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">See Pulse →</button>
-        </div>
-        <div class="data-row">
-          <div class="data-cell"><div class="label">Total</div><div class="value">—</div></div>
-          <div class="data-cell"><div class="label">Sessions</div><div class="value">—</div></div>
-          <div class="data-cell"><div class="label">Avg HR</div><div class="value">—</div></div>
-        </div>
-      </div>
-      <!-- The 14-day load card was redundant with Performance tab — keep only an empty stub for the renderer -->
-      <div style="display:none;">
-        <div id="progressLoadCard"><div class="bar-row" id="progressLoadBars"></div><div id="progressLoadCommentary"></div></div>
+      <!-- 3. ACTUAL recent workouts from Strava -->
+      <div id="recentStravaSessions"></div>
+
+      <!-- 4. COACH INSIGHTS — categorized, collapsed -->
+      <div id="planInsights"></div>
+
+      <!-- 5. EXPANDERS at the bottom for less-frequent info -->
+      <div style="margin-top: 18px;">
+        <button onclick="openScheduleModal()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px;">📅 Edit schedule preferences</button>
       </div>
 
-      <!-- 6.5-week arc as a quiet expander -->
-      <details style="margin-top: 8px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">View full plan arc</summary>
+      <details style="margin-top: 4px;">
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Course intel</summary>
+        <div id="courseIntelCard"></div>
+      </details>
+
+      <details style="margin-top: 4px;">
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">📊 6-week plan arc</summary>
         <div class="card" style="margin-top: 8px;">
           <div id="weekArc" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px 14px; font-size: 13px;"></div>
         </div>
       </details>
+
+      <!-- Hidden stubs for renderer compatibility (the data lives in Pulse tab now) -->
+      <div style="display:none;">
+        <div id="progress7DaySummary"></div>
+        <div id="progressLoadCard"><div class="bar-row" id="progressLoadBars"></div><div id="progressLoadCommentary"></div></div>
+      </div>
     </div>
   </div>
 
@@ -2036,6 +2033,36 @@
       <!-- Recent sessions in range -->
       <div class="section-label">Top sessions in this range</div>
       <div class="card" id="perfTopSessions" style="padding: 0; overflow: hidden;"></div>
+
+      <!-- Learn section — short body-education cards -->
+      <div class="section-label" style="margin-top: 22px;">Learn about your body</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div onclick="openLearnTopic('zone2')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 22px;">🧘</div>
+          <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Why easy days should feel really easy</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">The 80/20 rule — most fitness comes from the slow stuff.</div></div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+        <div onclick="openLearnTopic('hr')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 22px;">❤</div>
+          <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Reading your heart rate</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Resting vs workout HR, what zones mean, how to use them.</div></div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+        <div onclick="openLearnTopic('heat')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 22px;">🌡️</div>
+          <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">How heat affects your training</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Why HR rises in summer + how to acclimate before a hot race.</div></div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+        <div onclick="openLearnTopic('acwr')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 22px;">📏</div>
+          <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">The "don't ramp up too fast" rule</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Why a sudden volume jump injures you, and the safe build rate.</div></div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+        <div onclick="openLearnTopic('rest')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 22px;">💤</div>
+          <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Why rest IS the workout</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Your body adapts during recovery — not during the session.</div></div>
+          <div style="color: var(--text-soft);">›</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2442,6 +2469,18 @@
   </div>
 
   <!-- SESSION REPORT (past session) MODAL -->
+  <!-- LEARN MODAL — body-education content -->
+  <div class="modal-bg" id="learnModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 22px; margin: 0;" id="learnTitle">Learn</h2>
+        <button onclick="closeLearn()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div id="learnBody" style="font-size: 14px; line-height: 1.65; color: var(--text); margin-top: 14px;"></div>
+      <button class="btn btn-ghost btn-full" onclick="closeLearn()" style="margin-top: 18px;">Got it</button>
+    </div>
+  </div>
+
   <!-- GLOSSARY POPOVER -->
   <div class="modal-bg center" id="glossaryModal">
     <div class="modal" style="max-width: 360px;">
@@ -4929,6 +4968,92 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'Taper': { full: 'Taper', def: 'The 1–3 weeks before a race when training volume drops 30–60% (intensity stays sharp). Lets accumulated fatigue clear so you arrive fresh on race day.' },
     'Z2 base': { full: 'Aerobic Base / Zone 2', def: 'Easy aerobic training — the foundation of endurance fitness. 70–80% of weekly time should be at this intensity.' },
   };
+  // ──────────────────────────────────────────────────────────────────────
+  // LEARN TOPICS — body-education content cards. Plain-language + short.
+  // ──────────────────────────────────────────────────────────────────────
+  const LEARN_TOPICS = {
+    zone2: {
+      title: 'Why easy days should feel really easy',
+      body: `
+        <p><strong>Most of your training should feel comfortable.</strong> Like, "I could go all day" easy. If you're huffing and sweating, you're going too hard.</p>
+        <p>Elite endurance athletes spend roughly <strong>80% of their training time at low intensity</strong> (Zone 2 — conversational pace) and only ~20% at high intensity. This is called the <strong>polarized training model</strong>.</p>
+        <p>Why? Easy aerobic training builds the slow-twitch muscle fibers, capillary network, and mitochondria that power endurance. You can't get those gains by always going hard — you just accumulate fatigue and can't recover.</p>
+        <p><strong>Practical test:</strong> on an easy day, you should be able to hold a full conversation in complete sentences. If you can only get out 2-3 words, you're in Zone 3 and pushing the day's intent off course.</p>
+        <p style="font-size: 12px; color: var(--text-soft); margin-top: 14px;">Research: Seiler (2010), Stöggl & Sperlich (2014).</p>
+      `,
+    },
+    hr: {
+      title: 'Reading your heart rate',
+      body: `
+        <p>There are two heart rates worth tracking, and they tell you different things.</p>
+        <p><strong>Resting heart rate (RHR)</strong> — measured first thing in the morning. Goes <em>down</em> as you get fitter (a stronger heart pumps more blood per beat, so it doesn't have to beat as often). Spikes 5+ bpm above your norm can signal illness, poor sleep, or overtraining.</p>
+        <p><strong>Workout heart rate</strong> — your average HR during a training session. The most direct measure of how hard you're working. Lower workout HR at the same pace = improving fitness.</p>
+        <p><strong>HR Zones</strong> (% of max HR):</p>
+        <ul style="margin-left: 18px;">
+          <li><strong>Z1</strong> (50-60%): Recovery. Walking pace.</li>
+          <li><strong>Z2</strong> (60-70%): Easy aerobic. Conversational. <em>This is where most volume should live.</em></li>
+          <li><strong>Z3</strong> (70-80%): Tempo. "Comfortably hard." Choppy talking.</li>
+          <li><strong>Z4</strong> (80-90%): Threshold. ~1-hour max effort.</li>
+          <li><strong>Z5</strong> (90-100%): All-out. Short repeats only.</li>
+        </ul>
+        <p>Adapt's <strong>Pulse</strong> tab tracks workout HR for similar easy efforts over time — when it drops, you're getting fitter.</p>
+      `,
+    },
+    heat: {
+      title: 'How heat affects your training',
+      body: `
+        <p>When it's hot out, your heart works harder at the same effort. Roughly <strong>1 bpm extra per °C above 18°C</strong> (65°F).</p>
+        <p>That's because your body has two big jobs: power your muscles AND cool itself. In the heat, blood gets diverted to the skin for cooling, which means your heart has to pump faster to also supply the muscles.</p>
+        <p><strong>Why this matters:</strong> a hot week can look like fitness regression on paper (HR is up at the same pace) when you're actually fine. Adapt corrects for this — when temperature data is available, the Pulse "Body" reading factors it in.</p>
+        <p><strong>For a hot race:</strong> do a <strong>heat acclimatization block</strong> in the final 4 weeks. 10-14 days of progressive heat exposure (saunas, overdressed runs) makes your body adapt — bigger plasma volume, earlier sweating, lower HR at the same effort. Most heat-prep gains are made in 2 weeks; benefits last ~2-3 weeks after.</p>
+        <p style="font-size: 12px; color: var(--text-soft); margin-top: 14px;">Research: Pugh (1969), Tipton (2017), Périard (2015).</p>
+      `,
+    },
+    acwr: {
+      title: `The "don't ramp up too fast" rule`,
+      body: `
+        <p>The single most evidence-based way to stay injury-free: don't increase your training too fast.</p>
+        <p>The metric coaches use is <strong>Acute:Chronic Workload Ratio</strong> (ACWR) — your last 7 days of training divided by your trailing 4-week average.</p>
+        <ul style="margin-left: 18px;">
+          <li><strong>0.8 - 1.3</strong>: sweet spot. Steady, sustainable build.</li>
+          <li><strong>>1.5</strong>: red zone. Research shows 4-5× injury risk vs. the safe zone.</li>
+          <li><strong><0.7</strong>: detraining zone. Fitness starts eroding after ~10 days.</li>
+        </ul>
+        <p>The classic "10% rule" says: don't increase weekly volume by more than 10% from the prior week. That's a simpler approximation of ACWR.</p>
+        <p>Adapt's coach tracks your ACWR every render and flags spikes BEFORE they catch up to you. The most common cause of an ACWR spike is enthusiasm — a great week makes you want to do another great week. Don't.</p>
+        <p style="font-size: 12px; color: var(--text-soft); margin-top: 14px;">Research: Gabbett (2016), Hulin (2014).</p>
+      `,
+    },
+    rest: {
+      title: 'Why rest IS the workout',
+      body: `
+        <p>You don't get fitter <em>during</em> a workout. You get fitter <em>between</em> workouts — when your body repairs the damage and rebuilds slightly stronger than before. This is called <strong>supercompensation</strong>.</p>
+        <p>If you train every day, you accumulate damage faster than your body can repair. The result: stagnation, then injury, then forced rest anyway. Smarter to plan the rest.</p>
+        <p><strong>Minimum:</strong> at least one full rest day per week. <strong>Better:</strong> 1-2 rest days plus 2 truly easy days.</p>
+        <p>Research consistently shows that athletes who train 7/7 days have:</p>
+        <ul style="margin-left: 18px;">
+          <li>Higher injury rates</li>
+          <li>Elevated cortisol (stress hormone)</li>
+          <li>Lower HRV (a sign of poor recovery)</li>
+          <li>Reduced performance gains over the long term</li>
+        </ul>
+        <p>On a rest day: walk, stretch, sleep extra, eat well. That's the workout. Your body is doing the actual training while you rest.</p>
+        <p style="font-size: 12px; color: var(--text-soft); margin-top: 14px;">Research: Issurin (2010), Kellmann (2010).</p>
+      `,
+    },
+  };
+  function openLearnTopic(id) {
+    const topic = LEARN_TOPICS[id];
+    if (!topic) return;
+    document.getElementById('learnTitle').textContent = topic.title;
+    document.getElementById('learnBody').innerHTML = topic.body;
+    document.getElementById('learnModal').classList.add('show');
+    if (typeof trackEvent === 'function') trackEvent('learn_topic_opened', { topic: id });
+  }
+  function closeLearn() {
+    document.getElementById('learnModal').classList.remove('show');
+  }
+
   // Open a centered tooltip-modal showing one term's definition
   function defineTerm(term) {
     const entry = GLOSSARY[term];
@@ -5338,8 +5463,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           unit: 'bpm',
           valueColor: 'var(--good)',
           valueIcon: '📈',
-          headline: 'Aerobic fitness up',
-          explanation: `Temp-adjusted HR is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same easy effort${tempNote}.`,
+          headline: 'Easy runs feel easier',
+          explanation: `Your heart rate during easy runs is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same effort${tempNote}. Sign of fitness gains.`,
           tone: 'good'
         };
       } else if (diff >= 5) {
@@ -5348,8 +5473,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           unit: 'bpm',
           valueColor: 'var(--caution)',
           valueIcon: '↑',
-          headline: 'HR drifting up',
-          explanation: `Temp-adjusted HR is ${diff} bpm higher than the prior 3 weeks at easy effort${tempNote}. Watch for fatigue.`,
+          headline: 'Easy runs feel harder',
+          explanation: `Your heart rate during easy runs is ${diff} bpm higher than the prior 3 weeks at the same effort${tempNote}. Often means accumulated fatigue.`,
           tone: 'caution'
         };
       } else if (Math.abs(rawDiff) >= 4 && Math.abs(diff) < 3) {
@@ -5360,7 +5485,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           valueColor: 'var(--info)',
           valueIcon: '🌡️',
           headline: rawDiff > 0 ? 'HR up — but it\'s the heat' : 'HR down — partly the cold',
-          explanation: `Raw HR ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm vs prior 3 weeks, but temp ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'}. Adjusted for that, fitness is essentially flat.`,
+          explanation: `Workout HR ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm vs prior 3 weeks, but temp ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'}. Adjusted for that, fitness is steady.`,
           tone: 'info'
         };
       }
@@ -5566,7 +5691,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (acwr > 1.5) {
         out.push({
           severity: 'alert',
-          title: `Workload spike: ${acwr.toFixed(2)} ACWR`,
+          title: `You ramped up too fast this week`,
           simpleMessage: `You jumped your training a lot this week vs. your average. Stacked weeks like this is when most injuries happen.`,
           message: `Last 7 days: ${formatMins(minsLast7)} vs. 28-day rolling average of ${formatMins(Math.round(chronic7DayAvg))}/week. ACWR ${acwr.toFixed(2)} > 1.5 — Gabbett (2016) found this range carries 4-5× injury risk vs. the 0.8-1.3 sweet spot. Pull back next week.`,
           suggestion: 'Cut next week by 15-20% to bring the ratio back into the safe zone.'
@@ -5574,7 +5699,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       } else if (acwr < 0.7 && minsLast28 > 240) {
         out.push({
           severity: 'info',
-          title: `Detraining risk: ${acwr.toFixed(2)} ACWR`,
+          title: `Training dropped sharply`,
           simpleMessage: `Your training dropped sharply this week. A short break is fine — but more than 10 days of low load and fitness starts eroding.`,
           message: `Last 7 days only ${formatMins(minsLast7)} — your 28-day average per week was ${formatMins(Math.round(chronic7DayAvg))}. ACWR ${acwr.toFixed(2)} is in the under-loaded zone. If unintentional, ramp back up gradually.`,
           suggestion: 'If you\'re recovering from illness or travel, return at 70% volume next week, not full.'
@@ -5593,7 +5718,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (adherence < 0.5 && todayIdx >= 4) {
         out.push({
           severity: 'warn',
-          title: `Adherence: ${completedThisWeek} of ${plannedSessions.length} planned`,
+          title: `Falling behind this week`,
           simpleMessage: `You're missing more sessions than usual this week. The plan adapts — but if life is consistently in the way, let's right-size the schedule.`,
           message: `${completedThisWeek}/${plannedSessions.length} sessions logged so far this week. Hill 2018 — when adherence drops below 60% across 3+ weeks, planned-vs-done divergence usually means the plan was unrealistic, not the athlete.`,
           suggestion: 'If you can squeeze a session in, focus on the one quality day. Otherwise consider trimming next week\'s plan.'
@@ -5618,7 +5743,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (jumpPct > 15) {
         out.push({
           severity: 'warn',
-          title: `Long run jumped ${Math.round(jumpPct)}%`,
+          title: `Long run grew too quickly`,
           simpleMessage: `Your longest run this week was a big step up from the prior 3 weeks. Don't repeat the jump next week — keep it flat or down a bit.`,
           message: `Long run this week: ${formatMins(longestRunThis)}. Longest in the prior 3 weeks: ${formatMins(longestRunPrior)}. Daniels' Running Formula (>10% week-over-week long-run growth) is associated with overuse injury — your jump is ${Math.round(jumpPct)}%.`,
           suggestion: 'Hold or reduce the long run next week — banking the bigger session is fine, but build slowly.'
@@ -5632,7 +5757,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (jumpPct > 25) {
         out.push({
           severity: 'info',
-          title: `Long ride up ${Math.round(jumpPct)}%`,
+          title: `Long ride stepped up a lot`,
           message: `Long ride this week: ${formatMins(longestBikeThis)}. Prior 3-week longest: ${formatMins(longestBikePrior)}. Cycling tolerates bigger jumps than running (less impact), but +25% week-over-week is still aggressive — make sure recovery and fueling kept up.`,
           suggestion: 'Hold this duration for 1-2 weeks before extending further.'
         });
@@ -5680,7 +5805,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       } else if (diff >= 5) {
         out.push({
           severity: 'warn',
-          title: `Easy HR drifting up — possible fatigue`,
+          title: `Easy runs feel harder lately`,
           simpleMessage: `Even after correcting for temperature, your easy-run HR is ${diff} bpm higher than the prior 3 weeks. That can mean fatigue, illness, or dehydration.`,
           message: `Temp-adjusted easy-run avg HR last 7d: ${easyHr7} bpm vs. prior 3 weeks ${easyHr21} bpm. ${useTempAdj ? 'Heat correction applied — ruling out hot weather as the cause.' : 'No temperature data; raw HR comparison only.'}${tempNote} Cardiac drift of 5+ bpm at consistent effort is associated with accumulated fatigue (Achten & Jeukendrup 2003). Two recovery days ahead.`,
           suggestion: 'Insert an extra rest day, prioritize sleep + hydration, see if the HR returns to baseline.'
@@ -5712,7 +5837,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (backToBack) {
       out.push({
         severity: 'warn',
-        title: 'Two hard sessions stacked under 36 hours',
+        title: 'Two hard days too close together',
         simpleMessage: `In the last two weeks you put two hard efforts inside a 36-hour window. Both adaptations get blunted — research suggests at least 48h between intense sessions.`,
         message: `Strava data shows two high-Effort sessions (Suffer ≥80 or avg HR ≥155) less than 36h apart in the last 14 days. Seiler 2010 polarized-training research recommends 48-72h between high-intensity sessions to allow neural + metabolic recovery.`,
         suggestion: 'Spread quality sessions across the week — Tue/Thu/Sat is a classic spacing.'
@@ -5727,7 +5852,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (activeDayCount7 >= 7) {
       out.push({
         severity: 'warn',
-        title: '0 rest days in 7',
+        title: 'No rest day this week',
         simpleMessage: `You've trained every day this week. One full rest day per week is the minimum for sustainable training — your body adapts during rest, not during work.`,
         message: `Strava shows ${activeDayCount7}/7 days active. Long-term research (Issurin 2010) ties no-rest weeks to elevated overtraining markers (cortisol, HRV decline). At least one true rest day per week is foundational.`,
         suggestion: 'Take tomorrow as a full rest day. Walking + stretching only.'
@@ -5761,7 +5886,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       } else if (isFlat && minsLast7 >= 180) {
         out.push({
           severity: 'info',
-          title: 'Stable training volume',
+          title: 'Steady week — fitness consolidating',
           message: `Last 4 weeks held within ±8% of each other (~${formatMins(Math.round(avgPrev3))}/week avg). Stable volume is great for consolidating fitness — Hellard 2019 showed athletes peak after 6-12 weeks at consistent volume. If race is 6+ weeks out, time to introduce a planned overload week.`,
         });
       }
@@ -7366,7 +7491,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderSmartSummary();
     renderTodayHero();
-    renderFitnessPulse();
+    // Note: renderFitnessPulse() removed from Home — Smart Summary's Body row covers it
     renderTodayComingUp();
     renderTodayRationaleSlot();
     renderLogSession();
