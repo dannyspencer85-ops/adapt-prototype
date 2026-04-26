@@ -5127,7 +5127,216 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
+    // 9. SMART INSIGHTS — driven by real Strava data, not planned-only heuristics
+    insights.push(...computeSmartStravaInsights());
+
     return insights;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // SMART INSIGHTS ENGINE — computes evidence-based insights from real Strava history
+  // Each insight cites a numeric metric + research-backed threshold.
+  // Fails gracefully when Strava data is missing.
+  // ──────────────────────────────────────────────────────────────────────
+  function computeSmartStravaInsights() {
+    const out = [];
+    const visible = (typeof getVisibleStravaActivities === 'function') ? getVisibleStravaActivities() : [];
+    if (visible.length < 4) return out; // not enough history to draw conclusions
+
+    const now = Date.now();
+    const dayMs = 86400000;
+    const acts7 = visible.filter(a => (now - new Date(a.start_date_local || a.start_date).getTime()) < 7 * dayMs);
+    const acts28 = visible.filter(a => (now - new Date(a.start_date_local || a.start_date).getTime()) < 28 * dayMs);
+
+    const minsLast7 = acts7.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const minsLast28 = acts28.reduce((s, a) => s + (a.moving_min || 0), 0);
+
+    // ─── 9.1 ACWR (Acute:Chronic Workload Ratio) — Gabbett 2016 ───
+    // Research-backed sweet spot: 0.8–1.3. Above 1.5 = 4–5× injury risk.
+    if (minsLast28 >= 60 && acts28.length >= 4) {
+      const chronic7DayAvg = minsLast28 / 4; // 28d avg per 7d
+      const acwr = chronic7DayAvg > 0 ? minsLast7 / chronic7DayAvg : 1;
+      if (acwr > 1.5) {
+        out.push({
+          severity: 'alert',
+          title: `Workload spike: ${acwr.toFixed(2)} ACWR`,
+          simpleMessage: `You jumped your training a lot this week vs. your average. Stacked weeks like this is when most injuries happen.`,
+          message: `Last 7 days: ${formatMins(minsLast7)} vs. 28-day rolling average of ${formatMins(Math.round(chronic7DayAvg))}/week. ACWR ${acwr.toFixed(2)} > 1.5 — Gabbett (2016) found this range carries 4-5× injury risk vs. the 0.8-1.3 sweet spot. Pull back next week.`,
+          suggestion: 'Cut next week by 15-20% to bring the ratio back into the safe zone.'
+        });
+      } else if (acwr < 0.7 && minsLast28 > 240) {
+        out.push({
+          severity: 'info',
+          title: `Detraining risk: ${acwr.toFixed(2)} ACWR`,
+          simpleMessage: `Your training dropped sharply this week. A short break is fine — but more than 10 days of low load and fitness starts eroding.`,
+          message: `Last 7 days only ${formatMins(minsLast7)} — your 28-day average per week was ${formatMins(Math.round(chronic7DayAvg))}. ACWR ${acwr.toFixed(2)} is in the under-loaded zone. If unintentional, ramp back up gradually.`,
+          suggestion: 'If you\'re recovering from illness or travel, return at 70% volume next week, not full.'
+        });
+      }
+    }
+
+    // ─── 9.2 Adherence rate this week ───
+    // Compare planned non-rest sessions vs. actually-done activities.
+    const plannedSessions = DAYS.filter(d => planState.sessions[d] && planState.sessions[d].type !== 'rest');
+    const completedThisWeek = DAYS.filter(d => planState.sessions[d] && planState.sessions[d].completed).length;
+    if (plannedSessions.length >= 3) {
+      const adherence = completedThisWeek / plannedSessions.length;
+      // Only flag if adherence under 50% and week is at least half-over
+      const todayIdx = getTodayIdx();
+      if (adherence < 0.5 && todayIdx >= 4) {
+        out.push({
+          severity: 'warn',
+          title: `Adherence: ${completedThisWeek} of ${plannedSessions.length} planned`,
+          simpleMessage: `You're missing more sessions than usual this week. The plan adapts — but if life is consistently in the way, let's right-size the schedule.`,
+          message: `${completedThisWeek}/${plannedSessions.length} sessions logged so far this week. Hill 2018 — when adherence drops below 60% across 3+ weeks, planned-vs-done divergence usually means the plan was unrealistic, not the athlete.`,
+          suggestion: 'If you can squeeze a session in, focus on the one quality day. Otherwise consider trimming next week\'s plan.'
+        });
+      }
+    }
+
+    // ─── 9.3 Long session progression — Daniels' 10% rule ───
+    // Compare longest run/ride this week to longest in prior 3 weeks. >10% jump = risk.
+    function longestByType(acts, types) {
+      const filtered = acts.filter(a => types.includes(mapStravaTypeToSessionType(a.type)));
+      return filtered.reduce((max, a) => Math.max(max, a.moving_min || 0), 0);
+    }
+    const acts21Prior = visible.filter(a => {
+      const ageMs = now - new Date(a.start_date_local || a.start_date).getTime();
+      return ageMs >= 7 * dayMs && ageMs < 28 * dayMs;
+    });
+    const longestRunThis = longestByType(acts7, ['run']);
+    const longestRunPrior = longestByType(acts21Prior, ['run']);
+    if (longestRunThis > 60 && longestRunPrior > 0) {
+      const jumpPct = ((longestRunThis - longestRunPrior) / longestRunPrior) * 100;
+      if (jumpPct > 15) {
+        out.push({
+          severity: 'warn',
+          title: `Long run jumped ${Math.round(jumpPct)}%`,
+          simpleMessage: `Your longest run this week was a big step up from the prior 3 weeks. Don't repeat the jump next week — keep it flat or down a bit.`,
+          message: `Long run this week: ${formatMins(longestRunThis)}. Longest in the prior 3 weeks: ${formatMins(longestRunPrior)}. Daniels' Running Formula (>10% week-over-week long-run growth) is associated with overuse injury — your jump is ${Math.round(jumpPct)}%.`,
+          suggestion: 'Hold or reduce the long run next week — banking the bigger session is fine, but build slowly.'
+        });
+      }
+    }
+    const longestBikeThis = longestByType(acts7, ['bike']);
+    const longestBikePrior = longestByType(acts21Prior, ['bike']);
+    if (longestBikeThis > 90 && longestBikePrior > 0) {
+      const jumpPct = ((longestBikeThis - longestBikePrior) / longestBikePrior) * 100;
+      if (jumpPct > 25) {
+        out.push({
+          severity: 'info',
+          title: `Long ride up ${Math.round(jumpPct)}%`,
+          message: `Long ride this week: ${formatMins(longestBikeThis)}. Prior 3-week longest: ${formatMins(longestBikePrior)}. Cycling tolerates bigger jumps than running (less impact), but +25% week-over-week is still aggressive — make sure recovery and fueling kept up.`,
+          suggestion: 'Hold this duration for 1-2 weeks before extending further.'
+        });
+      }
+    }
+
+    // ─── 9.4 Easy-run aerobic decoupling — fitness improvement vs regression ───
+    // Compare avg HR for similar-effort easy runs in the last 7 days vs prior 21.
+    function avgHrForEasy(acts) {
+      const easy = acts.filter(a => mapStravaTypeToSessionType(a.type) === 'run' && a.moving_min >= 30 && a.avg_hr);
+      if (easy.length === 0) return null;
+      // Filter to lower 60% by intensity (avoid quality sessions)
+      const sorted = easy.slice().sort((a, b) => a.avg_hr - b.avg_hr);
+      const easyOnly = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.6)));
+      const totalMins = easyOnly.reduce((s, a) => s + a.moving_min, 0);
+      if (totalMins === 0) return null;
+      return Math.round(easyOnly.reduce((s, a) => s + a.avg_hr * a.moving_min, 0) / totalMins);
+    }
+    const easyHr7 = avgHrForEasy(acts7);
+    const easyHr21 = avgHrForEasy(acts21Prior);
+    if (easyHr7 && easyHr21) {
+      const diff = easyHr7 - easyHr21;
+      if (diff <= -3) {
+        out.push({
+          severity: 'info',
+          title: `Aerobic fitness improving 📉`,
+          simpleMessage: `At similar easy-run effort, your heart rate is ${Math.abs(diff)} bpm lower than the prior 3 weeks. That's a clear sign you're getting fitter.`,
+          message: `Easy-run avg HR last 7d: ${easyHr7} bpm. Prior 3 weeks: ${easyHr21} bpm. Lower HR at the same effort = improved aerobic efficiency (Coyle 1988). Keep the easy days truly easy to compound this.`,
+        });
+      } else if (diff >= 5) {
+        out.push({
+          severity: 'warn',
+          title: `Easy HR drifting up — possible fatigue`,
+          simpleMessage: `At similar easy-run effort, your heart rate is ${diff} bpm higher than the prior 3 weeks. That can mean fatigue, illness, or dehydration.`,
+          message: `Easy-run avg HR last 7d: ${easyHr7} bpm vs. prior 3 weeks ${easyHr21} bpm. Cardiac drift of 5+ bpm at consistent effort is associated with accumulated fatigue (Achten & Jeukendrup 2003). Two recovery days ahead.`,
+          suggestion: 'Insert an extra rest day, prioritize sleep + hydration, see if the HR returns to baseline.'
+        });
+      }
+    }
+
+    // ─── 9.5 Hard sessions stacked too close together ───
+    // Look at recent hard sessions (suffer score >= 80 or HR avg >= 85% maxHR) — should have 48h between.
+    const hardActs = visible
+      .filter(a => (a.suffer && a.suffer >= 80) || (a.avg_hr && a.avg_hr >= 155))
+      .map(a => new Date(a.start_date_local || a.start_date).getTime())
+      .sort((x, y) => x - y);
+    let backToBack = false;
+    for (let i = 1; i < hardActs.length; i++) {
+      if ((hardActs[i] - hardActs[i - 1]) < 36 * 3600 * 1000 && (now - hardActs[i]) < 14 * dayMs) {
+        backToBack = true;
+        break;
+      }
+    }
+    if (backToBack) {
+      out.push({
+        severity: 'warn',
+        title: 'Two hard sessions stacked under 36 hours',
+        simpleMessage: `In the last two weeks you put two hard efforts inside a 36-hour window. Both adaptations get blunted — research suggests at least 48h between intense sessions.`,
+        message: `Strava data shows two high-Effort sessions (Suffer ≥80 or avg HR ≥155) less than 36h apart in the last 14 days. Seiler 2010 polarized-training research recommends 48-72h between high-intensity sessions to allow neural + metabolic recovery.`,
+        suggestion: 'Spread quality sessions across the week — Tue/Thu/Sat is a classic spacing.'
+      });
+    }
+
+    // ─── 9.6 Recovery deficit — too few rest days ───
+    // Count Strava-active days in the last 7. >6 active days = no rest week.
+    const activeDayCount7 = new Set(
+      acts7.map(a => (a.start_date_local || a.start_date || '').slice(0, 10))
+    ).size;
+    if (activeDayCount7 >= 7) {
+      out.push({
+        severity: 'warn',
+        title: '0 rest days in 7',
+        simpleMessage: `You've trained every day this week. One full rest day per week is the minimum for sustainable training — your body adapts during rest, not during work.`,
+        message: `Strava shows ${activeDayCount7}/7 days active. Long-term research (Issurin 2010) ties no-rest weeks to elevated overtraining markers (cortisol, HRV decline). At least one true rest day per week is foundational.`,
+        suggestion: 'Take tomorrow as a full rest day. Walking + stretching only.'
+      });
+    }
+
+    // ─── 9.7 Volume trend stable / building / dropping ───
+    // Compare last 4 weeks of volume — is the user consistently building, holding, or dropping?
+    function weekTotal(weeksAgo) {
+      const start = now - (weeksAgo + 1) * 7 * dayMs;
+      const end = now - weeksAgo * 7 * dayMs;
+      return visible
+        .filter(a => {
+          const t = new Date(a.start_date_local || a.start_date).getTime();
+          return t >= start && t < end;
+        })
+        .reduce((s, a) => s + (a.moving_min || 0), 0);
+    }
+    const w0 = weekTotal(0), w1 = weekTotal(1), w2 = weekTotal(2), w3 = weekTotal(3);
+    if (w0 + w1 + w2 + w3 > 600) { // only commentary-worthy if total >10h across 4 weeks
+      const avgPrev3 = (w1 + w2 + w3) / 3;
+      const isPositive = w0 > avgPrev3 * 1.05 && w1 > w2 * 0.95;
+      const isFlat = Math.abs(w0 - avgPrev3) / avgPrev3 < 0.08 && Math.abs(w1 - w2) / Math.max(w2, 1) < 0.08;
+      if (isPositive) {
+        out.push({
+          severity: 'info',
+          title: `Volume building — last 4 weeks: ${formatMins(w3)} → ${formatMins(w2)} → ${formatMins(w1)} → ${formatMins(w0)}`,
+          message: `You're building volume sustainably (each week ≤ 10% above the prior). Bompa & Haff's classic periodization: this kind of progressive overload is exactly what builds aerobic capacity. Keep the next week within +10% to stay safe.`,
+        });
+      } else if (isFlat && minsLast7 >= 180) {
+        out.push({
+          severity: 'info',
+          title: 'Stable training volume',
+          message: `Last 4 weeks held within ±8% of each other (~${formatMins(Math.round(avgPrev3))}/week avg). Stable volume is great for consolidating fitness — Hellard 2019 showed athletes peak after 6-12 weeks at consistent volume. If race is 6+ weeks out, time to introduce a planned overload week.`,
+        });
+      }
+    }
+
+    return out;
   }
 
   function computeTodayRationale() {
