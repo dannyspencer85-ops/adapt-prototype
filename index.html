@@ -6833,13 +6833,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const syncEl = document.getElementById('stravaSyncStatus');
     if (syncEl) {
       const ts = planState.stravaSyncedAt;
-      const count = (planState.stravaActivities || []).length;
+      const acts = planState.stravaActivities || [];
+      const count = acts.length;
+      const hidden = getHiddenStravaIds().length;
       if (!ts) {
         syncEl.textContent = 'No activities synced yet — tap Sync below.';
       } else {
         const mins = Math.round((Date.now() - ts) / 60000);
         const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
-        syncEl.textContent = `${count} activities · last synced ${ago}`;
+        const range = describeSyncRange(acts);
+        const hiddenSuffix = hidden > 0 ? ` · ${hidden} hidden` : '';
+        syncEl.textContent = `${count} ${count === 1 ? 'activity' : 'activities'} · ${range} · synced ${ago}${hiddenSuffix}`;
       }
     }
   }
@@ -7203,6 +7207,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return Math.max(need, sticky); // never shrink below previously synced depth
   }
 
+  // Returns a friendly description of the synced range based on the actual data
+  // (e.g. "last 90 days", "last year", "since Mar 14"). Falls back to the planned
+  // depth if no activities were returned.
+  function describeSyncRange(activities) {
+    const planned = planState.stravaSyncDays || getDesiredSyncDays();
+    if (!activities || activities.length === 0) {
+      if (planned >= 365) return 'last year';
+      if (planned >= 30) return `last ${Math.round(planned / 30)} ${planned >= 60 ? 'months' : 'month'}`;
+      return `last ${planned} days`;
+    }
+    // Find the oldest activity to anchor the range
+    const oldest = activities.reduce((min, a) => {
+      const t = new Date(a.start_date_local || a.start_date).getTime();
+      return t < min ? t : min;
+    }, Date.now());
+    const daysOld = Math.floor((Date.now() - oldest) / 86400000);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const oldestDate = new Date(oldest);
+    const dateLabel = `${months[oldestDate.getMonth()]} ${oldestDate.getDate()}`;
+    // Phrase based on how deep the sync actually goes
+    if (planned >= 365) return `oldest is ${dateLabel} (≈${Math.round(daysOld / 30)} months back)`;
+    if (planned >= 90) return `last ${planned} days · oldest ${dateLabel}`;
+    if (planned >= 30) return `last ${planned} days`;
+    return `last ${planned} days`;
+  }
+
   // Profile-screen Sync button handler
   async function syncStravaFromProfile() {
     setStravaMsg('Syncing recent activities…', 'info');
@@ -7211,7 +7241,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // Auto-mark planned sessions complete based on Strava activity matches
       const marked = (typeof autoMarkSessionsFromStrava === 'function') ? autoMarkSessionsFromStrava() : 0;
       const markedSuffix = marked > 0 ? ` · Auto-marked ${marked} planned session${marked > 1 ? 's' : ''} complete.` : '';
-      setStravaMsg(`✅ Synced ${acts.length} activities from the last 30 days.${markedSuffix}`, 'ok');
+      setStravaMsg(`✅ Synced ${acts.length} ${acts.length === 1 ? 'activity' : 'activities'} · ${describeSyncRange(acts)}.${markedSuffix}`, 'ok');
       renderAll();
       renderStravaUI();
     } catch (e) {
