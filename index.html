@@ -1667,19 +1667,19 @@
         </div>
       </div>
 
-      <div class="card" id="weeklyRecalcCard" style="cursor: pointer;" onclick="runWeeklyRecalc()">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--secondary-soft); display: flex; align-items: center; justify-content: center; color: var(--secondary); font-size: 20px;">↻</div>
-          <div style="flex:1;">
-            <div style="font-weight: 700; font-size: 15px;">Weekly review</div>
-            <div style="color: var(--text-soft); font-size: 12px; margin-top: 2px;">See how this week went and let the engine reshape next week →</div>
-          </div>
-        </div>
+      <!-- Quick action row: check-in + weekly review -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+        <button onclick="toggleCheckin()" id="checkinToggle" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
+          ☀️ Morning check-in<div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">15-sec body / sleep / stress</div>
+        </button>
+        <button onclick="runWeeklyRecalc()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
+          ↻ Weekly review<div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Reshape next week</div>
+        </button>
       </div>
 
-      <div class="card" id="todayCheckin">
+      <!-- Check-in (hidden by default, expanded via button above) -->
+      <div class="card" id="todayCheckin" style="display: none;">
         <div class="card-title">Morning check-in</div>
-        <div style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">15 seconds. Tells the engine how to shape today.</div>
         <div class="field">
           <label>How's your body today?</label>
           <div class="chip-row" id="ciBody">
@@ -1715,24 +1715,6 @@
       </div>
 
       <div id="todayInsights"></div>
-      <div class="section-label">This week's training</div>
-      <div class="signals">
-        <div class="signal">
-          <div class="signal-label">Time so far</div>
-          <div class="signal-value">4:12</div>
-          <div class="signal-trend neutral">of 5:00 planned</div>
-        </div>
-        <div class="signal">
-          <div class="signal-label">Sessions</div>
-          <div class="signal-value">2/3</div>
-          <div class="signal-trend good">on track</div>
-        </div>
-        <div class="signal">
-          <div class="signal-label">Last RPE</div>
-          <div class="signal-value">7</div>
-          <div class="signal-trend neutral">Sat brick</div>
-        </div>
-      </div>
 
       <div class="section-label" id="heroSectionLabel">Today's workout</div>
       <div class="card hero-card" id="heroCard">
@@ -1754,13 +1736,6 @@
         <div class="hero-actions">
           <button class="btn btn-on-hero" onclick="showScreen('log')">Log session</button>
           <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust today</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Today's rationale</div>
-        <div id="todayRationale" style="font-size: 14px; line-height: 1.5; color: var(--text-soft);">
-          You've logged 4:12 across 2 of 3 sessions this week — right on target. Saturday's brick went well (RPE 7, controlled). Wednesday is three days out from Saturday's next brick, which is the right spacing for a quality session. Keep intervals honest but controlled.
         </div>
       </div>
 
@@ -1791,8 +1766,11 @@
       <div id="planInjuryBanner"></div>
       <div id="planChangeBanner"></div>
       <div id="planInsights"></div>
-      <div id="courseIntelCard"></div>
       <div id="planPeakBanner"></div>
+      <details>
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Course intel</summary>
+        <div id="courseIntelCard"></div>
+      </details>
 
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; margin-bottom: 8px;">
         <button onclick="navWeek(-1)" id="weekPrevBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹ Prev</button>
@@ -1806,10 +1784,33 @@
       <div id="recentStravaSessions"></div>
       <div id="weekSessions"></div>
 
-      <div class="section-label">The 6.5-week arc</div>
-      <div class="card">
-        <div id="weekArc" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px 14px; font-size: 13px;"></div>
+      <!-- Progress block (formerly its own tab) — at-a-glance stats -->
+      <div class="section-label" style="margin-top: 18px;">Your progress</div>
+      <div class="card" id="progress7DaySummary">
+        <div class="card-title">7-day summary</div>
+        <div class="data-row">
+          <div class="data-cell"><div class="label">Total</div><div class="value">—</div></div>
+          <div class="data-cell"><div class="label">Sessions</div><div class="value">—</div></div>
+          <div class="data-cell"><div class="label">Avg HR</div><div class="value">—</div></div>
+        </div>
       </div>
+      <div class="card" id="progressLoadCard">
+        <div class="card-title">Training load · last 14 days</div>
+        <div class="bar-row" id="progressLoadBars"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-top: 6px; font-weight: 600;">
+          <span>2 weeks ago</span>
+          <span>Today</span>
+        </div>
+        <div id="progressLoadCommentary" style="margin-top: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"></div>
+      </div>
+
+      <!-- 6.5-week arc as a quiet expander -->
+      <details style="margin-top: 8px;">
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">View full plan arc</summary>
+        <div class="card" style="margin-top: 8px;">
+          <div id="weekArc" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px 14px; font-size: 13px;"></div>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -1868,55 +1869,23 @@
     </div>
   </div>
 
-  <!-- PROGRESS (formerly Data) -->
+  <!-- PROGRESS screen merged into Plan tab. This stub remains only to satisfy any deep links. -->
   <div id="screen-data" class="screen">
     <div class="header">
       <button class="back-btn" onclick="goBack()" id="back-data" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         Back
       </button>
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <div>
-          <div class="greeting" id="progressGreeting">Days to your race</div>
-          <div class="title">Your progress</div>
-        </div>
-        <div class="readiness-pill" onclick="openReadinessModal()" id="rp-data" style="display:none;">
-          <div class="dot"></div>
-          <div><div class="score"></div><div class="rlabel"></div></div>
-        </div>
+      <div>
+        <div class="greeting" id="progressGreeting">Progress</div>
+        <div class="title">Your progress</div>
       </div>
     </div>
     <div class="screen-inner">
-      <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; border: 0;">
-        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85;">Your race</div>
-        <div id="progressRaceTitle" style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-top: 4px;">Your race</div>
-        <div id="progressRaceDate" style="font-size: 14px; opacity: 0.9; margin-top: 4px;"></div>
-        <div id="progressPhaseLine" style="margin-top: 12px; padding: 10px 12px; background: rgba(255,255,255,0.15); border-radius: 10px; font-size: 13px; line-height: 1.5;"></div>
+      <div style="padding: 16px;">
+        <div style="font-size: 14px; color: var(--text-soft); margin-bottom: 14px;">Progress now lives at the bottom of the Plan tab.</div>
+        <button class="btn btn-primary btn-full" onclick="showScreen('plan')">Go to Plan →</button>
       </div>
-
-      <!-- 7-day summary — populated from Strava when available -->
-      <div class="card" id="progress7DaySummary">
-        <div class="card-title">7-day summary</div>
-        <div class="data-row">
-          <div class="data-cell"><div class="label">Total</div><div class="value">—</div></div>
-          <div class="data-cell"><div class="label">Sessions</div><div class="value">—</div></div>
-          <div class="data-cell"><div class="label">Avg RPE</div><div class="value">—</div></div>
-        </div>
-      </div>
-
-      <!-- Training load 14-day bars — populated from Strava -->
-      <div class="card" id="progressLoadCard">
-        <div class="card-title">Training load · last 14 days</div>
-        <div class="bar-row" id="progressLoadBars"></div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-top: 6px; font-weight: 600;">
-          <span>2 weeks ago</span>
-          <span>Today</span>
-        </div>
-        <div id="progressLoadCommentary" style="margin-top: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5;"></div>
-      </div>
-
-      <div class="section-label">Recent sessions</div>
-      <div class="card" id="progressRecentSessions" style="padding: 0; overflow: hidden;"></div>
     </div>
   </div>
 
@@ -2182,32 +2151,28 @@
         <div style="font-size: 11px; color: var(--text-soft); margin-top: 8px; line-height: 1.5;">Get a free key at <a href="https://posthog.com" target="_blank" style="color: var(--primary);">posthog.com</a> if you want a separate dashboard.</div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Coaching detail level</div>
-        <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 10px;">How much explanation do you want with insights and warnings.</div>
-        <div class="chip-row" id="complexityProfileChips">
-          <button class="chip" data-mode="simple" onclick="setComplexityMode('simple')">Simple</button>
-          <button class="chip" data-mode="detailed" onclick="setComplexityMode('detailed')">Detailed</button>
+      <!-- Settings collapsed under one expander to keep Profile lean -->
+      <details style="margin-top: 10px;">
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">⚙️ Settings</summary>
+        <div class="card" style="margin-top: 6px;">
+          <div class="card-title">Coaching detail level</div>
+          <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 10px;">How much explanation do you want with insights and warnings.</div>
+          <div class="chip-row" id="complexityProfileChips">
+            <button class="chip" data-mode="simple" onclick="setComplexityMode('simple')">Simple</button>
+            <button class="chip" data-mode="detailed" onclick="setComplexityMode('detailed')">Detailed</button>
+          </div>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Color theme</div>
-        <div class="chip-row" id="themeProfileChips">
-          <button class="chip" data-theme="forest" onclick="setTheme('forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
-          <button class="chip" data-theme="ocean" onclick="setTheme('ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
-          <button class="chip" data-theme="sunset" onclick="setTheme('sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
-          <button class="chip" data-theme="berry" onclick="setTheme('berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
-          <button class="chip" data-theme="slate" onclick="setTheme('slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
+        <div class="card">
+          <div class="card-title">Color theme</div>
+          <div class="chip-row" id="themeProfileChips">
+            <button class="chip" data-theme="forest" onclick="setTheme('forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
+            <button class="chip" data-theme="ocean" onclick="setTheme('ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
+            <button class="chip" data-theme="sunset" onclick="setTheme('sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
+            <button class="chip" data-theme="berry" onclick="setTheme('berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
+            <button class="chip" data-theme="slate" onclick="setTheme('slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
+          </div>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Plan adjustments</div>
-        <div style="color: var(--text-soft); font-size: 14px; line-height: 1.5;">
-          Missed sessions and poor recovery automatically reshape upcoming workouts. No guilt, no cramming.
-        </div>
-      </div>
+      </details>
 
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 14px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--warn); border-color: var(--warn);">Log out</button>
@@ -2223,10 +2188,6 @@
     <button class="nav-btn" data-screen="plan" onclick="showScreen('plan')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
       Plan
-    </button>
-    <button class="nav-btn" data-screen="data" onclick="showScreen('data')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18c4-8 8-2 12-8 2 3 4 5 6 5"/><path d="M3 21h18"/></svg>
-      Progress
     </button>
     <button class="nav-btn" data-screen="profile" onclick="showScreen('profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -3059,6 +3020,13 @@
     const c = document.getElementById(containerId);
     if (!c) return;
     [...c.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === val));
+  }
+  // Toggle the morning check-in card open/closed on Today screen
+  function toggleCheckin() {
+    const card = document.getElementById('todayCheckin');
+    if (!card) return;
+    card.style.display = (card.style.display === 'none' || !card.style.display) ? 'block' : 'none';
+    if (card.style.display === 'block') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   function toggleCourseDetails() {
     const f = document.getElementById('courseDetailsFields');
@@ -5357,18 +5325,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { score, status, color, label, issues, wins };
   }
 
+  // Readiness pills cut from headers — readiness now surfaces only via Today rationale
   function renderReadinessPills() {
-    const r = computeRaceReadiness();
     ['rp-today', 'rp-plan', 'rp-data', 'rp-prep'].forEach(id => {
       const el = document.getElementById(id);
-      if (!el) return;
-      el.style.display = 'inline-flex';
-      const dot = el.querySelector('.dot');
-      const score = el.querySelector('.score');
-      const label = el.querySelector('.rlabel');
-      if (dot) dot.style.background = r.color;
-      if (score) score.textContent = r.score;
-      if (label) label.textContent = r.label;
+      if (el) el.style.display = 'none';
     });
   }
 
@@ -6825,24 +6786,93 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       <polyline fill="none" stroke="var(--primary)" stroke-width="1.5" points="${pts.join(' ')}" />
     </svg>`;
   }
-  // Build a small inline SVG line chart for HR over time
-  function renderHrChartSVG(hrArr, timeArr) {
+  // High-readability HR chart: colored zone bands, avg-HR dashed line, time + BPM axis labels
+  function renderHrChartSVG(hrArr, timeArr, opts) {
     if (!hrArr || hrArr.length < 2) return '';
-    const w = 320, h = 90, pad = 4;
-    const maxHr = Math.max(...hrArr);
-    const minHr = Math.min(...hrArr);
-    const range = Math.max(20, maxHr - minHr);
+    const o = opts || {};
+    const w = 320, h = 180;
+    const padL = 32, padR = 8, padT = 8, padB = 22;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    // Establish y-axis range — pad ±5 BPM beyond min/max for visual breathing room
+    const dataMax = Math.max(...hrArr);
+    const dataMin = Math.min(...hrArr);
+    const yMin = Math.max(40, Math.floor((dataMin - 5) / 10) * 10);
+    const yMax = Math.ceil((dataMax + 5) / 10) * 10;
+    const yRange = Math.max(20, yMax - yMin);
+
     const totalT = timeArr ? timeArr[timeArr.length - 1] : hrArr.length;
-    // Sample down to ~120 points for rendering
-    const step = Math.max(1, Math.floor(hrArr.length / 120));
+
+    const yPos = bpm => padT + (1 - (bpm - yMin) / yRange) * chartH;
+    const xPos = i => padL + ((timeArr ? timeArr[i] : i) / totalT) * chartW;
+
+    // Zone bands — derive thresholds from estimated MaxHR (use o.maxHr or dataMax + small buffer)
+    const maxHr = o.maxHr || Math.max(180, dataMax + 10);
+    const zones = [
+      { name: 'Z1', from: maxHr * 0.50, to: maxHr * 0.60, color: '#E3F0EA' },
+      { name: 'Z2', from: maxHr * 0.60, to: maxHr * 0.70, color: '#C9E3D2' },
+      { name: 'Z3', from: maxHr * 0.70, to: maxHr * 0.80, color: '#F5E5B8' },
+      { name: 'Z4', from: maxHr * 0.80, to: maxHr * 0.90, color: '#F4C9A0' },
+      { name: 'Z5', from: maxHr * 0.90, to: maxHr * 1.05, color: '#E9A4A4' },
+    ];
+    let zoneRects = '';
+    let zoneLabels = '';
+    zones.forEach(z => {
+      const top = Math.max(yPos(z.to), padT);
+      const bot = Math.min(yPos(z.from), padT + chartH);
+      if (bot <= top) return; // out of view
+      zoneRects += `<rect x="${padL}" y="${top}" width="${chartW}" height="${bot - top}" fill="${z.color}" opacity="0.55"/>`;
+      // Label only if band is tall enough
+      if (bot - top > 14) {
+        zoneLabels += `<text x="${padL + chartW - 4}" y="${top + 11}" text-anchor="end" font-size="9" font-weight="700" fill="rgba(0,0,0,0.35)">${z.name}</text>`;
+      }
+    });
+
+    // Y-axis: label at min, max, and a couple of reasonable midpoints
+    const yTicks = [];
+    const yStep = yRange <= 40 ? 10 : 20;
+    for (let v = yMin; v <= yMax; v += yStep) yTicks.push(v);
+    const yAxis = yTicks.map(v => `
+      <line x1="${padL}" y1="${yPos(v).toFixed(1)}" x2="${padL + chartW}" y2="${yPos(v).toFixed(1)}" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+      <text x="${padL - 6}" y="${(yPos(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-soft)" font-weight="600">${v}</text>
+    `).join('');
+
+    // X-axis: time marks every ~25% of the duration
+    const xLabel = sec => {
+      const m = Math.round(sec / 60);
+      if (m >= 60) { const h_ = Math.floor(m / 60); const r = m % 60; return r === 0 ? `${h_}h` : `${h_}h${r}`; }
+      return `${m}m`;
+    };
+    const xTickPos = [0, 0.25, 0.5, 0.75, 1.0];
+    const xAxis = xTickPos.map(frac => {
+      const t = totalT * frac;
+      const x = padL + frac * chartW;
+      return `<text x="${x.toFixed(1)}" y="${(padT + chartH + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--text-soft)" font-weight="600">${xLabel(t)}</text>`;
+    }).join('');
+
+    // Sample down to ~140 points and build the path
+    const step = Math.max(1, Math.floor(hrArr.length / 140));
     const pts = [];
     for (let i = 0; i < hrArr.length; i += step) {
-      const x = pad + ((timeArr ? timeArr[i] : i) / totalT) * (w - pad * 2);
-      const y = pad + (1 - (hrArr[i] - minHr) / range) * (h - pad * 2);
-      pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+      pts.push(xPos(i).toFixed(1) + ',' + yPos(hrArr[i]).toFixed(1));
     }
-    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:90px; display:block;">
-      <polyline fill="none" stroke="var(--primary)" stroke-width="2" points="${pts.join(' ')}" />
+
+    // Avg HR dashed reference line
+    const avg = Math.round(hrArr.reduce((a, b) => a + b, 0) / hrArr.length);
+    const avgY = yPos(avg).toFixed(1);
+    const avgLine = `
+      <line x1="${padL}" y1="${avgY}" x2="${padL + chartW}" y2="${avgY}" stroke="rgba(40,40,40,0.55)" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="${padL + chartW - 2}" y="${(parseFloat(avgY) - 3).toFixed(1)}" text-anchor="end" font-size="10" font-weight="700" fill="rgba(40,40,40,0.7)">avg ${avg}</text>
+    `;
+
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:180px; display:block;" preserveAspectRatio="xMidYMid meet">
+      ${zoneRects}
+      ${zoneLabels}
+      ${yAxis}
+      <polyline fill="none" stroke="#222" stroke-width="2" stroke-linejoin="round" points="${pts.join(' ')}" />
+      ${avgLine}
+      ${xAxis}
     </svg>`;
   }
 
