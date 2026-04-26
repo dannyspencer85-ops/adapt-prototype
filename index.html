@@ -2713,45 +2713,73 @@
       </div>
       <div id="sdEdit" style="display:none;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-          <h2 style="font-size:20px; margin:0;">Edit session</h2>
+          <h2 style="font-size:20px; margin:0;">What do you want to do?</h2>
           <button onclick="closeSessionModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
         </div>
         <div class="sub" id="sdEditWhen"></div>
 
-        <div class="field">
-          <label>Name</label>
-          <input type="text" id="edName">
-        </div>
-        <div class="two-col">
-          <div class="field">
-            <label>Duration (min)</label>
-            <input type="number" id="edDuration" min="0" max="360" oninput="refreshEditImpact()">
+        <!-- Quick discipline picker — tap to switch -->
+        <div class="field" style="margin-top: 14px;">
+          <label>Discipline</label>
+          <div class="chip-row" id="edDisciplineChips" style="flex-wrap: wrap;">
+            <button type="button" class="chip" data-disc="run" onclick="pickEdDiscipline('run')">🏃 Run</button>
+            <button type="button" class="chip" data-disc="bike" onclick="pickEdDiscipline('bike')">🚴 Bike</button>
+            <button type="button" class="chip" data-disc="swim" onclick="pickEdDiscipline('swim')">🏊 Swim</button>
+            <button type="button" class="chip" data-disc="strength" onclick="pickEdDiscipline('strength')">🏋️ Strength</button>
+            <button type="button" class="chip" data-disc="brick" onclick="pickEdDiscipline('brick')">🚴+🏃 Brick</button>
+            <button type="button" class="chip" data-disc="rest" onclick="pickEdDiscipline('rest')">💤 Rest</button>
           </div>
-          <div class="field">
-            <label>Type</label>
-            <select id="edType" onchange="refreshEditImpact()">
-              <option value="rest">Rest</option>
-              <option value="run">Run</option>
-              <option value="bike">Bike</option>
-              <option value="swim">Swim</option>
-              <option value="brick">Brick</option>
-              <option value="quality">Quality</option>
-              <option value="strength">Strength</option>
-              <option value="mobility">Mobility</option>
-            </select>
-          </div>
-        </div>
-        <div class="field">
-          <label>Details</label>
-          <input type="text" id="edMeta">
         </div>
 
-        <div class="detail-label" style="margin-top:8px;">Impact preview</div>
+        <!-- Intensity picker — only shown for non-rest -->
+        <div class="field" id="edIntensityField">
+          <label>Intensity</label>
+          <div class="chip-row" id="edIntensityChips">
+            <button type="button" class="chip" data-int="easy" onclick="pickEdIntensity('easy')">Easy</button>
+            <button type="button" class="chip" data-int="tempo" onclick="pickEdIntensity('tempo')">Tempo</button>
+            <button type="button" class="chip" data-int="quality" onclick="pickEdIntensity('quality')">Quality</button>
+            <button type="button" class="chip" data-int="long" onclick="pickEdIntensity('long')">Long</button>
+          </div>
+        </div>
+
+        <!-- Duration picker — common chips + custom -->
+        <div class="field" id="edDurationField">
+          <label>Duration</label>
+          <div class="chip-row" id="edDurationChips">
+            <button type="button" class="chip" data-dur="30" onclick="pickEdDuration(30)">30 min</button>
+            <button type="button" class="chip" data-dur="45" onclick="pickEdDuration(45)">45 min</button>
+            <button type="button" class="chip" data-dur="60" onclick="pickEdDuration(60)">1h</button>
+            <button type="button" class="chip" data-dur="90" onclick="pickEdDuration(90)">1h 30m</button>
+            <button type="button" class="chip" data-dur="120" onclick="pickEdDuration(120)">2h</button>
+            <button type="button" class="chip" data-dur="180" onclick="pickEdDuration(180)">3h</button>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+            <span style="font-size: 12px; color: var(--text-soft);">Custom:</span>
+            <input type="number" id="edDuration" min="0" max="360" oninput="refreshEditImpact()" style="flex: 1; padding: 6px 10px;">
+            <span style="font-size: 12px; color: var(--text-soft);">min</span>
+          </div>
+        </div>
+
+        <!-- Customize fine details (collapsed) -->
+        <details style="margin-top: 10px; margin-bottom: 6px;">
+          <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 6px 0; text-transform: uppercase; letter-spacing: 0.4px;">Fine-tune name + notes</summary>
+          <div class="field" style="margin-top: 8px;">
+            <label>Workout name</label>
+            <input type="text" id="edName">
+          </div>
+          <div class="field">
+            <label>Notes / details</label>
+            <input type="text" id="edMeta" placeholder="e.g. 6×3min @ threshold">
+          </div>
+          <input type="hidden" id="edType">
+        </details>
+
+        <div class="detail-label" style="margin-top:8px;">Impact on the rest of your week</div>
         <div id="editImpact" class="impact-diff"></div>
 
         <div style="display:flex; gap:8px; margin-top: 12px;">
           <button class="btn btn-ghost" style="flex:1;" onclick="cancelEditSession()">Cancel</button>
-          <button class="btn btn-primary" style="flex:1;" onclick="saveEditSession()">Save</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="saveEditSession()">Save · plan adapts</button>
         </div>
       </div>
     </div>
@@ -5819,10 +5847,21 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   let currentEditDay = null;
+  let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60 };
+
   function startEditSession() {
     const day = currentEditDay;
     const s = planState.sessions[day];
     if (!s) return;
+    // Pre-fill draft from current session
+    _edDraft = {
+      discipline: s.type === 'rest' ? 'rest'
+                : s.type === 'brick' ? 'brick'
+                : s.type === 'strength' ? 'strength'
+                : s.type === 'quality' ? inferDisciplineFromName(s.name) : s.type,
+      intensity: inferIntensityFromSession(s),
+      duration: s.duration || 60
+    };
     document.getElementById('edName').value = s.name;
     document.getElementById('edDuration').value = s.duration;
     document.getElementById('edType').value = s.type;
@@ -5830,7 +5869,120 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.getElementById('sdEditWhen').textContent = `${planState.dates[day]} · ${day}`;
     document.getElementById('sdView').style.display = 'none';
     document.getElementById('sdEdit').style.display = 'block';
+    syncEdChipState();
     refreshEditImpact();
+  }
+  // Heuristic mapping from a planned session name to a discipline chip
+  function inferDisciplineFromName(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('swim')) return 'swim';
+    if (n.includes('bike') || n.includes('ride')) return 'bike';
+    if (n.includes('brick')) return 'brick';
+    if (n.includes('strength') || n.includes('weight')) return 'strength';
+    return 'run';
+  }
+  function inferIntensityFromSession(s) {
+    const n = (s.name || '').toLowerCase();
+    if (n.includes('long')) return 'long';
+    if (n.includes('interval') || s.type === 'quality' || s.type === 'brick') return 'quality';
+    if (n.includes('tempo')) return 'tempo';
+    return 'easy';
+  }
+  // Highlight the chips that match the current draft
+  function syncEdChipState() {
+    document.querySelectorAll('#edDisciplineChips [data-disc]').forEach(c => {
+      c.classList.toggle('active', c.dataset.disc === _edDraft.discipline);
+    });
+    document.querySelectorAll('#edIntensityChips [data-int]').forEach(c => {
+      c.classList.toggle('active', c.dataset.int === _edDraft.intensity);
+    });
+    document.querySelectorAll('#edDurationChips [data-dur]').forEach(c => {
+      c.classList.toggle('active', parseInt(c.dataset.dur, 10) === _edDraft.duration);
+    });
+    // Hide intensity + duration when rest
+    const intF = document.getElementById('edIntensityField');
+    const durF = document.getElementById('edDurationField');
+    if (intF) intF.style.display = _edDraft.discipline === 'rest' ? 'none' : 'block';
+    if (durF) durF.style.display = _edDraft.discipline === 'rest' ? 'none' : 'block';
+  }
+  function pickEdDiscipline(d) {
+    _edDraft.discipline = d;
+    if (d === 'rest') _edDraft.duration = 0;
+    else if (_edDraft.duration === 0) _edDraft.duration = 60;
+    applyEdDraftToInputs();
+    syncEdChipState();
+    refreshEditImpact();
+  }
+  function pickEdIntensity(level) {
+    _edDraft.intensity = level;
+    // Long sessions default longer if user hasn't picked a duration
+    if (level === 'long' && _edDraft.duration < 75) _edDraft.duration = 90;
+    applyEdDraftToInputs();
+    syncEdChipState();
+    refreshEditImpact();
+  }
+  function pickEdDuration(mins) {
+    _edDraft.duration = mins;
+    applyEdDraftToInputs();
+    syncEdChipState();
+    refreshEditImpact();
+  }
+  // Build name + meta + type from the discipline+intensity+duration triple, push into hidden inputs
+  function applyEdDraftToInputs() {
+    const { discipline, intensity, duration } = _edDraft;
+    const nameInput = document.getElementById('edName');
+    const metaInput = document.getElementById('edMeta');
+    const typeInput = document.getElementById('edType');
+    const durInput = document.getElementById('edDuration');
+
+    let name, meta, sessionType;
+    if (discipline === 'rest') {
+      name = 'Rest day';
+      meta = 'Recovery';
+      sessionType = 'rest';
+    } else if (discipline === 'brick') {
+      const bikeMin = Math.round(duration * 0.7);
+      const runMin = Math.max(15, duration - bikeMin);
+      name = intensity === 'long' ? 'Long brick' : 'Brick session';
+      meta = `Bike ${Math.floor(bikeMin / 60)}:${String(bikeMin % 60).padStart(2,'0')} + Run 0:${String(runMin).padStart(2,'0')}`;
+      sessionType = 'brick';
+    } else if (discipline === 'strength') {
+      name = 'Strength session';
+      meta = `${duration} min · Compound lifts`;
+      sessionType = 'strength';
+    } else {
+      // run / bike / swim
+      const verb = discipline === 'run' ? 'run' : discipline === 'bike' ? 'ride' : 'swim';
+      const Verb = verb.charAt(0).toUpperCase() + verb.slice(1);
+      const dh = Math.floor(duration / 60); const dm = duration % 60;
+      const dStr = dh > 0 ? `${dh}:${String(dm).padStart(2,'0')}` : `${dm} min`;
+      switch (intensity) {
+        case 'easy':
+          name = `Easy ${verb}`;
+          meta = `${dStr} · Zone 2`;
+          sessionType = discipline; break;
+        case 'tempo':
+          name = `Tempo ${verb}`;
+          meta = `${dStr} · Zone 3 sustained`;
+          sessionType = discipline; break;
+        case 'quality':
+          name = `${Verb} intervals`;
+          meta = `${duration} min · Quality`;
+          sessionType = 'quality'; break;
+        case 'long':
+          name = `Long ${verb}`;
+          meta = `${dStr} · Zone 2 endurance`;
+          sessionType = discipline; break;
+        default:
+          name = `${Verb} session`;
+          meta = `${dStr}`;
+          sessionType = discipline;
+      }
+    }
+    if (nameInput) nameInput.value = name;
+    if (metaInput) metaInput.value = meta;
+    if (typeInput) typeInput.value = sessionType;
+    if (durInput) durInput.value = duration;
   }
 
   function cancelEditSession() {
