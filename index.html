@@ -4564,8 +4564,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const dayNum = d.getDate();
       const isToday = viewWeekOffset === 0 && i === todayIdx;
       const isPast = viewWeekOffset === 0 && i < todayIdx;
-      const cls = 'day-pill' + (isToday ? ' today' : isPast ? ' done' : '');
       const session = (viewWeekOffset === 0) ? planState.sessions[day] : null;
+      const isCompleted = !!(session && session.completed);
+      // Only mark a past day as "done" if there's an actual completed session
+      const cls = 'day-pill' + (isToday ? ' today' : isCompleted ? ' done' : '');
       const hasSession = session && session.type !== 'rest';
       const dot = hasSession ? '<div class="dot"></div>' : '';
       const opacity = viewWeekOffset !== 0 ? 'opacity:0.7;' : '';
@@ -4612,21 +4614,69 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const s = planState.sessions[day];
       if (!s) return;
       const isToday = i === todayIdx;
-      const isPast = i < todayIdx || s.completed;
-      const icon = ICON[s.type] || '•';
-      const statusText = isToday ? 'Up next' : isPast ? 'Done' : 'Planned';
-      const rowClass = 'session-row' + (isToday ? ' today' : isPast ? ' done' : '');
-      const iconStyle = isPast ? 'style="background:var(--primary);color:#fff;"' : '';
+      const isPast = i < todayIdx;
+      const isCompleted = !!s.completed;
+
+      // Don't show fake "completed" workouts for past days that have no real Strava match.
+      // Past + uncompleted = either skipped or rest. Render as muted "Skipped/Rest" with no checkmark.
+      // Past + completed = real Strava data attached, show as Done.
+      // Future = show as planned.
+      // Today = show as Up next (handled by renderTodayHero, but the row stays visible here).
+      let statusText, rowClass, iconStyle, iconChar;
+      if (isCompleted) {
+        statusText = 'Done';
+        rowClass = 'session-row done';
+        iconStyle = 'style="background:var(--primary);color:#fff;"';
+        iconChar = '✓';
+      } else if (isPast) {
+        // Past but no real workout — show muted, "Skipped" or "Rest" depending on plan
+        const wasRest = s.type === 'rest';
+        statusText = wasRest ? 'Rest' : 'Not logged';
+        rowClass = 'session-row';
+        iconStyle = 'style="background:var(--bg-soft); color: var(--text-soft); opacity: 0.7;"';
+        iconChar = wasRest ? '💤' : '–';
+      } else if (isToday) {
+        statusText = 'Up next';
+        rowClass = 'session-row today';
+        iconStyle = '';
+        iconChar = ICON[s.type] || '•';
+      } else {
+        statusText = 'Planned';
+        rowClass = 'session-row';
+        iconStyle = '';
+        iconChar = ICON[s.type] || '•';
+      }
+
       const dayLabel = planState.dates[day] + ' · ' + day + (isToday ? ' · Today' : '');
-      html += `<div class="${rowClass}" style="display:block;" onclick="openSessionModal('${day}')">
+      const muted = (isPast && !isCompleted) ? 'opacity: 0.55;' : '';
+
+      // For past + uncompleted non-rest sessions, show prescribed plan name but with "(not logged)" tone
+      let nameToShow = s.name;
+      let metaToShow = s.meta;
+      if (isPast && !isCompleted && s.type !== 'rest') {
+        nameToShow = s.name + ' (planned)';
+        metaToShow = 'Not logged · ' + s.meta;
+      }
+      // For past + completed (real Strava match), show actual data
+      if (isCompleted && s.stravaName) {
+        nameToShow = s.stravaName;
+        if (s.actualMins) {
+          const dh = Math.floor(s.actualMins / 60);
+          const dm = s.actualMins % 60;
+          const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
+          metaToShow = dStr + (s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : '');
+        }
+      }
+
+      html += `<div class="${rowClass}" style="display:block; ${muted}" onclick="openSessionModal('${day}')">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="session-icon" ${iconStyle}>${isPast ? '✓' : icon}</div>
+          <div class="session-icon" ${iconStyle}>${iconChar}</div>
           <div class="session-info">
             <div class="session-day">${dayLabel}</div>
-            <div class="session-name">${escapeHtml(s.name)}</div>
-            <div class="session-meta">${escapeHtml(s.meta)}</div>
+            <div class="session-name">${escapeHtml(nameToShow)}</div>
+            <div class="session-meta">${escapeHtml(metaToShow)}</div>
           </div>
-          <div class="session-status${isPast ? ' done' : ''}">${statusText}</div>
+          <div class="session-status${isCompleted ? ' done' : ''}">${statusText}</div>
           <div style="color: var(--text-soft); font-size: 18px; margin-left: 6px;">›</div>
         </div>
       </div>`;
