@@ -11,6 +11,7 @@
     --primary: #3B8968;
     --primary-soft: #DCEADF;
     --primary-dark: #2E6B51;
+    --primary-light: #5DA985;
     --secondary: #D9A94A;
     --secondary-soft: #FBF0D3;
     --text: #1F2A22;
@@ -113,7 +114,7 @@
     margin-bottom: 8px;
   }
   .hero-card {
-    background: linear-gradient(135deg, #3B8968, #5DA985);
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
     color: #fff;
     padding: 22px;
     border: 0;
@@ -1178,7 +1179,7 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--primary), #5DA985);
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1520,6 +1521,18 @@
             <button class="chip" data-mode="detailed" onclick="singleChip(this)">Detailed — full reasoning</button>
           </div>
         </div>
+
+        <div class="field">
+          <label>Color theme</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Pick a vibe. You can change later.</div>
+          <div class="chip-row" id="themeChips">
+            <button class="chip active" data-theme="forest" onclick="pickTheme(this, 'forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
+            <button class="chip" data-theme="ocean" onclick="pickTheme(this, 'ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
+            <button class="chip" data-theme="sunset" onclick="pickTheme(this, 'sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
+            <button class="chip" data-theme="berry" onclick="pickTheme(this, 'berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
+            <button class="chip" data-theme="slate" onclick="pickTheme(this, 'slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
+          </div>
+        </div>
         <div class="onboard-actions">
           <button class="btn btn-primary btn-full btn-lg" onclick="finishOnboard()">Build my plan</button>
         </div>
@@ -1843,7 +1856,7 @@
       </div>
     </div>
     <div class="screen-inner">
-      <div class="card" style="background: linear-gradient(135deg, var(--primary), #5DA985); color: #fff; border: 0;">
+      <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; border: 0;">
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85;">Your race</div>
         <div id="progressRaceTitle" style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-top: 4px;">Your race</div>
         <div id="progressRaceDate" style="font-size: 14px; opacity: 0.9; margin-top: 4px;"></div>
@@ -2224,6 +2237,17 @@
         <div class="chip-row" id="complexityProfileChips">
           <button class="chip" data-mode="simple" onclick="setComplexityMode('simple')">Simple</button>
           <button class="chip" data-mode="detailed" onclick="setComplexityMode('detailed')">Detailed</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Color theme</div>
+        <div class="chip-row" id="themeProfileChips">
+          <button class="chip" data-theme="forest" onclick="setTheme('forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
+          <button class="chip" data-theme="ocean" onclick="setTheme('ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
+          <button class="chip" data-theme="sunset" onclick="setTheme('sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
+          <button class="chip" data-theme="berry" onclick="setTheme('berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
+          <button class="chip" data-theme="slate" onclick="setTheme('slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
         </div>
       </div>
 
@@ -2956,7 +2980,7 @@
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); }
   }
   function goBack() {
     if (screenHistory.length === 0) return;
@@ -3068,6 +3092,43 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 - Don't open every response with his name`;
 
   const chatMessages = [];
+
+  // ── Color themes ──
+  const THEMES = {
+    forest: { primary: '#3B8968', soft: '#DCEADF', dark: '#2E6B51', light: '#5DA985' },
+    ocean:  { primary: '#2980B9', soft: '#D6E9F5', dark: '#1F608A', light: '#5BAEDD' },
+    sunset: { primary: '#E27D3F', soft: '#FBE4D2', dark: '#B85F2A', light: '#F1A977' },
+    berry:  { primary: '#8E44AD', soft: '#EBD9F2', dark: '#6B2F87', light: '#B574CD' },
+    slate:  { primary: '#546E7A', soft: '#DCE3E6', dark: '#3D4F58', light: '#7E97A3' }
+  };
+  function getTheme() { return localStorage.getItem('color-theme') || 'forest'; }
+  function applyTheme(name) {
+    const t = THEMES[name] || THEMES.forest;
+    const root = document.documentElement;
+    root.style.setProperty('--primary', t.primary);
+    root.style.setProperty('--primary-soft', t.soft);
+    root.style.setProperty('--primary-dark', t.dark);
+    root.style.setProperty('--primary-light', t.light);
+  }
+  function setTheme(name) {
+    if (!THEMES[name]) return;
+    localStorage.setItem('color-theme', name);
+    applyTheme(name);
+    document.querySelectorAll('#themeProfileChips .chip').forEach(c => c.classList.toggle('active', c.dataset.theme === name));
+    document.querySelectorAll('#themeChips .chip').forEach(c => c.classList.toggle('active', c.dataset.theme === name));
+    saveUserData();
+    trackEvent('theme_changed', { theme: name });
+  }
+  function pickTheme(btn, name) {
+    document.querySelectorAll('#themeChips .chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    setTheme(name);
+  }
+  function renderThemeProfileUI() {
+    const name = getTheme();
+    document.querySelectorAll('#themeProfileChips .chip').forEach(c => c.classList.toggle('active', c.dataset.theme === name));
+  }
+  applyTheme(getTheme());
 
   // ── Analytics (PostHog + console fallback) ──
   const DEFAULT_POSTHOG_KEY = 'phc_zqNceWQkyHr4XEch57oQg3bym2DFEjVAB2t2CjJzq2Ez';
@@ -4924,7 +4985,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         heroCard.style.background = 'linear-gradient(135deg, #D9A94A, #E8B961)';
         heroCard.style.boxShadow = '0 4px 16px rgba(217, 169, 74, 0.3)';
       } else {
-        heroCard.style.background = 'linear-gradient(135deg, #3B8968, #5DA985)';
+        heroCard.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
         heroCard.style.boxShadow = '';
       }
     }
