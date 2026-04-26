@@ -1762,8 +1762,9 @@
           <button onclick="quickSkip()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✕ Skip</button>
         </div>
         <div class="hero-actions" id="heroLogActions">
-          <button class="btn btn-on-hero" onclick="showScreen('log')">Log session</button>
-          <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust today</button>
+          <button class="btn btn-on-hero" onclick="openTodaySessionDetails()">Full workout</button>
+          <button class="btn btn-on-hero-ghost" onclick="showScreen('log')">Log session</button>
+          <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust</button>
         </div>
         <!-- Action row: shown when completed -->
         <div id="heroActionsDone" style="display: none; margin-top: 14px;">
@@ -6003,8 +6004,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     s.duration = parseInt(document.getElementById('edDuration').value) || 0;
     s.type = document.getElementById('edType').value;
     s.meta = document.getElementById('edMeta').value.trim() || s.meta;
-    setChange(`Edited ${day}: ${s.name} (${s.duration} min)`);
+    // Clear any prior auto-mark since the planned session changed shape
+    if (s.completed && s.stravaId) {
+      // Keep completion if there's still a real Strava activity matching today's new type — autoMark will re-check
+      s.completed = false;
+      s.actualMins = null; s.actualHr = null; s.actualWatts = null;
+      s.stravaId = null; s.stravaIds = null; s.stravaName = null; s.stravaDistance_km = null;
+    }
+    setChange(`Edited ${DAY_FULL[day] || day}: ${s.name} (${s.duration} min)`);
+    if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
+    saveUserData();
     closeSessionModal();
+    // Full re-render so Today hero, Plan rows, Performance, and insights all reflect the change
+    renderAll();
+    if (typeof trackEvent === 'function') trackEvent('session_edited', { day, type: s.type, duration: s.duration });
   }
 
   function refreshEditImpact() {
@@ -9665,6 +9678,15 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();
+  }
+
+  // Open today's session detail modal — same one that opens when tapping the day pill on Plan tab.
+  // Shows the full prescription: warmup, main set, cooldown, targets, cues, alternatives.
+  // Edit button inside the modal flows changes back through the app.
+  function openTodaySessionDetails() {
+    const today = getTodayDay();
+    if (!planState.sessions[today]) return;
+    openSessionModal(today, 0);
   }
 
   // Today is a rest day, but user wants to train — open the session editor with sensible defaults.
