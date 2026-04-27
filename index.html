@@ -1758,10 +1758,16 @@
       <div class="card hero-card" id="heroCard">
         <div id="heroAdjustedBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.22); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ WORKOUT ADJUSTED</div>
         <div id="heroDoneBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.25); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ COMPLETED</div>
-        <div class="card-title" id="heroLabel">Wednesday · Quality day</div>
-        <div class="workout-name" id="heroName">Swim + Bike intervals</div>
-        <div class="workout-duration" id="heroDuration">60 min · Moderate-Hard</div>
-        <div class="why" id="heroWhy">3 days out from Saturday's long brick — today is the right day for sharpness.</div>
+        <div onclick="openTodaySessionDetails()" style="cursor: pointer; padding-bottom: 4px;">
+          <div class="card-title" id="heroLabel">Wednesday · Quality day</div>
+          <div class="workout-name" id="heroName" style="display: flex; align-items: center; gap: 8px;">
+            <span style="flex: 1;">Swim + Bike intervals</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7; flex-shrink: 0;"><polyline points="9 6 15 12 9 18"/></svg>
+          </div>
+          <div class="workout-duration" id="heroDuration">60 min · Moderate-Hard</div>
+          <div class="why" id="heroWhy">3 days out from Saturday's long brick — today is the right day for sharpness.</div>
+          <div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-weight: 600;">Tap for full workout details →</div>
+        </div>
         <div id="heroDoneStats" style="display:none; margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
           <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">What you actually did</div>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 13px;">
@@ -7494,7 +7500,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       : `${todayFull} · ${s.type === 'rest' ? 'Rest day' : s.type === 'quality' || s.type === 'brick' ? 'Quality day' : s.type === 'strength' ? 'Strength' : 'Easy'}`;
 
     // Name + duration: show actual workout when completed, prescribed when not
-    if (name) name.textContent = completed && s.stravaName ? s.stravaName : s.name;
+    // heroName contains a span (text) + chevron SVG. Update only the span text.
+    if (name) {
+      const textSpan = name.querySelector('span');
+      const newText = completed && s.stravaName ? s.stravaName : s.name;
+      if (textSpan) textSpan.textContent = newText;
+      else name.textContent = newText;
+    }
     if (duration) {
       if (completed && s.actualMins) {
         const dh = Math.floor(s.actualMins / 60);
