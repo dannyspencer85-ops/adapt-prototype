@@ -7,6 +7,7 @@
 <style>
   :root {
     --bg: #F6F4EC;
+    --bg-soft: #ECE5D2;  /* Warm cream — sits between page bg and white cards. Used for nested surfaces. */
     --card: #FFFFFF;
     --primary: #3B8968;
     --primary-soft: #DCEADF;
@@ -1750,7 +1751,7 @@
 
       <!-- Smart summary — answers 'what's today, where's my body, what's next' in 3 lines -->
       <div class="section-label s-today" style="margin-top: 4px;">Here's your day</div>
-      <div id="todaySmartSummary" class="card" style="padding: 12px 14px; margin-bottom: 14px; display: none;"></div>
+      <div id="todaySmartSummary" class="card" style="padding: 12px 14px; margin-bottom: 14px; display: none; background: var(--bg-soft); border-color: transparent;"></div>
 
       <!-- 2. Today's workout — THE primary "what do I do" answer, full hero -->
       <div class="section-label s-today" id="heroSectionLabel" style="margin-top: 0;">Today's workout</div>
@@ -5741,7 +5742,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     //   Pulse    — alert red        (body / heart)
     //   Coming up — info blue       (calendar / future)
     const row = (color, kicker, content, contentColor, click) => `
-      <div onclick="${click}" style="display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer;">
+      <div onclick="${click}" style="display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.08); cursor: pointer;">
         <div style="height: 32px; background: ${color}; border-radius: 2px;"></div>
         <div style="min-width: 0;">
           <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${kicker}</div>
