@@ -2857,7 +2857,7 @@
             <button type="button" class="chip" data-disc="swim" onclick="pickEdDiscipline('swim')">🏊 Swim</button>
             <button type="button" class="chip" data-disc="strength" onclick="pickEdDiscipline('strength')">🏋️ Strength</button>
             <button type="button" class="chip" data-disc="brick" onclick="pickEdDiscipline('brick')">🚴+🏃 Brick</button>
-            <button type="button" class="chip" data-disc="rest" onclick="pickEdDiscipline('rest')">💤 Rest</button>
+            <button type="button" class="chip" data-disc="rest" onclick="pickEdDiscipline('rest')">Rest</button>
           </div>
         </div>
 
@@ -4978,7 +4978,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         statusText = wasRest ? 'Rest' : 'Not logged';
         rowClass = 'session-row';
         iconStyle = 'style="background:var(--bg-soft); color: var(--text-soft); opacity: 0.7;"';
-        iconChar = wasRest ? '💤' : '–';
+        iconChar = wasRest ? icon('rest', { size: 16, color: 'var(--text-soft)' }) : '–';
       } else if (isToday) {
         statusText = 'Up next';
         rowClass = 'session-row today';
