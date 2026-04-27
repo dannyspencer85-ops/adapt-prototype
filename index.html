@@ -1784,7 +1784,7 @@
           <button id="heroViewDetails" onclick="" class="btn btn-on-hero" style="width: 100%;">View workout details →</button>
         </div>
         <div id="heroActionsRest" style="display: none; margin-top: 14px;">
-          <button onclick="switchTodayToWorkout()" class="btn btn-on-hero" style="width: 100%;">💪 Workout instead?</button>
+          <button onclick="switchTodayToWorkout()" class="btn btn-on-hero" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>Workout instead?</button>
           <div style="font-size: 11px; opacity: 0.85; text-align: center; margin-top: 8px;">Pick a discipline + duration. Plan adapts to keep things balanced.</div>
         </div>
       </div>
@@ -1800,11 +1800,13 @@
 
       <!-- 6. Quick actions footer — check-in + weekly review -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;">
-        <button onclick="toggleCheckin()" id="checkinToggle" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
-          ☀️ Morning check-in<div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">15-sec body / sleep / stress</div>
+        <button onclick="toggleCheckin()" id="checkinToggle" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
+          <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>Morning check-in</div>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">15-sec body / sleep / stress</div>
         </button>
-        <button onclick="runWeeklyRecalc()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
-          ↻ Weekly review<div style="font-size: 11px; color: var(--text-soft); margin-top: 2px;">Reshape next week</div>
+        <button onclick="runWeeklyRecalc()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
+          <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></svg>Weekly review</div>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">Reshape next week</div>
         </button>
       </div>
 
@@ -1898,16 +1900,16 @@
 
       <!-- 5. EXPANDERS at the bottom for less-frequent info -->
       <div style="margin-top: 18px;">
-        <button onclick="openScheduleModal()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px;">📅 Edit schedule preferences</button>
+        <button onclick="openScheduleModal()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Edit schedule preferences</button>
       </div>
 
       <details style="margin-top: 4px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Course intel</summary>
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>Course intel</summary>
         <div id="courseIntelCard"></div>
       </details>
 
       <details style="margin-top: 4px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">📊 6-week plan arc</summary>
+        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>6-week plan arc</summary>
         <div class="card" style="margin-top: 8px;">
           <div id="weekArc" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px 14px; font-size: 13px;"></div>
         </div>
@@ -2049,9 +2051,9 @@
         </div>
         <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Are you getting fitter? Each dot is one workout in this range.</div>
         <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
-          <button class="chip active" data-trend-disc="run" onclick="setTrendDiscipline('run')">🏃 Run</button>
-          <button class="chip" data-trend-disc="bike" onclick="setTrendDiscipline('bike')">🚴 Bike</button>
-          <button class="chip" data-trend-disc="swim" onclick="setTrendDiscipline('swim')">🏊 Swim</button>
+          <button class="chip active" data-trend-disc="run" onclick="setTrendDiscipline('run')">Run</button>
+          <button class="chip" data-trend-disc="bike" onclick="setTrendDiscipline('bike')">Bike</button>
+          <button class="chip" data-trend-disc="swim" onclick="setTrendDiscipline('swim')">Swim</button>
         </div>
         <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
           <button class="chip active" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>
@@ -2084,27 +2086,27 @@
       <div class="section-label s-learn" style="margin-top: 22px;">Learn about your body</div>
       <div style="display: flex; flex-direction: column; gap: 8px;">
         <div onclick="openLearnTopic('zone2')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 22px;">🧘</div>
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--secondary-soft); color: var(--secondary); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5a1 1 0 1 0 -2 0a1 1 0 0 0 2 0z"/><path d="M17 11l-5 1l-3 -2l-3 1l-3 5"/><path d="M7 18l4 -2"/><path d="M9 13v4l5 1l-1 4"/><path d="M19 21v-3l-1 -2l-3 0"/></svg></div>
           <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Why easy days should feel really easy</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">The 80/20 rule — most fitness comes from the slow stuff.</div></div>
           <div style="color: var(--text-soft);">›</div>
         </div>
         <div onclick="openLearnTopic('hr')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 22px;">❤</div>
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--alert-soft); color: var(--alert); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
           <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Reading your heart rate</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Resting vs workout HR, what zones mean, how to use them.</div></div>
           <div style="color: var(--text-soft);">›</div>
         </div>
         <div onclick="openLearnTopic('heat')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 22px;">🌡️</div>
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--caution-soft); color: var(--caution); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></div>
           <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">How heat affects your training</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Why HR rises in summer + how to acclimate before a hot race.</div></div>
           <div style="color: var(--text-soft);">›</div>
         </div>
         <div onclick="openLearnTopic('acwr')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 22px;">📏</div>
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--info-soft); color: var(--info); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
           <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">The "don't ramp up too fast" rule</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Why a sudden volume jump injures you, and the safe build rate.</div></div>
           <div style="color: var(--text-soft);">›</div>
         </div>
         <div onclick="openLearnTopic('rest')" style="cursor: pointer; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 22px;">💤</div>
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--good-soft); color: var(--good); display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div>
           <div style="flex: 1;"><div style="font-weight: 700; font-size: 14px;">Why rest IS the workout</div><div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;">Your body adapts during recovery — not during the session.</div></div>
           <div style="color: var(--text-soft);">›</div>
         </div>
@@ -2338,7 +2340,7 @@
             ✅ Connected as <strong id="stravaAthleteName">—</strong>
             <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
           </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">↻ Sync recent activities</button>
+          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">Sync recent activities</button>
           <button class="btn btn-secondary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
           <div style="display:flex; gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
@@ -4050,7 +4052,84 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     lastChange: null
   };
 
-  const ICON = { rest: '💤', quality: '💪', brick: '🚴', run: '🏃', bike: '🚴', swim: '🏊', strength: '🏋️', mobility: '🧘' };
+  // ──────────────────────────────────────────────────────────────────────
+  // ICON LIBRARY — replaces all emojis with consistent SVG icons.
+  // Sourced from Tabler Icons (disciplines) + Lucide (UI/sections), MIT-licensed.
+  // Status icons are custom outlined shapes matching the brand language.
+  // ──────────────────────────────────────────────────────────────────────
+  const ICON_PATHS = {
+    // Disciplines — Tabler Icons
+    run:      '<path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 17l5 1l.75-1.5"/><path d="M15 21l0 -4l-4 -3l1 -6"/><path d="M7 12l0 -3l5 -1l3 3l3 1"/>',
+    bike:     '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/>',
+    swim:     '<path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/>',
+    strength: '<path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/>',
+    rest:     '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+    walk:     '<path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M7 21l3 -4"/><path d="M16 21l-2 -4l-3 -3l1 -6"/><path d="M6 12l2 -3l4 -1l3 3l3 1"/>',
+    mobility: '<path d="M16 5a1 1 0 1 0 -2 0a1 1 0 0 0 2 0z"/><path d="M17 11l-5 1l-3 -2l-3 1l-3 5"/><path d="M7 18l4 -2"/><path d="M9 13v4l5 1l-1 4"/><path d="M19 21v-3l-1 -2l-3 0"/>',
+    // Brick — stacked blocks (plays on the literal name + matches color-bar pattern)
+    brick:    '<rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/><line x1="11" y1="5" x2="11" y2="11"/><line x1="13" y1="13" x2="13" y2="19"/>',
+    // Quality / brick alternative — same as brick by default
+    quality:  '<rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/><line x1="11" y1="5" x2="11" y2="11"/><line x1="13" y1="13" x2="13" y2="19"/>',
+
+    // Sections — Lucide
+    sun:        '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+    activity:   '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    calendar:   '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+    lightbulb:  '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    book:       '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    flag:       '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+    trendingUp: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+    battery:    '<rect width="16" height="10" x="2" y="7" rx="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/>',
+    map:        '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/>',
+    scale:      '<path d="M16 16 3 3"/><path d="m12 12 9 9"/><path d="M5 14l-2 5 6 0z"/><path d="M14 5l2-3 6 0 -2 5"/>',
+    brain:      '<path d="M12 5a3 3 0 1 0-5.99.14"/><path d="M12 5a3 3 0 1 1 5.99.14"/><path d="M9 13a4 4 0 1 1-3-7"/><path d="M15 13a4 4 0 1 0 3-7"/><path d="M9 13a4 4 0 0 0-3 7 4 4 0 0 0 6 1"/><path d="M15 13a4 4 0 0 1 3 7 4 4 0 0 1-6 1"/><path d="M12 22V13"/>',
+
+    // Status — outlined shapes only (no fill, no interior icons)
+    statusGood:    '<path d="M12 2.5l2.7 6.2 6.8.6-5.1 4.6 1.5 6.6L12 17l-5.9 3.5 1.5-6.6L2.5 9.3l6.8-.6z"/>',
+    statusInfo:    '<path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-7l-5 4v-4H6a3 3 0 0 1-3-3z"/>',
+    statusCaution: '<path d="M12 2L22 12L12 22L2 12z"/>',
+    statusAlert:   '<path d="M8.7 1.5h6.6L22.5 8.7v6.6L15.3 22.5h-6.6L1.5 15.3v-6.6z"/>',
+
+    // UI — Lucide
+    settings:    '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+    sync:        '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/>',
+    pencil:      '<path d="M11 4h-7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+    x:           '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+    chevronLeft: '<polyline points="15 6 9 12 15 18"/>',
+    chevronRight:'<polyline points="9 6 15 12 9 18"/>',
+    check:       '<polyline points="4 12 10 18 20 6"/>',
+    flame:       '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    droplet:     '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    mountain:    '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+    waves:       '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1C7 13 7 11 9.5 11c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1C7 19 7 17 9.5 17c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+    thermometer: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
+    refresh:     '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/>',
+    target:      '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    dumbbell:    '<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
+  };
+
+  // Renders an inline SVG icon. Default: 18px, currentColor stroke.
+  // Usage: icon('run')  or  icon('run', { size: 20, color: 'var(--primary)' })
+  function icon(name, opts) {
+    const o = opts || {};
+    const path = ICON_PATHS[name];
+    if (!path) return '';
+    const size = o.size || 18;
+    const color = o.color || 'currentColor';
+    const stroke = o.stroke || 2;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">${path}</svg>`;
+  }
+
+  // Backward-compat: legacy code uses ICON[type] in templates expecting a single character.
+  // We now return the SVG markup directly so template usage `${ICON[type]}` still works
+  // — it just outputs the SVG instead of an emoji.
+  const ICON = new Proxy({}, {
+    get(_, type) {
+      const map = { rest: 'rest', quality: 'quality', brick: 'brick', run: 'run', bike: 'bike', swim: 'swim', strength: 'strength', mobility: 'mobility', walk: 'walk' };
+      const name = map[type] || 'run';
+      return icon(name, { size: 18 });
+    }
+  });
 
   // ──────────────────────────────────────────────────────────────────────
   // PHASE 1: Curated race database
@@ -4390,35 +4469,35 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!intel) return [];
     const out = [];
     if (intel.terrain === 'hilly' || intel.terrain === 'mountainous') {
-      out.push({ icon: '⛰️', label: 'Hill-strength priority',
+      out.push({ icon: 'mountain', label: 'Hill-strength priority',
         detail: 'Add a weekly hill repeat session and target +25% elevation gain on long sessions vs. a flat course.' });
     }
     if (intel.terrain === 'flat') {
-      out.push({ icon: '🛣️', label: 'Sustained-power focus',
+      out.push({ icon: 'target', label: 'Sustained-power focus',
         detail: 'Flat courses reward steady tempo. Long intervals at race pace beat hill work for this race.' });
     }
     if (intel.surface === 'trail' || intel.surface === 'gravel') {
-      out.push({ icon: '🪨', label: 'Surface-specific running/riding',
+      out.push({ icon: 'mountain', label: 'Surface-specific running/riding',
         detail: 'At least one weekly session on similar terrain. Builds ankle stability + handling skills.' });
     }
     if (intel.swim === 'ocean' || intel.swim === 'river') {
-      out.push({ icon: '🌊', label: 'Open-water sessions',
+      out.push({ icon: 'waves', label: 'Open-water sessions',
         detail: 'Swap one pool swim for open water every other week once water is safe — sighting, chop, wetsuit feel matter on race day.' });
     }
     if (intel.climate === 'hot' || intel.climate === 'hot-humid') {
-      out.push({ icon: '🔥', label: 'Heat acclimatization block',
+      out.push({ icon: 'flame', label: 'Heat acclimatization block',
         detail: '10–14 days of heat exposure (sauna or overdressed sessions) in the final 4 weeks. Big aerobic gains, big race-day insurance.' });
     }
     if (intel.climate === 'cool') {
-      out.push({ icon: '🧥', label: 'Cool-weather pacing',
+      out.push({ icon: 'droplet', label: 'Cool-weather pacing',
         detail: 'Cold starts can spike HR. Practice warm-up routine and layering on long sessions.' });
     }
     if (intel.altitude === 'high') {
-      out.push({ icon: '🏔️', label: 'Altitude prep',
+      out.push({ icon: 'mountain', label: 'Altitude prep',
         detail: 'Arriving 7+ days early or 12+ hrs the night before is best. Lower long-session intensity for the first 3 days at altitude.' });
     }
     if (intel.altitude === 'moderate') {
-      out.push({ icon: '🏕️', label: 'Mild altitude awareness',
+      out.push({ icon: 'mountain', label: 'Mild altitude awareness',
         detail: 'Expect ~5% pace drop. Don\'t panic-train at altitude — your sea-level fitness still applies.' });
     }
     return out;
@@ -4965,7 +5044,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function renderBanners() {
     const changeHtml = planState.lastChange
-      ? `<div class="change-banner"><div class="icon">↻</div><div><strong>Plan updated:</strong> ${escapeHtml(planState.lastChange)}</div></div>`
+      ? `<div class="change-banner"><div class="icon">${icon('sync', { size: 16 })}</div><div><strong>Plan updated:</strong> ${escapeHtml(planState.lastChange)}</div></div>`
       : '';
     const sev = planState.injury && planState.injury.severity;
     const injuryHtml = planState.injury
@@ -5508,7 +5587,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: Math.abs(diff),
           unit: 'bpm',
           valueColor: 'var(--good)',
-          valueIcon: '📈',
+          valueIcon: 'trendingUp',
           headline: 'Easy runs feel easier',
           explanation: `Your heart rate during easy runs is ${Math.abs(diff)} bpm lower than the prior 3 weeks at the same effort${tempNote}. Sign of fitness gains.`,
           tone: 'good'
@@ -5518,7 +5597,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: diff,
           unit: 'bpm',
           valueColor: 'var(--caution)',
-          valueIcon: '↑',
+          valueIcon: 'statusCaution',
           headline: 'Easy runs feel harder',
           explanation: `Your heart rate during easy runs is ${diff} bpm higher than the prior 3 weeks at the same effort${tempNote}. Often means accumulated fatigue.`,
           tone: 'caution'
@@ -5529,7 +5608,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: Math.abs(rawDiff),
           unit: 'bpm',
           valueColor: 'var(--info)',
-          valueIcon: '🌡️',
+          valueIcon: 'thermometer',
           headline: rawDiff > 0 ? 'HR up — but it\'s the heat' : 'HR down — partly the cold',
           explanation: `Workout HR ${rawDiff > 0 ? '+' : ''}${rawDiff} bpm vs prior 3 weeks, but temp ~${Math.round(Math.abs(tempDeltaC))}°C ${tempDeltaC > 0 ? 'warmer' : 'cooler'}. Adjusted for that, fitness is steady.`,
           tone: 'info'
@@ -5548,7 +5627,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: '+' + Math.round(pct) + '%',
           unit: '',
           valueColor: 'var(--good)',
-          valueIcon: '📈',
+          valueIcon: 'trendingUp',
           headline: 'Volume building safely',
           explanation: `Last 7 days ${formatHM(minsLast7)} vs ${formatHM(Math.round(priorAvg))}/week recent average. Within the 10% rule.`,
           tone: 'good'
@@ -5558,7 +5637,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: '+' + Math.round(pct) + '%',
           unit: '',
           valueColor: 'var(--caution)',
-          valueIcon: '⚠',
+          valueIcon: 'statusCaution',
           headline: 'Workload jumped',
           explanation: `Last 7 days are ${Math.round(pct)}% above your recent average. Big jumps raise injury risk.`,
           tone: 'caution'
@@ -5568,17 +5647,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           value: Math.round(pct) + '%',
           unit: '',
           valueColor: 'var(--info)',
-          valueIcon: '↓',
+          valueIcon: 'statusInfo',
           headline: 'Lighter week',
           explanation: `${formatHM(minsLast7)} this week vs ${formatHM(Math.round(priorAvg))}/week recent average. Could be intentional rest.`,
           tone: 'info'
         };
       } else if (Math.abs(pct) < 5) {
         return {
-          value: '↔',
+          value: '—',
           unit: '',
           valueColor: 'var(--info)',
-          valueIcon: '↔',
+          valueIcon: 'activity',
           headline: 'Holding steady',
           explanation: `${formatHM(minsLast7)} this week, in line with your ${formatHM(Math.round(priorAvg))}/week average. Consolidation phase.`,
           tone: 'flat'
@@ -5698,7 +5777,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           <div style="font-size: 32px; font-weight: 800; color: ${pulse.valueColor}; line-height: 1; min-width: 60px; text-align: center;">${escapeHtml(value)}<span style="font-size: 12px; font-weight: 700; color: var(--text-soft); margin-left: 2px;">${escapeHtml(pulse.unit || '')}</span></div>
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 700; font-size: 15px; color: var(--text); display: flex; align-items: center; gap: 6px;">
-              <span>${pulse.valueIcon}</span>${escapeHtml(pulse.headline)}
+              ${icon(pulse.valueIcon, { size: 16, color: pulse.valueColor })}${escapeHtml(pulse.headline)}
             </div>
             <div style="font-size: 12px; color: var(--text-soft); margin-top: 2px; line-height: 1.4;">${escapeHtml(pulse.explanation)}</div>
           </div>
@@ -5968,12 +6047,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Categories used for grouping insights in the UI.
   // Order = display order (top to bottom in the panel).
   const INSIGHT_CATEGORIES = [
-    { id: 'today',    label: 'Today\'s check-in', icon: '🧠' },
-    { id: 'load',     label: 'Recovery & Load',   icon: '🔋' },
-    { id: 'race',     label: 'Race Readiness',    icon: '🏁' },
-    { id: 'balance',  label: 'Plan Balance',      icon: '⚖️' },
-    { id: 'trends',   label: 'Trends',            icon: '📈' },
-    { id: 'other',    label: 'Other',             icon: '•' },
+    { id: 'today',    label: 'Today\'s check-in', svg: 'sun' },
+    { id: 'load',     label: 'Recovery & Load',   svg: 'battery' },
+    { id: 'race',     label: 'Race Readiness',    svg: 'flag' },
+    { id: 'balance',  label: 'Plan Balance',      svg: 'scale' },
+    { id: 'trends',   label: 'Trends',            svg: 'trendingUp' },
+    { id: 'other',    label: 'Other',             svg: 'lightbulb' },
   ];
   // Title-pattern → category. First match wins. The order here is precedence.
   function classifyInsight(insight) {
@@ -6013,7 +6092,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     INSIGHT_CATEGORIES.forEach(cat => {
       const list = grouped[cat.id];
       if (!list || list.length === 0) return;
-      html += `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-soft); margin: 14px 0 8px;">${cat.icon} ${cat.label} <span style="background:var(--bg-soft); color:var(--text-soft); padding:1px 7px; border-radius:100px; margin-left:4px; font-weight:700;">${list.length}</span></div>`;
+      html += `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-soft); margin: 14px 0 8px; display: flex; align-items: center; gap: 6px;">${icon(cat.svg, { size: 14 })} ${cat.label} <span style="background:var(--bg-soft); color:var(--text-soft); padding:1px 7px; border-radius:100px; margin-left:4px; font-weight:700;">${list.length}</span></div>`;
       list.forEach(ins => { html += renderInsightCard(ins, ins._idx); });
     });
     if (hasFixes && insights.length > 1) {
@@ -6087,10 +6166,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     //   warn   = amber circle → caution, worth investigating
     //   alert  = red triangle → action recommended
     const tone =
-        i.severity === 'good'  ? { color: 'var(--good)', bg: 'var(--good-soft)', icon: '✓', label: 'Good' }
-      : i.severity === 'alert' ? { color: 'var(--alert)', bg: 'var(--alert-soft)', icon: '🔺', label: 'Action' }
-      : i.severity === 'warn'  ? { color: 'var(--caution)', bg: 'var(--caution-soft)', icon: '⚠', label: 'Caution' }
-      :                          { color: 'var(--info)', bg: 'var(--info-soft)', icon: 'ℹ', label: 'FYI' };
+        i.severity === 'good'  ? { color: 'var(--good)',    bg: 'var(--good-soft)',    svg: 'statusGood',    label: 'Good' }
+      : i.severity === 'alert' ? { color: 'var(--alert)',   bg: 'var(--alert-soft)',   svg: 'statusAlert',   label: 'Action' }
+      : i.severity === 'warn'  ? { color: 'var(--caution)', bg: 'var(--caution-soft)', svg: 'statusCaution', label: 'Caution' }
+      :                          { color: 'var(--info)',    bg: 'var(--info-soft)',    svg: 'statusInfo',    label: 'FYI' };
     let fixBtn = '';
     if (i.fix) {
       const fixIdx = pendingFixes.length;
@@ -6118,7 +6197,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return `<div class="insight-card" style="background:${tone.bg}; border-left:4px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:8px; font-size:13px; line-height:1.5;">
       <div onclick="toggleInsightCard(this.parentElement)" style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
         <div style="font-weight:700; color:${tone.color}; display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
-          <span style="font-size:14px; flex-shrink:0;">${tone.icon}</span>
+          ${icon(tone.svg, { size: 18, color: tone.color })}
           <span style="overflow:hidden; text-overflow:ellipsis;">${markupGlossaryTerms(i.title)}</span>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
@@ -7157,7 +7236,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       card.innerHTML = `
         <div class="card" style="padding:14px; margin-bottom:12px; border:1px dashed var(--border);">
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-            <div style="font-size:18px;">🗺️</div>
+            <div style="color: var(--info); display: inline-flex;">${icon('map', { size: 18, color: 'var(--info)' })}</div>
             <div style="font-weight:700; font-size:14px;">Course intel not set</div>
           </div>
           <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-bottom:10px;">
@@ -7183,7 +7262,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       <div class="card" style="padding:14px; margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <div style="font-size:18px;">🗺️</div>
+            <div style="color: var(--info); display: inline-flex;">${icon('map', { size: 18, color: 'var(--info)' })}</div>
             <div style="font-weight:700; font-size:14px;">Course intel</div>
           </div>
           <button onclick="openCourseIntelEditor()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Edit</button>
@@ -7198,7 +7277,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           <div style="display:flex; flex-direction:column; gap:8px;">
             ${emphasis.map(e => `
               <div style="display:flex; gap:10px; align-items:flex-start; padding:10px; background:var(--primary-soft); border-radius:8px;">
-                <div style="font-size:18px; line-height:1;">${e.icon}</div>
+                <div style="color: var(--primary-dark); flex-shrink: 0; padding-top: 1px;">${icon(e.icon, { size: 18, color: 'var(--primary-dark)' })}</div>
                 <div>
                   <div style="font-weight:600; font-size:13px; margin-bottom:2px;">${escapeHtml(e.label)}</div>
                   <div style="font-size:12px; color:var(--text-soft); line-height:1.5;">${escapeHtml(e.detail)}</div>
@@ -8379,7 +8458,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     slot.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px;">
         <div style="font-size:11px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">From Strava ${syncedLabel ? '· synced ' + syncedLabel : ''}</div>
-        <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">↻ Sync</button>
+        <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">Sync</button>
       </div>
       ${recent.map(a => `
         <div class="session-row done" style="display: block; position: relative;">
@@ -9121,7 +9200,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (acts.length === 0) {
       const stravaConnected = !!getStravaConfig();
       const cta = stravaConnected
-        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">↻ Sync from Strava</button>'
+        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
       [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
       bars.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding: 12px;">No activities in this range. ${cta}</div>`;
@@ -9256,7 +9335,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     if (acts.length === 0) {
       const cta = stravaConnected
-        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">↻ Sync from Strava</button>'
+        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your real numbers here.';
       sumCard.innerHTML = `<div class="card-title">7-day summary</div>
         <div style="font-size:13px; color:var(--text-soft); padding: 6px 0;">No data yet. ${cta}</div>`;
@@ -9601,7 +9680,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         : 'Coach Chat mode. Ask me anything about your Half Ironman plan — why a session is the way it is, how to adapt, what to expect.';
     }
     const label = document.getElementById('chatModeLabel');
-    if (label) label.textContent = mode === 'rule' ? '⚡ Quick Actions (free)' : '🧠 Coach Chat (AI)';
+    if (label) label.textContent = mode === 'rule' ? 'Quick Actions (free)' : 'Coach Chat (AI)';
     const row = document.getElementById('suggestRow');
     if (row) {
       const chips = mode === 'rule'
