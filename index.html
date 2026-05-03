@@ -6076,12 +6076,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function renderInsights() {
     pendingFixes = [];
-    const insights = runAdaptiveEngine();
+    const allInsights = runAdaptiveEngine();
+    // Filter out user-dismissed insights (24-hour window)
+    const insights = allInsights.filter(i => !isInsightDismissed(i));
     const hasFixes = insights.some(i => i.fix);
+    const dismissedCount = allInsights.length - insights.length;
     const target = ['todayInsights', 'planInsights'];
 
     if (insights.length === 0) {
-      const html = `<div style="font-size:13px; color:var(--primary-dark); padding:12px 14px; background:var(--primary-soft); border:1px solid var(--primary); border-radius:12px; margin-bottom:14px; display:flex; align-items:center; gap:10px;"><span style="font-size:16px;">✓</span><span><strong>Plan is balanced.</strong> Key sessions covered, intensity ratio on target, no spacing issues.</span></div>`;
+      const dismissNote = dismissedCount > 0 ? `<div style="font-size: 11px; color: var(--text-soft); text-align: center; margin-top: 8px;">${dismissedCount} insight${dismissedCount === 1 ? '' : 's'} dismissed today · <a onclick="restoreAllInsights()" style="color: var(--primary); cursor: pointer;">restore</a></div>` : '';
+      const html = `<div style="font-size:13px; color:var(--primary-dark); padding:12px 14px; background:var(--primary-soft); border:1px solid var(--primary); border-radius:12px; margin-bottom:14px; display:flex; align-items:center; gap:10px;"><span style="font-size:16px;">✓</span><span><strong>Plan is balanced.</strong> Key sessions covered, intensity ratio on target, no spacing issues.</span></div>${dismissNote}`;
       target.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
       const rationaleEl = document.getElementById('todayRationale');
       if (rationaleEl) rationaleEl.textContent = computeTodayRationale();
@@ -6104,6 +6108,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
     if (hasFixes && insights.length > 1) {
       html += `<button class="btn btn-primary btn-full" style="margin-top: 12px;" onclick="applyAllFixes()">Apply all suggested adjustments</button>`;
+    }
+    // Footer note when there are dismissed insights — let user restore them
+    if (dismissedCount > 0) {
+      html += `<div style="font-size: 11px; color: var(--text-soft); text-align: center; margin-top: 12px;">${dismissedCount} insight${dismissedCount === 1 ? '' : 's'} dismissed · <a onclick="restoreAllInsights()" style="color: var(--primary); cursor: pointer; font-weight: 600;">restore</a></div>`;
     }
 
     target.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
@@ -6166,6 +6174,44 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     btn.textContent = isOpen ? 'Tell me more →' : 'Show less ↑';
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // INSIGHT DISMISSAL — × on each card to mark "I read it". Hidden 24h.
+  // After 24h the insight re-surfaces if its underlying condition is still true.
+  // ──────────────────────────────────────────────────────────────────────
+  function _hashInsight(insight) {
+    // Title alone is the stable identifier for dismissal — exact wording can vary
+    // with dynamic numbers, but the leading words are stable enough.
+    const t = (insight.title || '').toLowerCase().replace(/[0-9]+/g, '#').slice(0, 50);
+    let h = 0;
+    for (let i = 0; i < t.length; i++) h = ((h << 5) - h) + t.charCodeAt(i) | 0;
+    return String(h);
+  }
+  function getDismissedInsights() {
+    try { return JSON.parse(localStorage.getItem('insights-dismissed') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function setDismissedInsights(map) {
+    localStorage.setItem('insights-dismissed', JSON.stringify(map));
+  }
+  function isInsightDismissed(insight) {
+    const map = getDismissedInsights();
+    const ts = map[_hashInsight(insight)];
+    if (!ts) return false;
+    return (Date.now() - ts) < 24 * 60 * 60 * 1000;
+  }
+  function dismissInsightByHash(hash) {
+    const map = getDismissedInsights();
+    map[hash] = Date.now();
+    setDismissedInsights(map);
+    if (typeof trackEvent === 'function') trackEvent('insight_dismissed', { hash });
+    renderAll();
+  }
+  function restoreAllInsights() {
+    if (!confirm('Show all dismissed insights again?')) return;
+    setDismissedInsights({});
+    renderAll();
+  }
+
   function renderInsightCard(i, idx) {
     // Semantic color coding:
     //   good   = green check  → trends moving positively (HR dropping, volume building safely)
@@ -6203,8 +6249,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ${fixBtn}
       </div>`;
 
-    return `<div class="insight-card" style="background:${tone.bg}; border-left:4px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:8px; font-size:13px; line-height:1.5;">
-      <div onclick="toggleInsightCard(this.parentElement)" style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+    const insightHash = _hashInsight(i);
+    return `<div class="insight-card" style="background:${tone.bg}; border-left:4px solid ${tone.color}; padding:12px 14px; border-radius:10px; margin-bottom:8px; font-size:13px; line-height:1.5; position: relative;">
+      <div onclick="toggleInsightCard(this.parentElement)" style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; padding-right: 28px;">
         <div style="font-weight:700; color:${tone.color}; display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
           ${icon(tone.svg, { size: 18, color: tone.color })}
           <span style="overflow:hidden; text-overflow:ellipsis;">${markupGlossaryTerms(i.title)}</span>
@@ -6214,6 +6261,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           <span class="insight-chevron" style="color:${tone.color}; font-size:14px; transition:transform 0.15s; display:inline-block;">›</span>
         </div>
       </div>
+      <button onclick="event.stopPropagation(); dismissInsightByHash('${insightHash}')" aria-label="Dismiss insight" title="Mark as read · re-shows in 24h if still relevant"
+        style="position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.7); border: 1px solid ${tone.color}33; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; color: ${tone.color}; display: flex; align-items: center; justify-content: center; padding: 0;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
       ${expandedBody}
     </div>`;
   }
