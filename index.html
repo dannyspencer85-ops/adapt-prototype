@@ -5251,7 +5251,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       insights.push({
         severity: 'alert',
         title: 'You don\'t have a long workout this week',
-        simpleMessage: "Your weekly long session is missing. That's the workout that builds the most fitness for race day — let's add one back.",
+        simpleMessage: "No long session this week. That's the biggest fitness driver — add one back.",
         message: 'This week has no long session (75+ min). The long session is the single biggest driver of endurance fitness — without one, the week won\'t build toward race day.',
         suggestion: 'Try: "move [day] to Saturday" or "only 90 min Saturday" to reinstate it.',
         fix: weekend
@@ -5266,7 +5266,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       insights.push({
         severity: 'warn',
         title: 'All your workouts this week are easy',
-        simpleMessage: "Adding one harder session helps you keep getting fitter. Recovery weeks are fine — but stacking easy weeks slows your progress.",
+        simpleMessage: "All easy this week. Add one harder session if it's not a recovery week.",
         message: 'No intensity session planned. A recovery week is fine; back-to-back easy-only weeks blunts fitness gains.',
         suggestion: 'Add a short interval or tempo session mid-week if this isn\'t a taper.',
         fix: weekday ? { label: `Convert ${weekday} to quality`, tool: 'swapDiscipline', input: { day: weekday, newType: 'quality', newName: 'Bike intervals', newMeta: '45 min · 6×2min hard', reason: 'add weekly quality dose' }} : null
@@ -5284,7 +5284,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'warn',
           title: 'Training less than planned this week',
-          simpleMessage: `You're training less than your plan calls for this week. A little less here and there is fine — but several weeks like this would slow your progress.`,
+          simpleMessage: `Training short of plan this week. Occasional is fine; repeated weeks erode race fitness.`,
           message: `Total ${formatMins(totalMins)} vs. ${formatMins(targetMins)} planned — ${Math.round((1 - ratio) * 100)}% under target. A few weeks like this and race fitness erodes.`,
           suggestion: 'Lengthen an easy session or open another training day.',
           fix: easy ? { label: `Extend ${easy.day} by 30 min`, tool: 'shortenSession', input: { day: easy.day, newMinutes: easy.s.duration + 30, newName: easy.s.name, newMeta: easy.s.meta.replace(/\d+\s*min/i, (easy.s.duration + 30) + ' min'), reason: 'hit volume target' }} : null
@@ -5294,7 +5294,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'warn',
           title: 'Training more than planned',
-          simpleMessage: `You're doing more training than the plan calls for. Doing this week after week makes injuries more likely.`,
+          simpleMessage: `Over plan this week. Sustained over-training raises injury risk.`,
           message: `Total ${formatMins(totalMins)} vs. ${formatMins(targetMins)} planned (${Math.round((ratio - 1) * 100)}% over). Pushing past plan for multiple weeks raises injury risk.`,
           suggestion: 'Shorten an easy day back.',
           fix: longest ? { label: `Shorten ${longest.day} by 20%`, tool: 'shortenSession', input: { day: longest.day, newMinutes: Math.round(longest.s.duration * 0.8), newName: longest.s.name, newMeta: longest.s.meta, reason: 'bring volume back on target' }} : null
@@ -5314,7 +5314,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           insights.push({
             severity: 'warn',
             title: 'You\'re going hard too often',
-            simpleMessage: `Most of your training should feel easy. Take one of your hard sessions down to easy aerobic this week — you'll get fitter, not less.`,
+            simpleMessage: `Too much hard work this week. Drop one quality session to easy — you'll get fitter, not less.`,
             message: `${Math.round(qRatio * 100)}% of your training is hard/long this week. Target for your hours is ~${Math.round(targetQ * 100)}%. Too much intensity without aerobic volume leads to plateau and injury.`,
             suggestion: 'Add an easy session or convert a quality day to easy aerobic.'
           });
@@ -5333,7 +5333,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'warn',
           title: `Two hard workouts back-to-back (${days[i]}→${days[i + 1]})`,
-          simpleMessage: `${days[i]} and ${days[i + 1]} are both hard sessions. Move one to a different day so your legs get a real break in between.`,
+          simpleMessage: `${days[i]} and ${days[i + 1]} are both hard. Move one — legs need a real break between.`,
           message: `Less than 24h between two hard sessions blunts adaptation from both and raises injury risk. Endurance research supports 48-72h between hard sessions.`,
           suggestion: `Move one: "move ${days[i + 1]} to [later day]".`
         });
@@ -5365,7 +5365,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       insights.push({
         severity: 'alert',
         title: "You're behind for race day",
-        simpleMessage: `If your training stays at this level, you might not be ready by race day. Add some training back, or consider moving the race to a later date.`,
+        simpleMessage: `On this trajectory, you may not be race-ready. Add volume back or push the date.`,
         message: `Total hours across the block (${totalRemaining.toFixed(1)}h) are below what a Half Ironman finish typically needs (~${baselineForFinish}h). Cumulative changes have reduced your trajectory.`,
         suggestion: 'Restore volume in peak weeks, or consider a later race date.',
         fix: { label: `Scale weeks 2-4 up by 15%`, tool: 'adjustVolume', input: { fromWeekIndex: 1, toWeekIndex: 3, percentChange: 15, reason: 'restore race readiness trajectory' } }
@@ -5423,7 +5423,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       insights.push({
         severity: 'warn',
         title: 'Race week is too heavy',
-        simpleMessage: `You'll race better with fresh legs. Cut back training in the final week so you arrive rested.`,
+        simpleMessage: `Race week is too heavy. Cut volume so you arrive fresh.`,
         message: `Final week shows ${raceWeek.hours}h — taper should typically cut volume ~50% below a normal week (target: under 3h).`,
         suggestion: '"Reduce week 6 by 30%" if changes pushed volume up.',
         fix: { label: `Reduce race week by 30%`, tool: 'adjustVolume', input: { fromWeekIndex: planState.weekArc.length - 1, toWeekIndex: planState.weekArc.length - 1, percentChange: -30, reason: 'enforce proper taper' } }
@@ -5439,7 +5439,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'warn',
           title: 'Heat acclimatization window',
-          simpleMessage: `Your race is hot. Start sweating on purpose now — saunas, overdressed runs — so race-day heat doesn't blow up your day.`,
+          simpleMessage: `Your race is hot. Start a heat block now — saunas or overdressed runs.`,
           message: `${daysToRace} days to a ${intel.climate === 'hot-humid' ? 'hot & humid' : 'hot'} race. The ideal heat block is 10–14 days of progressive heat exposure inside the final 4 weeks. Start within the next 7 days.`,
           suggestion: 'Add 4 sauna sessions per week (15-30 min post-easy-run) or do 2 weekly Z2 sessions overdressed.',
         });
@@ -5449,7 +5449,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'info',
           title: 'High-altitude race ahead',
-          simpleMessage: `Your race is at altitude. Plan to arrive 7+ days early or land the night before — anything in between makes you feel worse.`,
+          simpleMessage: `High-altitude race. Arrive 7+ days early or the night before — in between is worst.`,
           message: `Altitude takes 7-14 days to acclimate. Splitting the difference (3-5 days early) is the worst option physiologically. Pick a strategy now and book travel accordingly.`,
           suggestion: 'Book to arrive 7+ days before, or 12 hours before. Drop intensity for the first 3 days at altitude.',
         });
@@ -5463,7 +5463,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           insights.push({
             severity: 'info',
             title: `${intel.terrain === 'mountainous' ? 'Mountainous' : 'Hilly'} course — train the climbs`,
-            simpleMessage: `Your race has serious climbing. Make sure your long sessions include hills, not just flat distance.`,
+            simpleMessage: `Race has serious climbing. Long sessions should include hills.`,
             message: `Race terrain: ${intel.terrain}. Flat training builds aerobic engine but not the leg-strength + descending durability you'll need on race day.`,
             suggestion: 'Route long rides/runs through your hilliest local terrain. Add a weekly hill-repeat session.',
           });
@@ -5474,7 +5474,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'info',
           title: 'Open-water swim race',
-          simpleMessage: `Your race swim isn't in a pool. Get into open water at least 3-4 times before race day — it feels completely different.`,
+          simpleMessage: `Open-water race. Get into open water 3-4 times before race day — it's different from a pool.`,
           message: `Race swim type: ${intel.swim}. Sighting, chop, wetsuit fit, and race-start chaos are skills you can only practice in open water.`,
           suggestion: 'Swap one pool swim every other week for an open-water session once water is safe (>60°F with wetsuit).',
         });
@@ -5484,7 +5484,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         insights.push({
           severity: 'info',
           title: `${intel.surface === 'gravel' ? 'Gravel' : 'Trail'} race — surface practice matters`,
-          simpleMessage: `Your race isn't on pavement. Schedule at least one weekly session on similar surface to build handling and ankle stability.`,
+          simpleMessage: `Off-pavement race. One weekly session on similar surface — handling + ankle stability.`,
           message: `Race surface: ${intel.surface}. Road training transfers ~70% — the rest is bike-handling, line choice, and ankle/foot strength specific to ${intel.surface}.`,
           suggestion: `One weekly long session on similar terrain. Dial in tire/shoe choice early.`,
         });
@@ -5814,7 +5814,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         out.push({
           severity: 'alert',
           title: `You ramped up too fast this week`,
-          simpleMessage: `You jumped your training a lot this week vs. your average. Stacked weeks like this is when most injuries happen.`,
+          simpleMessage: `Big jump from your usual load — stacked weeks like this cause most injuries.`,
           message: `Last 7 days: ${formatMins(minsLast7)} vs. 28-day rolling average of ${formatMins(Math.round(chronic7DayAvg))}/week. ACWR ${acwr.toFixed(2)} > 1.5 — Gabbett (2016) found this range carries 4-5× injury risk vs. the 0.8-1.3 sweet spot. Pull back next week.`,
           suggestion: 'Cut next week by 15-20% to bring the ratio back into the safe zone.'
         });
@@ -5822,7 +5822,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         out.push({
           severity: 'info',
           title: `Training dropped sharply`,
-          simpleMessage: `Your training dropped sharply this week. A short break is fine — but more than 10 days of low load and fitness starts eroding.`,
+          simpleMessage: `Sharp drop this week. A short break is fine; 10+ days low and fitness erodes.`,
           message: `Last 7 days only ${formatMins(minsLast7)} — your 28-day average per week was ${formatMins(Math.round(chronic7DayAvg))}. ACWR ${acwr.toFixed(2)} is in the under-loaded zone. If unintentional, ramp back up gradually.`,
           suggestion: 'If you\'re recovering from illness or travel, return at 70% volume next week, not full.'
         });
@@ -5841,7 +5841,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         out.push({
           severity: 'warn',
           title: `Falling behind this week`,
-          simpleMessage: `You're missing more sessions than usual this week. The plan adapts — but if life is consistently in the way, let's right-size the schedule.`,
+          simpleMessage: `Missing more sessions than usual. If this repeats, right-size the schedule.`,
           message: `${completedThisWeek}/${plannedSessions.length} sessions logged so far this week. Hill 2018 — when adherence drops below 60% across 3+ weeks, planned-vs-done divergence usually means the plan was unrealistic, not the athlete.`,
           suggestion: 'If you can squeeze a session in, focus on the one quality day. Otherwise consider trimming next week\'s plan.'
         });
@@ -5866,7 +5866,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         out.push({
           severity: 'warn',
           title: `Long run grew too quickly`,
-          simpleMessage: `Your longest run this week was a big step up from the prior 3 weeks. Don't repeat the jump next week — keep it flat or down a bit.`,
+          simpleMessage: `Long run jumped vs. prior 3 weeks. Hold or trim it next week — don't stack jumps.`,
           message: `Long run this week: ${formatMins(longestRunThis)}. Longest in the prior 3 weeks: ${formatMins(longestRunPrior)}. Daniels' Running Formula (>10% week-over-week long-run growth) is associated with overuse injury — your jump is ${Math.round(jumpPct)}%.`,
           suggestion: 'Hold or reduce the long run next week — banking the bigger session is fine, but build slowly.'
         });
@@ -5921,14 +5921,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         out.push({
           severity: 'good',
           title: `Aerobic fitness improving`,
-          simpleMessage: `At similar easy-run effort, your heart rate is ${Math.abs(diff)} bpm lower than the prior 3 weeks (temperature-adjusted). That's a clear sign you're getting fitter.`,
+          simpleMessage: `Easy-run HR is ${Math.abs(diff)} bpm lower than the prior 3 weeks (temp-adjusted). Fitness gains.`,
           message: `Temp-adjusted easy-run avg HR last 7d: ${easyHr7} bpm. Prior 3 weeks: ${easyHr21} bpm. Lower HR at the same effort + temperature = improved aerobic efficiency (Coyle 1988). ${useTempAdj ? 'Heat correction applied (Pugh/Tipton: ~1 bpm/°C above 18°C).' : 'No temp data — using raw HR.'}${tempNote} Keep easy days truly easy to compound this.`,
         });
       } else if (diff >= 5) {
         out.push({
           severity: 'warn',
           title: `Easy runs feel harder lately`,
-          simpleMessage: `Even after correcting for temperature, your easy-run HR is ${diff} bpm higher than the prior 3 weeks. That can mean fatigue, illness, or dehydration.`,
+          simpleMessage: `Easy-run HR is ${diff} bpm higher than 3 weeks ago (temp-adjusted). Could be fatigue, illness, or dehydration.`,
           message: `Temp-adjusted easy-run avg HR last 7d: ${easyHr7} bpm vs. prior 3 weeks ${easyHr21} bpm. ${useTempAdj ? 'Heat correction applied — ruling out hot weather as the cause.' : 'No temperature data; raw HR comparison only.'}${tempNote} Cardiac drift of 5+ bpm at consistent effort is associated with accumulated fatigue (Achten & Jeukendrup 2003). Two recovery days ahead.`,
           suggestion: 'Insert an extra rest day, prioritize sleep + hydration, see if the HR returns to baseline.'
         });
@@ -5960,7 +5960,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       out.push({
         severity: 'warn',
         title: 'Two hard days too close together',
-        simpleMessage: `In the last two weeks you put two hard efforts inside a 36-hour window. Both adaptations get blunted — research suggests at least 48h between intense sessions.`,
+        simpleMessage: `Two hard efforts inside 36h in the last 2 weeks. Spread them out — 48-72h between intense sessions.`,
         message: `Strava data shows two high-Effort sessions (Suffer ≥80 or avg HR ≥155) less than 36h apart in the last 14 days. Seiler 2010 polarized-training research recommends 48-72h between high-intensity sessions to allow neural + metabolic recovery.`,
         suggestion: 'Spread quality sessions across the week — Tue/Thu/Sat is a classic spacing.'
       });
@@ -5975,7 +5975,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       out.push({
         severity: 'warn',
         title: 'No rest day this week',
-        simpleMessage: `You've trained every day this week. One full rest day per week is the minimum for sustainable training — your body adapts during rest, not during work.`,
+        simpleMessage: `Trained every day this week. One full rest day is the minimum — adaptation happens during rest.`,
         message: `Strava shows ${activeDayCount7}/7 days active. Long-term research (Issurin 2010) ties no-rest weeks to elevated overtraining markers (cortisol, HRV decline). At least one true rest day per week is foundational.`,
         suggestion: 'Take tomorrow as a full rest day. Walking + stretching only.'
       });
@@ -6189,13 +6189,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Small uppercase badge in the top-right makes severity instantly readable
     const badge = `<span style="font-size:10px; font-weight:800; letter-spacing:0.6px; text-transform:uppercase; padding:2px 8px; border-radius:100px; background:${tone.color}; color:#fff;">${tone.label}</span>`;
 
-    // Build the expandable body (message + suggestion + fix). Collapsed by default.
-    const bodyText = mode === 'simple' && i.simpleMessage ? i.simpleMessage : (i.message || i.simpleMessage);
-    const detailMessage = (mode === 'simple' && i.message && i.simpleMessage) ? `<div style="margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.04); border-radius:8px; font-size:12px; color:var(--text-soft); line-height:1.5;"><strong style="color:var(--text);">Why this matters:</strong> ${markupGlossaryTerms(i.message)}</div>` : '';
-    const suggBlock = i.suggestion ? `<div style="color:var(--text-soft); margin-top:8px; font-style:italic; font-size:12px;">→ ${markupGlossaryTerms(i.suggestion)}</div>` : '';
+    // Concise expanded body: short message + actionable suggestion + fix button.
+    // Detailed research-cited "message" only shows in detailed mode (Settings → Coaching detail).
+    const bodyText = i.simpleMessage || i.message || '';
+    const showDetail = mode === 'detailed' && i.message && i.simpleMessage;
+    const detailMessage = showDetail ? `<div style="margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.04); border-radius:8px; font-size:12px; color:var(--text-soft); line-height:1.5;">${markupGlossaryTerms(i.message)}</div>` : '';
+    const suggBlock = i.suggestion ? `<div style="color:var(--text-soft); margin-top:8px; font-size:12px; line-height:1.5;">→ ${markupGlossaryTerms(i.suggestion)}</div>` : '';
     const expandedBody = `
       <div class="insight-body" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07);">
-        <div style="color:var(--text); font-size:13px; line-height:1.5;">${markupGlossaryTerms(bodyText || '')}</div>
+        <div style="color:var(--text); font-size:13px; line-height:1.5;">${markupGlossaryTerms(bodyText)}</div>
         ${detailMessage}
         ${suggBlock}
         ${fixBtn}
