@@ -8255,10 +8255,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const err = params.get('error');
+    const errDesc = params.get('error_description') || '';
     if (err) {
-      console.warn('Strava OAuth declined:', err);
-      // Clean the URL
+      console.warn('Strava OAuth declined:', err, errDesc);
+      // Clean the URL so a refresh doesn't re-trigger
       history.replaceState({}, '', window.location.origin + window.location.pathname);
+      // Surface a clear message — don't fail silently
+      if (typeof showScreen === 'function') showScreen('profile');
+      const friendly = err === 'access_denied'
+        ? 'You declined the Strava authorization. Tap "Re-authorize Strava" to try again and approve.'
+        : err === 'invalid_redirect_uri' || /redirect/i.test(errDesc)
+        ? `Strava rejected the redirect URL. Your Strava app's "Authorization Callback Domain" must match this site's domain (${window.location.host}). Update it at strava.com/settings/api.`
+        : `Strava authorization failed: ${err}${errDesc ? ' — ' + errDesc : ''}`;
+      setStravaMsg(friendly, 'err');
       return;
     }
     if (!code) return;
