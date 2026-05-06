@@ -2285,14 +2285,9 @@
     </div>
 
     <div id="chatActive" style="display:none; flex:1; flex-direction:column; min-height:0;">
-      <div id="chatModeBar" style="padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; font-size: 12px;">
-        <span style="color: var(--text-soft); font-weight: 600;">Mode:</span>
-        <span id="chatModeLabel" style="font-weight: 700; color: var(--primary);">⚡ Quick Actions</span>
-        <button onclick="toggleChatMode()" style="margin-left: auto; background: none; border: 1px solid var(--primary); color: var(--primary); padding: 5px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit;">Switch</button>
-      </div>
       <div class="chat-area" id="chatArea">
         <div class="bubble bot" id="chatModeGreeting">
-          Quick Actions mode. Tell me what to change — move a session, shorten a day, flag an injury, insert a rest week, or scale back volume.
+          Hey — I'm your coach. Ask me anything about your plan, or tell me what to change. I'll explain the why and execute the change.
         </div>
         <div class="suggest-row inline" id="suggestRow"></div>
       </div>
@@ -2367,51 +2362,56 @@
       <!-- STRAVA CONNECTION -->
       <div class="card">
         <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Strava connection</span>
+          <span>Strava</span>
           <span id="stravaStatusPill" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg); color:var(--text-soft);">Not connected</span>
         </div>
         <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 12px; line-height: 1.5;">
-          Lets the Course Intel feature pull elevation + course data from any Strava activity or segment URL. Your credentials live only in this browser — never in the source code.
+          Pulls in your activities so the coach can read your real training. Credentials live only in this browser.
         </div>
         <div id="stravaConnected" style="display:none;">
           <div style="font-size:13px; padding:10px 12px; background:var(--primary-soft); border-radius:8px; margin-bottom:10px;">
             ✅ Connected as <strong id="stravaAthleteName">—</strong>
             <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
           </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">Sync recent activities (last year)</button>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="syncStravaAllTime()" style="margin-bottom:8px;">Pull full history (up to 5 years)</button>
-          <button class="btn btn-ghost btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
-          <button class="btn btn-ghost btn-full btn-sm" onclick="showStravaAuthUrl()" style="margin-bottom:8px;">Show OAuth URL (debug / desktop)</button>
-          <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px; line-height:1.45;">
-            On the Strava consent screen, <strong>tick the "View data about your private activities" box</strong>. If you skip it, you'll get "Token rejected" on every sync.
+          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:6px;">Sync activities</button>
+          <div style="display:flex; gap:14px; justify-content:space-between; font-size:12px; padding:4px 2px;">
+            <button onclick="syncStravaAllTime()" style="background:none; border:0; color:var(--primary); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Pull full history</button>
+            <button onclick="disconnectStrava()" style="background:none; border:0; color:var(--warn); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Disconnect</button>
           </div>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
-            <button class="btn btn-ghost btn-sm" onclick="diagnoseStrava()" style="flex:1;">Diagnose</button>
-            <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
-            <button class="btn btn-ghost btn-sm" onclick="disconnectStrava()" style="flex:1; color:var(--warn); border-color:var(--warn);">Disconnect</button>
-          </div>
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer; font-size:12px; color:var(--text-soft); font-weight:600; padding:6px 0;">Troubleshoot ▾</summary>
+            <div style="padding-top:8px;">
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px; line-height:1.45;">
+                If sync isn't working, run Diagnose. The most common fix is to Re-authorize and tick the "View data about your private activities" checkbox on the Strava consent screen.
+              </div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                <button class="btn btn-ghost btn-sm" onclick="diagnoseStrava()">Diagnose</button>
+                <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()">Test connection</button>
+                <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()">Refresh token</button>
+                <button class="btn btn-ghost btn-sm" onclick="startStravaAuth()">Re-authorize</button>
+                <button class="btn btn-ghost btn-sm" onclick="showStravaAuthUrl()" style="grid-column: span 2;">Show OAuth URL (desktop fallback)</button>
+              </div>
+            </div>
+          </details>
         </div>
         <div id="stravaDisconnected">
           <div class="field" style="margin-bottom:8px;">
             <label style="font-size:12px;">Client ID</label>
-            <input type="text" id="stravaClientId" placeholder="123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+            <input type="text" id="stravaClientId" placeholder="e.g. 123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
           </div>
-          <div class="field" style="margin-bottom:8px;">
+          <div class="field" style="margin-bottom:10px;">
             <label style="font-size:12px;">Client Secret</label>
             <input type="password" id="stravaClientSecret" placeholder="paste secret" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
           </div>
-          <div class="field" style="margin-bottom:8px;">
-            <label style="font-size:12px;">Access Token</label>
-            <input type="password" id="stravaAccessToken" placeholder="paste access token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()">Authorize via Strava</button>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.5;">
+            Get Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>. On Strava's consent screen, <strong>tick "View data about your private activities"</strong> — without it sync will fail.
           </div>
-          <div class="field" style="margin-bottom:10px;">
-            <label style="font-size:12px;">Refresh Token</label>
-            <input type="password" id="stravaRefreshToken" placeholder="paste refresh token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
-          </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom: 8px;">Authorize via Strava (recommended)</button>
-          <button class="btn btn-ghost btn-full btn-sm" onclick="saveStravaConfig()">Save tokens manually</button>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.5;">Need Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>. "Authorize via Strava" handles the rest — no token copying needed.</div>
+          <!-- Hidden inputs so legacy access/refresh-token paths still compile.
+               No UI for them — pasting the static read-only tokens from Strava's
+               settings page was the #1 source of confusion. OAuth handles tokens. -->
+          <input type="hidden" id="stravaAccessToken">
+          <input type="hidden" id="stravaRefreshToken">
         </div>
         <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
       </div>
@@ -3181,21 +3181,13 @@
     computeReadinessFlags();
     onbStep(6);
   }
-  function selectChatMode(mode) {
-    localStorage.setItem('chat-mode', mode);
-    document.getElementById('chatOptRule').classList.toggle('active', mode === 'rule');
-    document.getElementById('chatOptClaude').classList.toggle('active', mode === 'claude');
-  }
-  function chatMode() {
-    return localStorage.getItem('chat-mode') || 'rule';
-  }
-  function toggleChatMode() {
-    const current = chatMode();
-    const next = current === 'rule' ? 'claude' : 'rule';
-    localStorage.setItem('chat-mode', next);
-    saveUserData();
-    updateChatState();
-  }
+  // Coach Chat is now the only mode. Quick Actions/rule-based chat was removed
+  // when Mistral-backed Coach Chat became reliable + scope-guarded. These shims
+  // exist so older callers that referenced chatMode/toggleChatMode/selectChatMode
+  // don't break — they all behave as if Coach Chat is permanently selected.
+  function selectChatMode() { /* no-op */ }
+  function chatMode() { return 'claude'; }
+  function toggleChatMode() { /* no-op — only one mode */ }
   function showApiKeyHelp() { document.getElementById('apiHelp').classList.add('show'); }
   function closeApiHelp() { document.getElementById('apiHelp').classList.remove('show'); }
 
@@ -5745,7 +5737,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     } else if ((planState.stravaActivities || []).length < 4) {
       bodyLine = 'Sync more workouts to see fitness trends';
       bodyColor = 'var(--text-soft)';
-      bodyClick = `showScreen('profile')`;
+      bodyClick = `showScreen('data')`;
     } else {
       bodyLine = 'Holding steady';
       bodyColor = 'var(--info)';
@@ -9966,32 +9958,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const setup = document.getElementById('coachIntro');
     const active = document.getElementById('chatActive');
     if (!setup || !active) return;
-    const mode = chatMode();
-    if (mode === 'rule') {
+    if (hasAcceptedCoach()) {
       setup.style.display = 'none';
       active.style.display = 'flex';
     } else {
-      if (hasAcceptedCoach()) {
-        setup.style.display = 'none';
-        active.style.display = 'flex';
-      } else {
-        setup.style.display = 'block';
-        active.style.display = 'none';
-      }
+      setup.style.display = 'block';
+      active.style.display = 'none';
     }
-    const greeting = document.getElementById('chatModeGreeting');
-    if (greeting) {
-      greeting.textContent = mode === 'rule'
-        ? 'Quick Actions mode. Tell me what to change — move a session, shorten a day, flag an injury, insert a rest week, or scale back volume. I can also answer common questions ("what is 80/20?", "how hard should today feel?").'
-        : 'Coach Chat mode. Ask me anything about your plan — why a session is structured the way it is, how to adapt when life shifts, what to expect.';
-    }
-    const label = document.getElementById('chatModeLabel');
-    if (label) label.textContent = mode === 'rule' ? 'Quick Actions (free)' : 'Coach Chat (AI)';
+    // Suggestion chips — a tight mix of common questions and quick-change prompts.
     const row = document.getElementById('suggestRow');
     if (row) {
-      const chips = mode === 'rule'
-        ? [["What's today?","What's today?"],['Move Sat to Sun','Move Saturday to Sunday'],['Only 30 min Wed','Only 30 min Wednesday'],['My knee hurts','My knee hurts'],['Skipped Wednesday','Skipped Wednesday']]
-        : [["Why Saturday's brick?","Why is Saturday's brick so important?"],['What if I miss Saturday?','What if I miss Saturday?'],['How hard Wednesday?','How hard should Wednesday feel?']];
+      const chips = [
+        ["What's today?", "What's today's session and how should it feel?"],
+        ["Why Saturday's brick?", "Why is Saturday's brick so important?"],
+        ['Move Sat → Sun', 'Move Saturday to Sunday'],
+        ['Only 30 min Wed', 'I only have 30 minutes on Wednesday'],
+        ['Skipped today', "I'm skipping today's session"],
+        ['My knee hurts', "My knee is sore — flag it as a low-grade injury"],
+      ];
       row.innerHTML = chips.map(([label, prompt]) =>
         `<button class="suggest-chip" onclick="askSuggested(${JSON.stringify(prompt)})">${label}</button>`
       ).join('');
@@ -10851,8 +10835,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
   }
 
   async function sendChat() {
-    const mode = chatMode();
-    if (mode === 'claude' && !hasAcceptedCoach()) { updateChatState(); return; }
+    if (!hasAcceptedCoach()) { updateChatState(); return; }
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
     if (!text) return;
@@ -10860,12 +10843,6 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     addBubble(text, 'user');
     const row = document.getElementById('suggestRow');
     if (row) row.style.display = 'none';
-
-    if (mode === 'rule') {
-      const reply = handleRuleBased(text);
-      setTimeout(() => { addBubble(reply, 'bot'); refreshSuggestions(); }, 200);
-      return;
-    }
 
     // Coach Chat (Mistral): start an empty bubble that streams tokens in place.
     const bubble = addBubble('…', 'bot typing');
@@ -10879,8 +10856,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
   }
 
   function askSuggested(text) {
-    const mode = chatMode();
-    if (mode === 'claude' && !hasAcceptedCoach()) { updateChatState(); return; }
+    if (!hasAcceptedCoach()) { updateChatState(); return; }
     document.getElementById('chatInput').value = text;
     sendChat();
   }
