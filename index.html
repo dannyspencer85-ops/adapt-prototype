@@ -2352,6 +2352,7 @@
           </div>
           <div style="display:flex; gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
+            <button class="btn btn-ghost btn-sm" onclick="diagnoseStrava()" style="flex:1;">Diagnose</button>
             <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
             <button class="btn btn-ghost btn-sm" onclick="disconnectStrava()" style="flex:1; color:var(--warn); border-color:var(--warn);">Disconnect</button>
           </div>
@@ -8205,10 +8206,27 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     window.location.href = url;
   }
   // Handle the redirect back from Strava — exchange auth code for tokens.
-  async function handleStravaAuthCallback(code) {
+  // `grantedScope` is the comma-separated string Strava attaches to the redirect URL
+  // (e.g. "read,activity:read_all,profile:read_all"). It does NOT come back in the
+  // token-exchange response body, only in the redirect URL — caller must pluck it
+  // from window.location.search before we clean the URL.
+  async function handleStravaAuthCallback(code, grantedScope) {
     const cfg = getStravaConfig();
     if (!cfg || !cfg.clientId || !cfg.clientSecret) {
       console.warn('Strava OAuth callback: no client credentials saved.');
+      return;
+    }
+    // Hard-fail BEFORE the token exchange if the user un-checked the activity
+    // scope on the consent screen. Otherwise we'd burn a code on a useless token.
+    const grantedList = (grantedScope || '').split(/[, ]+/).filter(Boolean);
+    if (grantedList.length > 0 && !grantedList.includes('activity:read_all')) {
+      setStravaMsg(
+        'Strava connected, but you didn\'t approve activity access. ' +
+        'Tap "Re-authorize Strava" again — and on the consent screen, make sure ' +
+        'the "View data about your private activities" checkbox is TICKED. ' +
+        `(Granted: ${grantedScope || 'none'})`,
+        'err'
+      );
       return;
     }
     try {
@@ -8232,10 +8250,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       cfg.accessToken = j.access_token;
       cfg.refreshToken = j.refresh_token;
       cfg.expiresAt = j.expires_at || 0;
-      // Strava's token response includes the granted scopes when scopes were requested.
-      // If `activity:read_all` is missing, the user un-checked it on the consent screen
-      // and the token can't list activities. Save what we got so we can warn clearly.
-      if (j.scope) cfg.scope = j.scope;
+      // Persist the granted scope from the URL (Strava's token response body
+      // doesn't include `scope` — only the redirect URL does). Used later for
+      // diagnostics if a sync call fails.
+      if (grantedScope) cfg.scope = grantedScope;
+      else if (j.scope) cfg.scope = j.scope;
       if (j.athlete) {
         cfg.athleteName = `${j.athlete.firstname || ''} ${j.athlete.lastname || ''}`.trim() || j.athlete.username || 'Strava user';
       }
@@ -8278,6 +8297,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function checkStravaOAuthCallback() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
+    const grantedScope = params.get('scope') || '';
     const err = params.get('error');
     const errDesc = params.get('error_description') || '';
     if (err) {
@@ -8299,7 +8319,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     history.replaceState({}, '', window.location.origin + window.location.pathname);
     // Make sure Profile is visible so the user sees the result message
     if (typeof showScreen === 'function') showScreen('profile');
-    handleStravaAuthCallback(code);
+    handleStravaAuthCallback(code, grantedScope);
   }
   // Pull elevation + distance from a Strava activity or segment URL.
   // Auto-refreshes once if access token is expired.
@@ -8407,13 +8427,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return _stravaApiCall(path, true);
     }
     if (res.status === 401) {
-      throw new Error('Token rejected. Tap "Re-authorize Strava" — and on the consent screen, make sure the "View data about your private activities" checkbox is ticked.');
+      // Surface Strava's actual error body so we can diagnose. Strava returns 401
+      // for: (a) bad/expired token, (b) missing scope, (c) revoked app access.
+      let body = '';
+      try { body = await res.text(); } catch (e) {}
+      const scopeStr = cur.scope ? ` Granted scope: "${cur.scope}".` : ' (no scope info saved)';
+      throw new Error(`Strava 401: ${body.slice(0, 200)}.${scopeStr} Tap "Re-authorize Strava" and TICK the "View data about your private activities" checkbox.`);
     }
     if (res.status === 403) {
-      // Try to read body for scope hint
-      let detail = '';
-      try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
-      throw new Error(`Permission denied — your Strava token is missing the "activity:read_all" scope. Re-authorize and tick the activities checkbox. ${detail}`);
+      let body = '';
+      try { body = await res.text(); } catch (e) {}
+      throw new Error(`Strava 403: ${body.slice(0, 200)}. This is almost always a missing activity:read_all scope. Re-authorize and tick the activities checkbox.`);
     }
     if (!res.ok) {
       let body = '';
@@ -8486,6 +8510,58 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const need = Math.max(perf + 14, 365); // always cover at least the past year
     return Math.max(need, sticky); // never shrink below previously synced depth
   }
+  // Diagnostic tool — hits both /athlete (works with any scope) and
+  // /athlete/activities (requires activity:read_all) and reports raw responses.
+  // This tells us in plain language whether the issue is the token itself or scope.
+  async function diagnoseStrava() {
+    const cfg = getStravaConfig();
+    if (!cfg || !cfg.accessToken) {
+      setStravaMsg('Not connected. Authorize first.', 'err');
+      return;
+    }
+    setStravaMsg('Diagnosing…', 'info');
+    const lines = [];
+    const tokenPreview = cfg.accessToken.slice(0, 8) + '…' + cfg.accessToken.slice(-4);
+    lines.push(`Token: ${tokenPreview}, scope: "${cfg.scope || '(unknown)'}", expires: ${cfg.expiresAt ? new Date(cfg.expiresAt * 1000).toLocaleString() : 'unknown'}`);
+    // Probe 1: /athlete (works with `read` scope)
+    try {
+      const r1 = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: { 'Authorization': 'Bearer ' + cfg.accessToken }
+      });
+      lines.push(`/athlete → ${r1.status} ${r1.statusText}`);
+      if (!r1.ok) {
+        const t = await r1.text().catch(() => '');
+        lines.push(`  body: ${t.slice(0, 150)}`);
+      }
+    } catch (e) { lines.push(`/athlete → network error: ${e.message}`); }
+    // Probe 2: /athlete/activities (requires activity:read_all)
+    try {
+      const r2 = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=1', {
+        headers: { 'Authorization': 'Bearer ' + cfg.accessToken }
+      });
+      lines.push(`/athlete/activities → ${r2.status} ${r2.statusText}`);
+      if (!r2.ok) {
+        const t = await r2.text().catch(() => '');
+        lines.push(`  body: ${t.slice(0, 150)}`);
+      } else {
+        const arr = await r2.json().catch(() => []);
+        lines.push(`  activities returned: ${Array.isArray(arr) ? arr.length : 'unknown'}`);
+      }
+    } catch (e) { lines.push(`/athlete/activities → network error: ${e.message}`); }
+    const verdict = (cfg.scope || '').includes('activity:read_all')
+      ? 'Scope looks good.'
+      : 'PROBABLE ROOT CAUSE: token is missing "activity:read_all" scope. Re-authorize and tick the activities checkbox.';
+    lines.push(verdict);
+    const el = document.getElementById('stravaMsg');
+    if (el) {
+      el.style.color = 'var(--text)';
+      el.innerHTML = '<pre style="white-space:pre-wrap; font-size:11px; line-height:1.4; margin:0; font-family:monospace;">' +
+        lines.map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('\n') +
+        '</pre>';
+    }
+    console.log('[Strava diagnose]\n' + lines.join('\n'));
+  }
+
   // Pull the user's full Strava history (capped at 5 years to keep storage sane).
   async function syncStravaAllTime() {
     setStravaMsg('Pulling full Strava history (this can take a minute)…', 'info');
