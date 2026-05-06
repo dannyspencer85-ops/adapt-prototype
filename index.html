@@ -9967,6 +9967,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // Build the live-state payload that goes into the system prompt every turn.
   // Keep it tight — anything we put here costs tokens on every message.
+  // Relative-day mapping is precomputed so the model never has to do
+  // "Tue + 1 = Wed" math (which it gets wrong about a third of the time).
   function buildCoachContext() {
     const todayDay = (typeof getTodayDay === 'function') ? getTodayDay() : '';
     const todayDateStr = (typeof getTodayDateString === 'function') ? getTodayDateString() : '';
@@ -9980,8 +9982,36 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       avgHR: a.avgHR || a.average_heartrate || null,
       rpe: a.rpe || null,
     }));
+
+    // Build a day-by-day timeline anchored on today, with the session on each
+    // day inlined so the model sees: yesterday=Mon (Full rest), today=Tue
+    // (Rest day), tomorrow=Wed (Quality 60 min), etc. No day-of-week math.
+    const dayOrder = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const todayIdx = dayOrder.indexOf(todayDay);
+    const labels = ['yesterday','today','tomorrow','dayAfter','in3days','in4days','in5days'];
+    const timeline = {};
+    if (todayIdx >= 0) {
+      for (let offset = -1; offset <= 5; offset++) {
+        const labelIdx = offset + 1; // -1 -> 0 (yesterday), 0 -> 1 (today), ...
+        if (labelIdx >= labels.length) break;
+        const dIdx = ((todayIdx + offset) % 7 + 7) % 7;
+        const day = dayOrder[dIdx];
+        const s = (planState.sessions || {})[day] || null;
+        timeline[labels[labelIdx]] = {
+          day,
+          name: s ? s.name : null,
+          meta: s ? s.meta : null,
+          durationMin: s ? s.duration : null,
+          type: s ? s.type : null,
+          completed: s ? !!s.completed : false,
+          skipped: s ? !!s.skipped : false,
+        };
+      }
+    }
+
     return {
       today: { day: todayDay, label: todayDateStr },
+      timeline,
       daysToRace,
       raceDate: planState.raceDate || null,
       sessions: planState.sessions || {},
