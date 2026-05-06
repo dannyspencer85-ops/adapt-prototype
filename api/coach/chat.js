@@ -29,6 +29,17 @@ function rateLimitOk(ip) {
 }
 
 export default async function handler(req) {
+  // Health check — visiting /api/coach/chat in the browser returns this so we
+  // can confirm the function is actually deployed (vs a 404 from Vercel routing).
+  if (req.method === 'GET') {
+    return new Response(JSON.stringify({
+      ok: true,
+      message: 'Adapt coach proxy is live. POST messages here.',
+      defaultModel: DEFAULT_MODEL,
+      toolModel: TOOL_MODEL,
+      hasKey: !!process.env.MISTRAL_API_KEY,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
   // Only POST
   if (req.method !== 'POST') {
     return jsonError(405, 'Method not allowed');
