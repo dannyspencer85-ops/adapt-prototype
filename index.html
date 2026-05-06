@@ -2347,6 +2347,7 @@
           <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">Sync recent activities (last year)</button>
           <button class="btn btn-secondary btn-full btn-sm" onclick="syncStravaAllTime()" style="margin-bottom:8px;">Pull full history (up to 5 years)</button>
           <button class="btn btn-ghost btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
+          <button class="btn btn-ghost btn-full btn-sm" onclick="showStravaAuthUrl()" style="margin-bottom:8px;">Show OAuth URL (debug / desktop)</button>
           <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px; line-height:1.45;">
             On the Strava consent screen, <strong>tick the "View data about your private activities" box</strong>. If you skip it, you'll get "Token rejected" on every sync.
           </div>
@@ -8510,6 +8511,47 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const need = Math.max(perf + 14, 365); // always cover at least the past year
     return Math.max(need, sticky); // never shrink below previously synced depth
   }
+  // Build the exact OAuth URL we'd redirect to. Used by the "Show OAuth URL"
+  // button so the user can verify scope is being requested correctly and
+  // optionally paste it into a desktop browser when mobile flows misbehave.
+  function buildStravaOAuthUrl() {
+    const cfg = getStravaConfig();
+    const clientId = (cfg && cfg.clientId) || document.getElementById('stravaClientId')?.value.trim();
+    if (!clientId) return null;
+    const redirect = window.location.origin + window.location.pathname;
+    return `https://www.strava.com/oauth/authorize`
+      + `?client_id=${encodeURIComponent(clientId)}`
+      + `&response_type=code`
+      + `&redirect_uri=${encodeURIComponent(redirect)}`
+      + `&approval_prompt=force`
+      + `&scope=read,activity:read_all,profile:read_all`;
+  }
+  function showStravaAuthUrl() {
+    const url = buildStravaOAuthUrl();
+    const el = document.getElementById('stravaMsg');
+    if (!url) {
+      if (el) { el.style.color = 'var(--warn)'; el.textContent = 'Need Client ID first.'; }
+      return;
+    }
+    if (el) {
+      el.style.color = 'var(--text)';
+      el.innerHTML =
+        '<div style="font-size:11px; line-height:1.5;">' +
+        '<strong>OAuth URL we send to Strava:</strong><br>' +
+        '<textarea readonly onclick="this.select()" style="width:100%; height:90px; font-family:monospace; font-size:10px; padding:6px; border:1px solid var(--border); border-radius:6px; background:#fff; margin:6px 0;">' +
+        url.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+        '</textarea>' +
+        '<div style="display:flex; gap:6px; margin-top:6px;">' +
+        '<button class="btn btn-ghost btn-sm" style="flex:1;" onclick="navigator.clipboard?.writeText(' + JSON.stringify(url) + ').then(()=>setStravaMsg(\'URL copied to clipboard.\',\'ok\'))">Copy</button>' +
+        '<a class="btn btn-primary btn-sm" style="flex:1; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;" href="' + url.replace(/"/g, '&quot;') + '">Open</a>' +
+        '</div>' +
+        '<div style="font-size:11px; color:var(--text-soft); margin-top:6px;">' +
+        'Look for <code>scope=read,activity:read_all,profile:read_all</code> in the URL above. ' +
+        'If you\'re on a phone, copy this URL and paste it into a desktop browser — the desktop consent page always shows the activity checkbox. If you\'re already on desktop, tap Open and watch carefully for the activity checkbox.' +
+        '</div></div>';
+    }
+  }
+
   // Diagnostic tool — hits both /athlete (works with any scope) and
   // /athlete/activities (requires activity:read_all) and reports raw responses.
   // This tells us in plain language whether the issue is the token itself or scope.
