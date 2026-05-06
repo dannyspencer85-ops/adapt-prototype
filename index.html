@@ -9966,6 +9966,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       active.style.display = 'none';
     }
     // Suggestion chips — a tight mix of common questions and quick-change prompts.
+    // The prompt text is stored in a data-prompt attribute (HTML-escaped) and
+    // read by a delegated click handler — this avoids the JSON-in-onclick
+    // double-quote escape mess that was silently breaking chip clicks.
     const row = document.getElementById('suggestRow');
     if (row) {
       const chips = [
@@ -9976,9 +9979,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ['Skipped today', "I'm skipping today's session"],
         ['My knee hurts', "My knee is sore — flag it as a low-grade injury"],
       ];
+      const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       row.innerHTML = chips.map(([label, prompt]) =>
-        `<button class="suggest-chip" onclick="askSuggested(${JSON.stringify(prompt)})">${label}</button>`
+        `<button class="suggest-chip" data-prompt="${escAttr(prompt)}">${escAttr(label)}</button>`
       ).join('');
+      // Wire (idempotent) click delegation once.
+      row.onclick = (e) => {
+        const btn = e.target.closest('.suggest-chip');
+        if (!btn) return;
+        const p = btn.getAttribute('data-prompt');
+        if (p) askSuggested(p);
+      };
       row.style.display = '';
     }
   }
