@@ -2233,23 +2233,20 @@
       <div class="title">Ask a question</div>
     </div>
 
-    <div id="apiKeySetup" style="display:none; overflow-y:auto; padding:4px 20px 20px;">
+    <div id="coachIntro" style="display:none; overflow-y:auto; padding:4px 20px 20px;">
       <div class="card">
-        <div class="card-title">Enable smart chat</div>
+        <div class="card-title">Turn on AI Coach Chat</div>
         <p style="font-size:14px; color:var(--text-soft); line-height:1.5; margin-bottom:14px;">
-          This chat connects to Claude, the same AI that helped design your plan. Paste an Anthropic API key below to turn it on.
+          Coach Chat uses Mistral, an AI model, to give you open-ended coaching answers and adapt your plan in real time. Before you turn it on, here's what to know.
         </p>
-        <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" style="width:100%; padding:13px 14px; border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; margin-bottom:10px; background:#fff;">
-        <button class="btn btn-primary btn-full" onclick="saveApiKey()">Save & enable chat</button>
-      </div>
-      <div class="card">
-        <div class="card-title">How this works</div>
-        <div style="font-size:13px; color:var(--text-soft); line-height:1.6;">
-          <p style="margin-bottom:8px;">• Get a free API key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--primary); font-weight:600;">console.anthropic.com</a> (includes $5 free credit).</p>
-          <p style="margin-bottom:8px;">• The key is stored only in your browser's localStorage and sent only to Anthropic's API.</p>
-          <p style="margin-bottom:8px;">• <strong style="color:var(--warn);">Local testing only.</strong> For a real deployed app, a backend would hide the key — anyone viewing a shared HTML file could read it from their browser.</p>
-          <p>• Chat is scope-locked to your training plan. Nutrition, medical, and gear questions get redirected to the right specialist.</p>
+        <div style="font-size:13px; color:var(--text); line-height:1.6; margin-bottom:14px;">
+          <p style="margin-bottom:8px;"><strong>What gets shared:</strong> Your training plan, recent activities, and check-in data go to Mistral when you send a message. Your name doesn't.</p>
+          <p style="margin-bottom:8px;"><strong>Where it goes:</strong> Mistral is hosted in the EU. Adapt sends your data through its own server — no one else sees it.</p>
+          <p style="margin-bottom:8px;"><strong>What it costs you:</strong> Nothing. Adapt covers the API cost during the prototype (capped at 50 messages/day per user).</p>
+          <p style="margin-bottom:0;"><strong>What it can do:</strong> Move sessions, shorten days, flag injuries, scale volume — and explain why. It cannot diagnose injuries or give medical/nutrition advice.</p>
         </div>
+        <button class="btn btn-primary btn-full" onclick="acceptCoach()">Turn on Coach Chat</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="toggleChatMode()">Stay in Quick Actions</button>
       </div>
     </div>
 
@@ -2347,8 +2344,12 @@
             ✅ Connected as <strong id="stravaAthleteName">—</strong>
             <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
           </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">Sync recent activities</button>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
+          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:8px;">Sync recent activities (last year)</button>
+          <button class="btn btn-secondary btn-full btn-sm" onclick="syncStravaAllTime()" style="margin-bottom:8px;">Pull full history (up to 5 years)</button>
+          <button class="btn btn-ghost btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Re-authorize Strava (grant activity access)</button>
+          <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px; line-height:1.45;">
+            On the Strava consent screen, <strong>tick the "View data about your private activities" box</strong>. If you skip it, you'll get "Token rejected" on every sync.
+          </div>
           <div style="display:flex; gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()" style="flex:1;">Test</button>
             <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()" style="flex:1;">Refresh token</button>
@@ -2922,33 +2923,22 @@
     </div>
   </div>
 
-  <!-- API KEY HELP MODAL -->
+  <!-- COACH CHAT HELP MODAL -->
   <div class="modal-bg" id="apiHelp">
     <div class="modal" style="max-height: 80vh; overflow-y: auto;">
-      <h2>Getting an Anthropic API key</h2>
-      <div class="sub">About 2 minutes, free to start ($5 credit included).</div>
+      <h2>About Coach Chat</h2>
+      <div class="sub">Open-ended AI coaching that can read and reshape your plan.</div>
 
-      <div style="font-size: 14px; line-height: 1.7; color: var(--text);">
-        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-          <div style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">1</div>
-          <div>Go to <a href="https://console.anthropic.com" target="_blank" style="color: var(--primary); font-weight: 600;">console.anthropic.com</a> and sign up with email or Google.</div>
-        </div>
-        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-          <div style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">2</div>
-          <div>Click <strong>Settings → API Keys → Create Key</strong>. Name it "Adapt" or anything you'll remember.</div>
-        </div>
-        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-          <div style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">3</div>
-          <div>Copy the key (starts with <code style="background: var(--bg); padding: 1px 6px; border-radius: 4px; font-size: 13px;">sk-ant-</code>). <strong>Copy it immediately</strong> — you can't see it again.</div>
-        </div>
-        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-          <div style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">4</div>
-          <div>Paste into the Adapt chat setup screen. Done.</div>
-        </div>
+      <div style="font-size: 14px; line-height: 1.7; color: var(--text); margin-top: 14px;">
+        <p style="margin-bottom: 12px;"><strong>What it does.</strong> Ask the coach anything about your training — why a session is structured the way it is, how to adapt when life interferes, what to expect on race day. It can also <em>execute</em> changes: move a session, shorten a day, flag an injury, scale a build week.</p>
+        <p style="margin-bottom: 12px;"><strong>What it sees.</strong> Each time you send a message, Adapt sends your current plan, recent Strava activities, and check-in data to Mistral (the AI). Your name and login don't go.</p>
+        <p style="margin-bottom: 12px;"><strong>What it doesn't do.</strong> No medical diagnosis, no nutrition prescriptions, no gear advice. It will redirect those.</p>
+        <p style="margin-bottom: 12px;"><strong>Daily cap.</strong> 50 messages per day per device, to keep API costs sane during the prototype.</p>
+        <p style="margin-bottom: 0;"><strong>Reset.</strong> You can clear the conversation and turn off Coach Chat anytime in your Account screen.</p>
       </div>
 
-      <div style="background: var(--bg); border-radius: 12px; padding: 14px; font-size: 13px; color: var(--text-soft); line-height: 1.5; margin-top: 8px; margin-bottom: 16px;">
-        <strong style="color: var(--text);">Cost for a regular user:</strong> the first $5 is free. Typical Adapt chat usage after that runs ~$0.50-2/month. The free credit usually lasts months of casual use.
+      <div style="background: var(--bg); border-radius: 12px; padding: 14px; font-size: 13px; color: var(--text-soft); line-height: 1.5; margin-top: 16px; margin-bottom: 16px;">
+        <strong style="color: var(--text);">Privacy:</strong> Adapt forwards your messages and plan context to Mistral's API. Mistral states it doesn't train on API traffic. Conversation history is stored only in your browser.
       </div>
 
       <button class="btn btn-primary btn-full" onclick="closeApiHelp()">Got it</button>
@@ -3164,9 +3154,6 @@
     const next = current === 'rule' ? 'claude' : 'rule';
     localStorage.setItem('chat-mode', next);
     saveUserData();
-    if (next === 'claude' && !hasApiKey()) {
-      alert('Coach Chat needs an Anthropic API key. Refresh the Ask tab to set one up, or switch back to Quick Actions.');
-    }
     updateChatState();
   }
   function showApiKeyHelp() { document.getElementById('apiHelp').classList.add('show'); }
@@ -4666,11 +4653,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function tool_shortenSession({ day, newMinutes, newName, newMeta, reason }) {
     const s = planState.sessions[day];
     if (!s) return { success: false, message: `No session on ${day}.` };
-    s.name = newName;
-    s.meta = newMeta;
+    if (newName) s.name = newName;
+    if (newMeta) s.meta = newMeta;
     s.duration = newMinutes;
     renderWeekSessions();
-    const msg = `Shortened ${day} to ${newMinutes} min: ${newName}`;
+    const msg = `Shortened ${day} to ${newMinutes} min: ${s.name}`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
@@ -4678,11 +4665,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function tool_swapDiscipline({ day, newType, newName, newMeta, reason }) {
     const s = planState.sessions[day];
     if (!s) return { success: false, message: `No session on ${day}.` };
-    s.name = newName;
-    s.meta = newMeta;
+    if (newName) s.name = newName;
+    if (newMeta) s.meta = newMeta;
     s.type = newType;
     renderWeekSessions();
-    const msg = `${day} is now ${newName} (${newType}).`;
+    const msg = `${day} is now ${s.name} (${newType}).`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
@@ -8141,36 +8128,48 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Refreshes the access token using the refresh token + client credentials.
   // NOTE: This sends the Client Secret from the browser. Acceptable for a single-user
   // prototype; for multi-user/production this MUST move to a backend.
-  async function refreshStravaToken() {
+  async function refreshStravaToken(opts) {
+    const silent = !!(opts && opts.silent);
     const cfg = getStravaConfig();
     if (!cfg || !cfg.refreshToken || !cfg.clientId || !cfg.clientSecret) {
-      setStravaMsg('Need Client ID + Secret + Refresh Token to refresh. Re-enter all four.', 'err');
-      return;
+      const msg = 'Need Client ID + Secret + Refresh Token to refresh. Re-enter all four.';
+      if (!silent) setStravaMsg(msg, 'err');
+      throw new Error(msg);
     }
-    setStravaMsg('Refreshing…', 'info');
+    if (!silent) setStravaMsg('Refreshing…', 'info');
+    const params = new URLSearchParams({
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: cfg.refreshToken
+    });
+    let res;
     try {
-      const params = new URLSearchParams({
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-        grant_type: 'refresh_token',
-        refresh_token: cfg.refreshToken
-      });
-      const res = await fetch('https://www.strava.com/api/v3/oauth/token', {
+      res = await fetch('https://www.strava.com/api/v3/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString()
       });
-      if (!res.ok) {
-        setStravaMsg(`Refresh failed (${res.status}). You may need to re-enter credentials.`, 'err');
-        return;
-      }
-      const j = await res.json();
-      cfg.accessToken = j.access_token;
-      cfg.refreshToken = j.refresh_token || cfg.refreshToken;
-      cfg.expiresAt = j.expires_at || 0;
-      setStravaConfig(cfg);
-      setStravaMsg(`✅ Token refreshed. Valid for ~6 hours.`, 'ok');
-    } catch (e) { setStravaMsg(`Network error: ${e.message}`, 'err'); }
+    } catch (e) {
+      if (!silent) setStravaMsg(`Network error: ${e.message}`, 'err');
+      throw e;
+    }
+    if (!res.ok) {
+      // 400 = invalid_grant (refresh token revoked/expired). User must re-authorize.
+      const msg = res.status === 400
+        ? 'Strava connection expired or was revoked. Tap "Re-authorize Strava" below.'
+        : `Refresh failed (${res.status}). Try Re-authorize.`;
+      if (!silent) setStravaMsg(msg, 'err');
+      throw new Error(msg);
+    }
+    const j = await res.json();
+    cfg.accessToken = j.access_token;
+    cfg.refreshToken = j.refresh_token || cfg.refreshToken;
+    cfg.expiresAt = j.expires_at || 0;
+    if (j.scope) cfg.scope = j.scope; // remember granted scopes (Strava sometimes echoes this)
+    setStravaConfig(cfg);
+    if (!silent) setStravaMsg(`✅ Token refreshed. Valid for ~6 hours.`, 'ok');
+    return cfg;
   }
   function disconnectStrava() {
     if (!confirm('Disconnect Strava? Your tokens will be removed from this browser.')) return;
@@ -8233,18 +8232,43 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       cfg.accessToken = j.access_token;
       cfg.refreshToken = j.refresh_token;
       cfg.expiresAt = j.expires_at || 0;
+      // Strava's token response includes the granted scopes when scopes were requested.
+      // If `activity:read_all` is missing, the user un-checked it on the consent screen
+      // and the token can't list activities. Save what we got so we can warn clearly.
+      if (j.scope) cfg.scope = j.scope;
       if (j.athlete) {
         cfg.athleteName = `${j.athlete.firstname || ''} ${j.athlete.lastname || ''}`.trim() || j.athlete.username || 'Strava user';
       }
       setStravaConfig(cfg);
+
+      // Verify the token actually has the scope we need before claiming success.
+      // Strava sometimes omits `scope` from the token response, so fall back to a
+      // probe call against /athlete/activities. If that 401s, the user needs to
+      // re-authorize and this time TICK the activity-data checkbox.
+      const grantedScopes = (cfg.scope || '').split(/[, ]+/).filter(Boolean);
+      const needScope = 'activity:read_all';
+      const scopeKnownMissing = grantedScopes.length > 0 && !grantedScopes.includes(needScope);
+      if (scopeKnownMissing) {
+        setStravaMsg(
+          'Connected, but Strava didn\'t grant access to your activities. On the next Re-authorize screen, make sure the "View data about your private activities" box is checked.',
+          'err'
+        );
+        return;
+      }
+
       setStravaMsg('✅ Authorized. Syncing activities…', 'ok');
-      // Auto-sync after successful auth
       try {
         const acts = await syncStravaActivities(getDesiredSyncDays());
         setStravaMsg(`✅ Authorized as ${cfg.athleteName} · synced ${acts.length} activities.`, 'ok');
         renderAll();
       } catch (e) {
-        setStravaMsg('Authorized, but sync failed: ' + e.message, 'err');
+        // If the very first sync after a fresh OAuth fails with token-rejected,
+        // it's almost always the scope checkbox issue.
+        const isTokenErr = /token rejected|missing activity|401|403|permission/i.test(e.message || '');
+        const hint = isTokenErr
+          ? 'Tap Re-authorize and make sure the "View data about your private activities" checkbox is ticked on the Strava consent screen.'
+          : '';
+        setStravaMsg(`Authorized, but sync failed: ${e.message}${hint ? ' — ' + hint : ''}`, 'err');
       }
     } catch (e) {
       setStravaMsg('Authorization error: ' + e.message, 'err');
@@ -8361,21 +8385,35 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   async function _stravaApiCall(path, isRetry) {
     const cfg = getStravaConfig();
     if (!cfg) throw new Error('Strava not connected.');
+    // Proactive refresh: if the token is known to be expired (or expires in
+    // < 60s), refresh BEFORE the call rather than eat a guaranteed 401.
+    if (!isRetry && cfg.accessToken && cfg.expiresAt && cfg.refreshToken && cfg.clientSecret) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (cfg.expiresAt && (cfg.expiresAt - nowSec) < 60) {
+        try { await refreshStravaToken({ silent: true }); } catch (e) { /* fall through; the call below will surface the auth error */ }
+      }
+    }
+    const cur = getStravaConfig() || cfg;
     const res = await fetch('https://www.strava.com/api/v3' + path, {
-      headers: { 'Authorization': 'Bearer ' + cfg.accessToken }
+      headers: { 'Authorization': 'Bearer ' + cur.accessToken }
     });
-    if (res.status === 401 && !isRetry && cfg.refreshToken && cfg.clientSecret) {
-      await refreshStravaToken();
+    if (res.status === 401 && !isRetry && cur.refreshToken && cur.clientSecret) {
+      try {
+        await refreshStravaToken({ silent: true });
+      } catch (refreshErr) {
+        // Refresh token is itself dead — user must re-authorize.
+        throw new Error('Strava connection expired. Tap "Re-authorize Strava" below to reconnect.');
+      }
       return _stravaApiCall(path, true);
     }
     if (res.status === 401) {
-      throw new Error('Token rejected. Click "Re-authorize Strava" to grant the right permissions.');
+      throw new Error('Token rejected. Tap "Re-authorize Strava" — and on the consent screen, make sure the "View data about your private activities" checkbox is ticked.');
     }
     if (res.status === 403) {
       // Try to read body for scope hint
       let detail = '';
       try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
-      throw new Error(`Permission denied — your token is missing activity:read_all scope. Click "Re-authorize Strava". ${detail}`);
+      throw new Error(`Permission denied — your Strava token is missing the "activity:read_all" scope. Re-authorize and tick the activities checkbox. ${detail}`);
     }
     if (!res.ok) {
       let body = '';
@@ -8386,15 +8424,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   // Fetch last N days of activities and store on planState + localStorage.
   // Paginated — Strava caps per_page at 200; we walk pages until we get an empty one
-  // or hit a hard cap to keep things bounded.
+  // or hit a hard cap. Cap is generous to support pulling multi-year history.
   async function syncStravaActivities(days) {
     const cfg = getStravaConfig();
     if (!cfg) return null;
-    const numDays = days || 90;
+    const numDays = days || 365; // default to a full year — covers the annual training cycle
     const after = Math.floor((Date.now() - numDays * 86400 * 1000) / 1000);
     const list = [];
     const PER_PAGE = 200;
-    const MAX_PAGES = 6; // covers up to 1200 activities even for very high-volume users
+    const MAX_PAGES = 25; // up to 5,000 activities — covers years for very high-volume athletes
     for (let page = 1; page <= MAX_PAGES; page++) {
       const pageData = await _stravaApiCall(`/athlete/activities?after=${after}&per_page=${PER_PAGE}&page=${page}`);
       if (!pageData || pageData.length === 0) break;
@@ -8440,12 +8478,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     } catch (e) {}
   }
   // Pick a sync depth that covers Performance range + a buffer.
-  // Default 90 days; bumps to 365 when user has ever picked the year range.
+  // Default 365 days so coach + analytics see the full annual cycle. The user can
+  // bump to multi-year via the explicit "Sync all-time" action below.
   function getDesiredSyncDays() {
     const perf = parseInt(localStorage.getItem('perf-range') || '30', 10);
     const sticky = parseInt(localStorage.getItem('strava-sync-days') || '0', 10);
-    const need = Math.max(perf + 14, 90); // always cover at least 90 days
+    const need = Math.max(perf + 14, 365); // always cover at least the past year
     return Math.max(need, sticky); // never shrink below previously synced depth
+  }
+  // Pull the user's full Strava history (capped at 5 years to keep storage sane).
+  async function syncStravaAllTime() {
+    setStravaMsg('Pulling full Strava history (this can take a minute)…', 'info');
+    try {
+      const acts = await syncStravaActivities(365 * 5);
+      setStravaMsg(`✅ Synced ${acts.length} activities · ${describeSyncRange(acts)}.`, 'ok');
+      renderAll();
+      renderStravaUI();
+    } catch (e) {
+      setStravaMsg(`Sync failed: ${e.message}`, 'err');
+    }
   }
 
   // Returns a friendly description of the synced range based on the actual data
@@ -9707,32 +9758,56 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       showScreen('auth');
     }
     renderAll();
+    // Hydrate Coach Chat history from localStorage so prior conversations persist.
+    if (typeof loadCoachHistory === 'function') loadCoachHistory();
     // If we just came back from a Strava OAuth redirect, finish the handshake
     if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
   });
 
-  function hasApiKey() {
-    return !!localStorage.getItem('claude-api-key');
+  // Coach Chat (Mistral via Adapt's backend) — gated on an explicit one-time
+  // privacy acceptance. Conversation history persists in localStorage.
+  const COACH_ACCEPT_KEY = 'adapt-coach-accepted';
+  const COACH_HISTORY_KEY = 'adapt-coach-history';
+
+  function hasAcceptedCoach() {
+    return localStorage.getItem(COACH_ACCEPT_KEY) === '1';
   }
-  function saveApiKey() {
-    const input = document.getElementById('apiKeyInput');
-    const key = input.value.trim();
-    if (!key.startsWith('sk-ant-')) {
-      alert('API key should start with "sk-ant-". Double-check what you pasted.');
-      return;
-    }
-    localStorage.setItem('claude-api-key', key);
-    input.value = '';
+  function acceptCoach() {
+    localStorage.setItem(COACH_ACCEPT_KEY, '1');
     updateChatState();
   }
-  function clearApiKey() {
-    if (!confirm('Remove your saved API key? Chat will be disabled until you add one again.')) return;
-    localStorage.removeItem('claude-api-key');
+  function resetCoach() {
+    if (!confirm('Turn off Coach Chat and clear its conversation history? Your training plan stays untouched.')) return;
+    localStorage.removeItem(COACH_ACCEPT_KEY);
+    localStorage.removeItem(COACH_HISTORY_KEY);
     chatMessages.length = 0;
     updateChatState();
   }
+
+  // Backward-compat shims — older code paths may still reference these names.
+  function hasApiKey() { return hasAcceptedCoach(); }
+  function clearApiKey() { resetCoach(); }
+  function saveApiKey() { acceptCoach(); }
+
+  function loadCoachHistory() {
+    try {
+      const raw = localStorage.getItem(COACH_HISTORY_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return;
+      chatMessages.length = 0;
+      arr.forEach(m => chatMessages.push(m));
+    } catch (e) { /* ignore corrupt history */ }
+  }
+  function saveCoachHistory() {
+    try {
+      // Trim to last 40 messages to keep storage + payload manageable.
+      const trimmed = chatMessages.slice(-40);
+      localStorage.setItem(COACH_HISTORY_KEY, JSON.stringify(trimmed));
+    } catch (e) { /* ignore quota */ }
+  }
   function updateChatState() {
-    const setup = document.getElementById('apiKeySetup');
+    const setup = document.getElementById('coachIntro');
     const active = document.getElementById('chatActive');
     if (!setup || !active) return;
     const mode = chatMode();
@@ -9740,7 +9815,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       setup.style.display = 'none';
       active.style.display = 'flex';
     } else {
-      if (hasApiKey()) {
+      if (hasAcceptedCoach()) {
         setup.style.display = 'none';
         active.style.display = 'flex';
       } else {
@@ -9752,7 +9827,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (greeting) {
       greeting.textContent = mode === 'rule'
         ? 'Quick Actions mode. Tell me what to change — move a session, shorten a day, flag an injury, insert a rest week, or scale back volume. I can also answer common questions ("what is 80/20?", "how hard should today feel?").'
-        : 'Coach Chat mode. Ask me anything about your Half Ironman plan — why a session is the way it is, how to adapt, what to expect.';
+        : 'Coach Chat mode. Ask me anything about your plan — why a session is structured the way it is, how to adapt when life shifts, what to expect.';
     }
     const label = document.getElementById('chatModeLabel');
     if (label) label.textContent = mode === 'rule' ? 'Quick Actions (free)' : 'Coach Chat (AI)';
@@ -9768,65 +9843,167 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
-  async function askClaude(userText) {
+  // Build the live-state payload that goes into the system prompt every turn.
+  // Keep it tight — anything we put here costs tokens on every message.
+  function buildCoachContext() {
+    const todayDay = (typeof getTodayDay === 'function') ? getTodayDay() : '';
+    const todayDateStr = (typeof getTodayDateString === 'function') ? getTodayDateString() : '';
+    const daysToRace = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    const acts = (planState.stravaActivities || []).slice(0, 30).map(a => ({
+      date: a.date || a.start_date || '',
+      type: a.type || a.discipline || '',
+      name: a.name || '',
+      durationMin: a.durationMin || a.duration || a.moving_time_min || null,
+      distanceMi: a.distanceMi || a.distance_mi || null,
+      avgHR: a.avgHR || a.average_heartrate || null,
+      rpe: a.rpe || null,
+    }));
+    return {
+      today: { day: todayDay, label: todayDateStr },
+      daysToRace,
+      raceDate: planState.raceDate || null,
+      sessions: planState.sessions || {},
+      weekArc: (planState.weekArc || []).slice(0, 8),
+      injury: planState.injury || null,
+      lastChange: planState.lastChange || null,
+      lastCheckin: planState.lastCheckin || null,
+      recentActivities: acts,
+    };
+  }
+
+  // Stream from Mistral via Adapt's backend proxy. We render tokens into
+  // `bubble` as they arrive, accumulate any tool_calls, execute them locally
+  // against planState, and loop until the model finishes (no more tool calls).
+  async function askMistral(userText, bubble) {
     chatMessages.push({ role: 'user', content: userText });
-    const apiKey = localStorage.getItem('claude-api-key');
     const savedHistory = chatMessages.length;
+    let visibleText = '';
+
     try {
       for (let iter = 0; iter < 6; iter++) {
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        const resp = await fetch('/api/coach/chat', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-opus-4-7',
-            max_tokens: 16000,
-            thinking: { type: 'adaptive' },
-            cache_control: { type: 'ephemeral' },
-            system: ADAPT_SYSTEM_PROMPT,
-            tools: TOOLS,
-            messages: chatMessages
-          })
+            messages: chatMessages,
+            context: buildCoachContext(),
+          }),
         });
+
         if (!resp.ok) {
           let msg = 'HTTP ' + resp.status;
-          try { const j = await resp.json(); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) {}
+          try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (e) {}
           throw new Error(msg);
         }
-        const data = await resp.json();
-        chatMessages.push({ role: 'assistant', content: data.content });
+        if (!resp.body) throw new Error('No response stream from server.');
 
-        if (data.stop_reason === 'tool_use') {
-          const toolResults = [];
-          for (const block of data.content) {
-            if (block.type === 'tool_use') {
-              const result = executeTool(block.name, block.input);
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: JSON.stringify(result)
-              });
+        // Parse SSE: the server pipes Mistral's raw event stream straight back.
+        // Each event is a `data: {...}\n\n` block. The model sends content
+        // tokens in `delta.content` and tool calls in `delta.tool_calls[]`.
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let assistantContent = '';
+        const toolCallsByIdx = new Map(); // index -> { id, name, args (string accumulator) }
+        let finishReason = null;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let eolIdx;
+          while ((eolIdx = buffer.indexOf('\n\n')) >= 0) {
+            const eventBlock = buffer.slice(0, eolIdx);
+            buffer = buffer.slice(eolIdx + 2);
+            // Each event block can have multiple `data:` lines; concat their payloads.
+            const dataLines = eventBlock.split('\n').filter(l => l.startsWith('data:'));
+            if (dataLines.length === 0) continue;
+            const payload = dataLines.map(l => l.slice(5).trimStart()).join('');
+            if (!payload || payload === '[DONE]') continue;
+
+            let evt;
+            try { evt = JSON.parse(payload); } catch (e) { continue; }
+            const choice = evt.choices && evt.choices[0];
+            if (!choice) continue;
+            const delta = choice.delta || {};
+
+            if (typeof delta.content === 'string' && delta.content.length > 0) {
+              assistantContent += delta.content;
+              visibleText += delta.content;
+              if (bubble) {
+                bubble.classList.remove('typing');
+                bubble.textContent = visibleText;
+                const area = document.getElementById('chatArea');
+                if (area) area.scrollTop = area.scrollHeight;
+              }
             }
+
+            if (Array.isArray(delta.tool_calls)) {
+              for (const tc of delta.tool_calls) {
+                const idx = (typeof tc.index === 'number') ? tc.index : 0;
+                let entry = toolCallsByIdx.get(idx);
+                if (!entry) {
+                  entry = { id: tc.id || `call_${idx}`, name: '', args: '' };
+                  toolCallsByIdx.set(idx, entry);
+                }
+                if (tc.id) entry.id = tc.id;
+                const fn = tc.function || {};
+                if (fn.name) entry.name = fn.name;
+                if (fn.arguments) entry.args += fn.arguments;
+              }
+            }
+
+            if (choice.finish_reason) finishReason = choice.finish_reason;
           }
-          chatMessages.push({ role: 'user', content: toolResults });
-          continue;
         }
 
-        if (data.stop_reason === 'pause_turn') continue;
+        // Persist the assistant turn in OpenAI/Mistral message format.
+        const assistantMsg = { role: 'assistant', content: assistantContent || '' };
+        if (toolCallsByIdx.size > 0) {
+          assistantMsg.tool_calls = Array.from(toolCallsByIdx.values()).map(tc => ({
+            id: tc.id,
+            type: 'function',
+            function: { name: tc.name, arguments: tc.args || '{}' },
+          }));
+        }
+        chatMessages.push(assistantMsg);
 
-        const text = (data.content || [])
-          .filter(b => b.type === 'text')
-          .map(b => b.text)
-          .join('\n\n') || '(no response)';
-        return text;
+        // No tool calls → we're done.
+        if (toolCallsByIdx.size === 0) {
+          if (!visibleText) visibleText = '(no response)';
+          if (bubble) bubble.textContent = visibleText;
+          saveCoachHistory();
+          return visibleText;
+        }
+
+        // Execute each tool against the local planState, then push results
+        // and loop. Mistral expects role:'tool' messages with tool_call_id.
+        for (const tc of assistantMsg.tool_calls) {
+          let parsedArgs = {};
+          try { parsedArgs = tc.function.arguments ? JSON.parse(tc.function.arguments) : {}; } catch (e) {}
+          let result;
+          try {
+            result = executeTool(tc.function.name, parsedArgs);
+          } catch (err) {
+            result = { success: false, message: 'Tool error: ' + err.message };
+          }
+          chatMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            name: tc.function.name,
+            content: JSON.stringify(result),
+          });
+        }
+
+        // Loop back — the next round-trip will get the model's natural-language
+        // confirmation of what it just did.
       }
-      throw new Error('Too many tool-use iterations. Try rephrasing.');
+      throw new Error('Too many tool iterations. Try rephrasing.');
     } catch (err) {
+      // Roll back the user turn so they can retry without polluting history.
       chatMessages.length = savedHistory - 1;
+      saveCoachHistory();
       throw err;
     }
   }
@@ -10460,7 +10637,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
 
   async function sendChat() {
     const mode = chatMode();
-    if (mode === 'claude' && !hasApiKey()) { updateChatState(); return; }
+    if (mode === 'claude' && !hasAcceptedCoach()) { updateChatState(); return; }
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
     if (!text) return;
@@ -10475,20 +10652,19 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       return;
     }
 
-    const typing = addBubble('…', 'bot typing');
+    // Coach Chat (Mistral): start an empty bubble that streams tokens in place.
+    const bubble = addBubble('…', 'bot typing');
     try {
-      const reply = await askClaude(text);
-      typing.remove();
-      addBubble(reply, 'bot');
+      await askMistral(text, bubble);
     } catch (err) {
-      typing.remove();
-      addBubble('Something went wrong: ' + err.message, 'bot');
+      bubble.classList.remove('typing');
+      bubble.textContent = 'Something went wrong: ' + err.message;
     }
   }
 
   function askSuggested(text) {
     const mode = chatMode();
-    if (mode === 'claude' && !hasApiKey()) { updateChatState(); return; }
+    if (mode === 'claude' && !hasAcceptedCoach()) { updateChatState(); return; }
     document.getElementById('chatInput').value = text;
     sendChat();
   }

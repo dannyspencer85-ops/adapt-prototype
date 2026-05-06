@@ -1,0 +1,9 @@
+{
+  "name": "adapt-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Adapt — adaptive endurance training coach. Single-page HTML prototype + Vercel-hosted Mistral coach proxy.",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
