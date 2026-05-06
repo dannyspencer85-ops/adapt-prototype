@@ -659,6 +659,29 @@
     border-bottom-left-radius: 6px;
     align-self: flex-start;
   }
+  /* Markdown-rendered bot content — paragraphs, lists, bold, code */
+  .bubble.bot p { margin: 0 0 8px 0; }
+  .bubble.bot p:last-child { margin-bottom: 0; }
+  .bubble.bot strong { font-weight: 700; color: var(--text); }
+  .bubble.bot em { font-style: italic; }
+  .bubble.bot ul,
+  .bubble.bot ol { margin: 4px 0 8px 0; padding-left: 20px; }
+  .bubble.bot ul:last-child,
+  .bubble.bot ol:last-child { margin-bottom: 0; }
+  .bubble.bot li { margin: 2px 0; }
+  .bubble.bot code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+  }
+  .bubble.bot h1, .bubble.bot h2, .bubble.bot h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 4px 0 4px 0;
+    color: var(--text);
+  }
   .bubble.user {
     background: var(--primary);
     color: #fff;
@@ -680,17 +703,28 @@
     gap: 6px;
     padding: 0 16px 10px;
   }
+  /* When suggest-row lives inside the chat area, render as an in-chat row
+     of clickable chips that scrolls with the rest of the conversation. */
+  .suggest-row.inline {
+    align-self: flex-start;
+    padding: 4px 0 6px;
+    margin: 2px 0 4px;
+    max-width: 100%;
+  }
   .suggest-chip {
-    padding: 7px 12px;
+    padding: 8px 13px;
     background: var(--primary-soft);
     color: var(--primary-dark);
     border: 0;
     border-radius: 100px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    line-height: 1.3;
   }
+  .suggest-chip:hover { background: var(--primary); color: #fff; }
+  .suggest-chip:active { transform: scale(0.97); }
   .bubble.preview {
     background: var(--primary-soft);
     border: 1px solid var(--primary);
@@ -2260,8 +2294,8 @@
         <div class="bubble bot" id="chatModeGreeting">
           Quick Actions mode. Tell me what to change — move a session, shorten a day, flag an injury, insert a rest week, or scale back volume.
         </div>
+        <div class="suggest-row inline" id="suggestRow"></div>
       </div>
-      <div class="suggest-row" id="suggestRow"></div>
       <div class="chat-input-wrap">
         <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your plan…" onkeydown="if(event.key==='Enter') sendChat()">
         <button class="send-btn" onclick="sendChat()">
@@ -2398,6 +2432,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
       Home
     </button>
+    <button class="nav-btn" data-screen="ask" onclick="showScreen('ask')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat
+    </button>
     <button class="nav-btn" data-screen="plan" onclick="showScreen('plan')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
       Plan
@@ -2405,10 +2443,6 @@
     <button class="nav-btn" data-screen="data" onclick="showScreen('data')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
       Pulse
-    </button>
-    <button class="nav-btn" data-screen="ask" onclick="showScreen('ask')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Chat
     </button>
     <button class="nav-btn" data-screen="profile" onclick="showScreen('profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -10023,6 +10057,35 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     };
   }
 
+  // Tiny markdown -> HTML renderer for chat bubbles. Handles **bold**,
+  // *italic*, `code`, paragraphs (\n\n), soft breaks (\n), and bulleted /
+  // numbered lists. Designed to be safe under streaming — partial markdown
+  // (unmatched **) just renders as text until the closing token arrives.
+  function escapeHtmlForChat(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function renderMarkdownToHtml(text) {
+    if (!text) return '';
+    let s = escapeHtmlForChat(text);
+    s = s.replace(/\*\*([^\n]+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^\n_]+?)__/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^\n*]+?)\*(?!\*)/g, '$1<em>$2</em>');
+    s = s.replace(/`([^`\n]+?)`/g, '<code>$1</code>');
+    const blocks = s.split(/\n\s*\n/);
+    const html = blocks.map(block => {
+      const lines = block.split('\n').map(l => l.trimEnd()).filter(l => l !== '');
+      if (lines.length === 0) return '';
+      if (lines.every(l => /^\s*[-*•]\s+/.test(l))) {
+        return '<ul>' + lines.map(l => '<li>' + l.replace(/^\s*[-*•]\s+/, '') + '</li>').join('') + '</ul>';
+      }
+      if (lines.every(l => /^\s*\d+\.\s+/.test(l))) {
+        return '<ol>' + lines.map(l => '<li>' + l.replace(/^\s*\d+\.\s+/, '') + '</li>').join('') + '</ol>';
+      }
+      return '<p>' + lines.join('<br>') + '</p>';
+    }).filter(b => b).join('');
+    return html;
+  }
+
   // Stream from Mistral via Adapt's backend proxy. We render tokens into
   // `bubble` as they arrive, accumulate any tool_calls, execute them locally
   // against planState, and loop until the model finishes (no more tool calls).
@@ -10085,7 +10148,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
               visibleText += delta.content;
               if (bubble) {
                 bubble.classList.remove('typing');
-                bubble.textContent = visibleText;
+                bubble.innerHTML = renderMarkdownToHtml(visibleText);
                 const area = document.getElementById('chatArea');
                 if (area) area.scrollTop = area.scrollHeight;
               }
@@ -10124,7 +10187,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         // No tool calls → we're done.
         if (toolCallsByIdx.size === 0) {
           if (!visibleText) visibleText = '(no response)';
-          if (bubble) bubble.textContent = visibleText;
+          if (bubble) bubble.innerHTML = renderMarkdownToHtml(visibleText);
           saveCoachHistory();
           return visibleText;
         }
@@ -10800,7 +10863,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
 
     if (mode === 'rule') {
       const reply = handleRuleBased(text);
-      setTimeout(() => addBubble(reply, 'bot'), 200);
+      setTimeout(() => { addBubble(reply, 'bot'); refreshSuggestions(); }, 200);
       return;
     }
 
@@ -10812,6 +10875,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       bubble.classList.remove('typing');
       bubble.textContent = 'Something went wrong: ' + err.message;
     }
+    refreshSuggestions();
   }
 
   function askSuggested(text) {
@@ -10826,9 +10890,28 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const b = document.createElement('div');
     b.className = 'bubble ' + kind;
     b.textContent = text;
-    area.appendChild(b);
+    // Insert ABOVE the in-chat suggestion row so the chips always stay at the bottom.
+    const sugg = document.getElementById('suggestRow');
+    if (sugg && sugg.parentElement === area) {
+      area.insertBefore(b, sugg);
+    } else {
+      area.appendChild(b);
+    }
     area.scrollTop = area.scrollHeight;
     return b;
+  }
+  // Re-render and show the suggestion chips after a response. Defers to
+  // updateChatState which already builds context-aware chips for the mode.
+  function refreshSuggestions() {
+    const sugg = document.getElementById('suggestRow');
+    if (!sugg) return;
+    if (typeof updateChatState === 'function') updateChatState();
+    sugg.style.display = '';
+    const area = document.getElementById('chatArea');
+    if (area && sugg.parentElement === area) {
+      area.appendChild(sugg); // ensure it's at the end
+      area.scrollTop = area.scrollHeight;
+    }
   }
   function openCrunch() { document.getElementById('crunch').classList.add('show'); }
   let _checkinFormHTML = null;
