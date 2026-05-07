@@ -10297,6 +10297,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function acceptCoach() {
     localStorage.setItem(COACH_ACCEPT_KEY, '1');
     updateChatState();
+    // If a flow (like the morning check-in) handed off a prompt before the
+    // user had accepted, fire it now so they don't have to re-enter info.
+    if (typeof flushPendingCoachPrompt === 'function') flushPendingCoachPrompt();
   }
   function resetCoach() {
     if (!confirm('Turn off Coach Chat and clear its conversation history? Your training plan stays untouched.')) return;
@@ -11687,11 +11690,18 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     `;
   }
 
+  // Pending Coach Chat prompt — set when a flow (like check-in) wants to
+  // hand off a message to the AI. Fires automatically when:
+  //   (a) the user is already on Coach Chat (just send), OR
+  //   (b) the user accepts the privacy disclosure (deferred send).
+  // Cleared after firing so re-entries don't repeat the same message.
+  let _pendingCoachPrompt = null;
+
   // Bridge from morning check-in → Coach Chat. Builds a structured prompt
-  // from the saved check-in and PASTES it into the chat input so the user
-  // can review, edit, or add detail before sending. Once they tap send, the
-  // AI runs its full acknowledge → impact → cascade → warning flow and
-  // executes the relevant tool calls.
+  // from the saved check-in and AUTO-SENDS it as the first message in the
+  // chat. If Coach Chat hasn't been accepted yet, queues the prompt and
+  // fires it the moment the user accepts the privacy disclosure — they
+  // never have to re-enter their check-in.
   function askCoachAboutCheckin() {
     const ci = planState.lastCheckin;
     if (!ci) return;
@@ -11703,17 +11713,26 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       : `Today (${todayFull}) is scheduled as rest.`;
     const notesLine = ci.notes ? ` Notes: "${ci.notes}".` : '';
     const prompt = `Just checked in. Body: ${ci.body}. Sleep: ${ci.sleep}. Stress: ${ci.stress}.${notesLine} ${sessLine} Should we adjust today's plan?`;
-    if (!hasAcceptedCoach || typeof hasAcceptedCoach !== 'function' || !hasAcceptedCoach()) {
-      // Coach Chat hasn't been turned on yet. Send them through the privacy
-      // disclosure first; they can come back to this CTA after accepting.
-      showScreen('ask');
-      if (typeof updateChatState === 'function') updateChatState();
-      return;
-    }
+
+    _pendingCoachPrompt = prompt;
+    if (typeof trackEvent === 'function') trackEvent('checkin_to_coach', { body: ci.body, sleep: ci.sleep, stress: ci.stress });
     showScreen('ask');
-    // Drop a one-time system bubble so the user sees WHERE the prefilled
-    // text came from — context, not magic. Only render if there isn't already
-    // a check-in bridge bubble at the top.
+    // updateChatState handles the "show privacy disclosure vs active chat" gating.
+    if (typeof updateChatState === 'function') updateChatState();
+    // Try to fire immediately if Coach Chat is already accepted.
+    flushPendingCoachPrompt();
+  }
+
+  // Send any queued prompt as the first chat message. Called both from
+  // askCoachAboutCheckin (immediate) and from acceptCoach (after user
+  // accepts the disclosure). Safe to call when there's nothing pending.
+  function flushPendingCoachPrompt() {
+    const prompt = _pendingCoachPrompt;
+    if (!prompt) return;
+    if (!hasAcceptedCoach || typeof hasAcceptedCoach !== 'function' || !hasAcceptedCoach()) return;
+    _pendingCoachPrompt = null;
+    // Defer briefly so the chat UI is rendered + visible before we drop a
+    // system bubble + fire the message.
     setTimeout(() => {
       const area = document.getElementById('chatArea');
       if (area && !area.querySelector('[data-checkin-bridge]')) {
@@ -11721,26 +11740,16 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
         intro.className = 'bubble system';
         intro.setAttribute('data-checkin-bridge', '1');
         intro.style.maxWidth = '100%';
-        intro.innerHTML = '☀ <strong>Your check-in is in the box below.</strong> Edit anything you want to add (training plans, soreness, time constraints) — then tap send and I\'ll suggest changes.';
-        // Insert above the suggest-row if present so suggestions stay pinned at bottom.
+        intro.innerHTML = '☀ <strong>Bringing your check-in straight to the coach.</strong> They\'ll review your plan + adherence and propose adjustments. Add anything else after their reply.';
         const sugg = area.querySelector('#suggestRow');
         if (sugg) area.insertBefore(intro, sugg);
         else area.appendChild(intro);
         area.scrollTop = area.scrollHeight;
       }
       const input = document.getElementById('chatInput');
-      if (input) {
-        input.value = prompt;
-        input.focus();
-        // Place cursor at the very end so the user can immediately type more.
-        try { input.setSelectionRange(prompt.length, prompt.length); } catch (e) {}
-        // Hide the suggestion chips for now — they'd compete with the
-        // pre-filled input.
-        const row = document.getElementById('suggestRow');
-        if (row) row.style.display = 'none';
-      }
+      if (input) input.value = prompt;
+      if (typeof sendChat === 'function') sendChat();
     }, 150);
-    if (typeof trackEvent === 'function') trackEvent('checkin_to_coach', { body: ci.body, sleep: ci.sleep, stress: ci.stress });
   }
 
   function editCheckin() {
