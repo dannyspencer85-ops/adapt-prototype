@@ -6422,10 +6422,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Build HTML with section headers per category
     let html = `<div class="section-label s-insights" style="margin-top:0;">Coach insights</div>`;
+    // Pick the header color by the highest-severity alert in the group so
+    // the label always matches its loudest card. Severity priority:
+    //   alert > warn > info > good > (none) → text-soft.
+    const SEVERITY_COLOR = {
+      alert: 'var(--alert)',
+      warn:  'var(--caution)',
+      info:  'var(--info)',
+      good:  'var(--good)',
+    };
+    const SEVERITY_RANK = { alert: 4, warn: 3, info: 2, good: 1 };
     INSIGHT_CATEGORIES.forEach(cat => {
       const list = grouped[cat.id];
       if (!list || list.length === 0) return;
-      const catColor = cat.color || 'var(--text-soft)';
+      let topSev = null, topRank = 0;
+      for (const ins of list) {
+        const r = SEVERITY_RANK[ins.severity] || 0;
+        if (r > topRank) { topRank = r; topSev = ins.severity; }
+      }
+      const catColor = SEVERITY_COLOR[topSev] || cat.color || 'var(--text-soft)';
       html += `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:${catColor}; margin: 14px 0 8px; display: flex; align-items: center; gap: 6px;">${icon(cat.svg, { size: 14, color: catColor })} ${cat.label} <span style="background:${catColor}; color:#fff; padding:1px 7px; border-radius:100px; margin-left:4px; font-weight:700;">${list.length}</span></div>`;
       list.forEach(ins => { html += renderInsightCard(ins, ins._idx); });
     });
