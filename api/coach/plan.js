@@ -18,13 +18,42 @@ const PLAN_MODEL = 'mistral-large-latest'; // quality > speed for plan generatio
 const MAX_TOKENS = 4500;                    // 6 weeks of detail fits in ~3000-4000 tokens
 const REQUEST_TIMEOUT_MS = 45000;
 
+// Plan generation is the most expensive call in this app (~$0.025-0.04 per
+// invocation with Mistral Large). Cap per-IP attempts hard. The map is
+// in-memory and Edge functions are stateless across instances/cold starts —
+// this is best-effort, NOT a real spend ceiling. The real backstop is the
+// monthly budget set in console.mistral.ai/billing.
+const _planRate = new Map(); // key: ip|date, value: count
+const _planGlobalRate = new Map(); // key: date, value: count
+const PLAN_DAILY_PER_IP = 5;     // soft cap — covers honest "Start over" exploration
+const PLAN_DAILY_GLOBAL = 100;   // global runaway-guard; ~$3 max per Edge instance/day
+
+function planRateLimitOk(ip) {
+  const day = new Date().toISOString().slice(0, 10);
+  const gn = _planGlobalRate.get(day) || 0;
+  if (gn >= PLAN_DAILY_GLOBAL) return { ok: false, reason: 'global' };
+  const key = `${ip}|${day}`;
+  const n = _planRate.get(key) || 0;
+  if (n >= PLAN_DAILY_PER_IP) return { ok: false, reason: 'ip' };
+  _planRate.set(key, n + 1);
+  _planGlobalRate.set(day, gn + 1);
+  return { ok: true };
+}
+
 export default async function handler(req) {
   if (req.method === 'GET') {
+    const today = new Date().toISOString().slice(0, 10);
     return new Response(JSON.stringify({
       ok: true,
       message: 'Adapt plan generator. POST inputs here.',
       model: PLAN_MODEL,
       hasKey: !!process.env.MISTRAL_API_KEY,
+      caps: {
+        perIPDaily: PLAN_DAILY_PER_IP,
+        globalDaily: PLAN_DAILY_GLOBAL,
+        usedTodayThisInstance: _planGlobalRate.get(today) || 0,
+        note: 'In-memory cap — resets on Edge cold start. Real backstop: Mistral console budget limit.',
+      },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
   if (req.method !== 'POST') {
@@ -32,6 +61,18 @@ export default async function handler(req) {
   }
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) return jsonErr(500, 'Server misconfigured: MISTRAL_API_KEY env var missing.');
+
+  // Cost guard: cap how often any one IP can run plan generation (the most
+  // expensive call in the app). Over the limit -> 429 with a clear message
+  // so the frontend knows to fall back to the rule engine.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
+  const rl = planRateLimitOk(ip);
+  if (!rl.ok) {
+    const msg = rl.reason === 'global'
+      ? 'Plan-generation daily limit reached for this server. Try again tomorrow or use the rule-engine plan.'
+      : `Plan-generation daily limit reached for your IP (${PLAN_DAILY_PER_IP}/day). Resets at midnight UTC.`;
+    return jsonErr(429, msg);
+  }
 
   let body;
   try { body = await req.json(); } catch (e) { return jsonErr(400, 'Invalid JSON body'); }
