@@ -1790,6 +1790,7 @@
     </div>
     <div class="screen-inner">
       <!-- Banners (only render when something's actually wrong/changed) -->
+      <div id="planSourceBanner"></div>
       <div id="todayInjuryBanner"></div>
       <div id="todayChangeBanner"></div>
 
@@ -1939,6 +1940,8 @@
     </div>
     <div class="screen-inner">
       <!-- Banners (only show when relevant) -->
+      <div id="planSourceBannerPlan"></div>
+      <div id="planSummaryCard"></div>
       <div id="planInjuryBanner"></div>
       <div id="planChangeBanner"></div>
       <div id="planPeakBanner"></div>
@@ -2383,6 +2386,7 @@
           <textarea id="integrationSuggestionText" placeholder="e.g. Garmin Connect direct integration so I don't have to route through Apple Health" style="width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; resize: vertical;"></textarea>
           <button class="btn btn-primary btn-full btn-sm" onclick="sendIntegrationSuggestion()" style="margin-top: 8px;" id="integrationSuggestionBtn">Send suggestion</button>
           <div id="integrationSuggestionMsg" style="margin-top: 8px; font-size: 12px; color: var(--text-soft); min-height: 16px;"></div>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px; line-height: 1.4;">No email client? Copy your note and email it to <a href="#" onclick="copyFeedbackEmail(event)" style="color: var(--primary); font-weight: 600; text-decoration: underline;">dannyspencer85@gmail.com</a> directly.</div>
         </div>
       </div>
 
@@ -2458,6 +2462,7 @@
       <!-- Settings now lives in the gear (⚙️) button at the top of every screen -->
 
       <a href="mailto:dannyspencer85@gmail.com?subject=Adapt%20feedback&body=What%20worked%2C%20what%20didn't%2C%20what%20you%20wish%20it%20did%3A%0A%0A" class="btn btn-ghost btn-full" style="margin-top: 14px; text-decoration: none;">📨 Send feedback</a>
+      <div style="text-align: center; font-size: 11px; color: var(--text-soft); margin-top: 6px; line-height: 1.4;">No email client? Email <a href="#" onclick="copyFeedbackEmail(event)" style="color: var(--primary); font-weight: 600;">dannyspencer85@gmail.com</a> directly (tap to copy).</div>
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 10px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--warn); border-color: var(--warn);">Log out</button>
     </div>
@@ -3148,6 +3153,23 @@
     saveUserData();
   }
 
+  // Copy the feedback email to clipboard for users whose device has no
+  // configured mail client (Chrome on a fresh Mac, kiosk modes, etc.).
+  function copyFeedbackEmail(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const email = 'dannyspencer85@gmail.com';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(email).then(() => {
+        try { alert('Email copied: ' + email); } catch (_) {}
+      }).catch(() => {
+        try { alert('Email: ' + email); } catch (_) {}
+      });
+    } else {
+      try { alert('Email: ' + email); } catch (_) {}
+    }
+    if (typeof trackEvent === 'function') trackEvent('feedback_email_copied');
+  }
+
   // Suggest-an-integration: opens a mailto: with the user's request prefilled
   // so the message lands in dannyspencer85@gmail.com without me building a
   // server-side intake form. Clears the textarea + shows a confirmation.
@@ -3334,13 +3356,19 @@
     // we silently fall back to the rule-based engine so the user always lands
     // on a working plan. The AI engine is the upgrade; the rule engine is the
     // safety net.
+    // Drive the staged status messages so the user sees progress, not a
+    // 30-second pulse-dot black box.
+    startStagedPlanStatus();
     generatePlanWithAI({ event, eventDate, eventLocation, hours, days: activeDays, complexity })
       .then(aiPlan => {
         if (aiPlan && aiPlan.weeks) {
           applyAIPlan(aiPlan);
+          planState.planSource = 'ai';
         } else {
           generatePlanFromInputs();
+          planState.planSource = 'fallback';
         }
+        stopStagedPlanStatus();
         computeReadinessFlags();
         renderAll();
         // If we're already past the "building" screen (user navigated away),
@@ -3349,11 +3377,40 @@
       })
       .catch(err => {
         console.warn('AI plan generation failed; falling back to rule engine:', err);
+        planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+        planState.planSource = 'fallback';
         generatePlanFromInputs();
+        stopStagedPlanStatus();
         computeReadinessFlags();
         renderAll();
         if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
       });
+  }
+
+  // Rotate through methodology-flavored status lines while the AI plan
+  // generator runs (15-30s with Mistral Large). Cleared by stopStagedPlanStatus.
+  let _stagedStatusTimer = null;
+  function startStagedPlanStatus() {
+    const el = document.getElementById('planBuildingStatus');
+    if (!el) return;
+    const stages = [
+      'Reading your inputs and race target…',
+      'Layering in Friel block periodization (Base → Build → Peak → Taper)…',
+      'Applying Daniels VDOT pace zones to your run sessions…',
+      'Enforcing Seiler 80/20 polarized intensity across the week…',
+      'Setting brick + long-session progression by phase…',
+      'Configuring your race-week taper protocol…',
+      'Almost there — tightening session prescriptions…',
+    ];
+    let i = 0;
+    el.textContent = stages[0];
+    _stagedStatusTimer = setInterval(() => {
+      i = (i + 1) % stages.length;
+      el.textContent = stages[i];
+    }, 4500);
+  }
+  function stopStagedPlanStatus() {
+    if (_stagedStatusTimer) { clearInterval(_stagedStatusTimer); _stagedStatusTimer = null; }
   }
 
   // POSTs onboarding inputs to /api/coach/plan (Mistral Large) and returns
@@ -8057,8 +8114,79 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     slot.textContent = computeTodayRationale();
   }
 
+  // Tells the user when they're seeing a fallback (rule-engine) plan instead
+  // of the AI plan, so they can either retry generation or know what they have.
+  function renderPlanSourceBanner() {
+    const html = (() => {
+      if (planState.planSource !== 'fallback') return '';
+      const errLine = planState.aiPlanError ? `<div style="font-size:11px; opacity:0.8; margin-top:2px;">${escapeHtml(planState.aiPlanError)}</div>` : '';
+      return `<div style="background:var(--secondary-soft); border:1px solid var(--secondary); padding:10px 12px; border-radius:10px; margin-bottom:14px; font-size:12px; line-height:1.5; color:var(--text); display:flex; gap:10px; align-items:flex-start;">
+        <span style="flex-shrink:0;">⚠</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;">Starter scaffold (couldn't reach the AI engine)</div>
+          <div style="color:var(--text-soft); margin-top:2px;">You're seeing a basic schedule, not the AI-coached plan with intervals and zones. <a onclick="retryAIPlan()" style="color:var(--primary); cursor:pointer; font-weight:600;">Retry AI plan →</a></div>
+          ${errLine}
+        </div>
+      </div>`;
+    })();
+    ['planSourceBanner', 'planSourceBannerPlan'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    });
+    // Also render the AI plan summary + notes card on the Plan tab if present.
+    const summaryEl = document.getElementById('planSummaryCard');
+    if (summaryEl) {
+      if (planState.planSource === 'ai' && (planState.aiPlanSummary || (planState.aiPlanNotes || []).length > 0)) {
+        const notes = (planState.aiPlanNotes || []).map(n => `<li>${escapeHtml(n)}</li>`).join('');
+        summaryEl.innerHTML = `<div class="card" style="margin-bottom:14px; background:var(--primary-soft); border:1px solid var(--primary);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="font-size:14px;">🧠</span>
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--primary-dark);">Plan summary</div>
+          </div>
+          ${planState.aiPlanSummary ? `<div style="font-size:13px; line-height:1.5; color:var(--text);">${escapeHtml(planState.aiPlanSummary)}</div>` : ''}
+          ${notes ? `<ul style="margin:8px 0 0 18px; font-size:12px; color:var(--text-soft); line-height:1.5;">${notes}</ul>` : ''}
+        </div>`;
+      } else {
+        summaryEl.innerHTML = '';
+      }
+    }
+  }
+
+  // Re-runs the AI plan generation using the user's current onboarding inputs
+  // pulled from localStorage. Used by the fallback banner's retry link.
+  function retryAIPlan() {
+    const event = localStorage.getItem('race-event') || planState.raceEvent || 'Half Ironman';
+    const eventDate = localStorage.getItem('race-date') || planState.raceDate || '';
+    const eventLocation = localStorage.getItem('race-location') || planState.raceLocation || '';
+    const hours = parseFloat(localStorage.getItem('hours-per-week') || '5');
+    let days = [];
+    try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
+    if (!Array.isArray(days) || days.length === 0) days = ['Wed','Sat','Sun'];
+    const complexity = localStorage.getItem('complexity-mode') || 'simple';
+    showScreen('onboard');
+    onbStep(6); // building screen
+    startStagedPlanStatus();
+    planState.aiPlanError = null;
+    generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity })
+      .then(p => {
+        if (p && p.weeks) { applyAIPlan(p); planState.planSource = 'ai'; }
+        else { planState.planSource = 'fallback'; }
+        stopStagedPlanStatus();
+        renderAll();
+        showScreen('today');
+      })
+      .catch(err => {
+        planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+        planState.planSource = 'fallback';
+        stopStagedPlanStatus();
+        renderAll();
+        showScreen('today');
+      });
+  }
+
   function renderAll() {
     recomputeWeekDates();
+    renderPlanSourceBanner();
     renderTodayGreetingAndRace();
     renderRaceMeta();
     restoreCheckinSummaryIfSaved();
@@ -10568,6 +10696,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       recentActivities: acts,
       fullPlan: fullPlanCompact,
       adherence: computeAdherenceContext(),
+      // User's preferred coaching detail level. Server prompt branches on this.
+      coachingDetail: localStorage.getItem('complexity-mode') || 'simple',
+      planSource: planState.planSource || 'unknown',
     };
   }
 
@@ -10703,16 +10834,27 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.sleep === p.sleep));
       }
     }
-    // Step 4: hours
+    // Step 4: hours.  Buckets are {2.5, 4, 5, 7, 10}.  When equidistant
+    // between two buckets (e.g. user said 6 → between 5 and 7), prefer the
+    // HIGHER bucket — under-allocating is worse for plan quality than mild
+    // over-allocation, and athletes generally have a little more time than
+    // they say.
     if (p.hours) {
       const wrap = document.getElementById('hoursChips');
       if (wrap) {
-        const hStr = String(p.hours);
-        // Map exact value or nearest bucket: chips are 2.5 / 4 / 5 / 7 / 10
         const buckets = [2.5, 4, 5, 7, 10];
-        const want = parseFloat(hStr) || 5;
-        const nearest = buckets.reduce((best, b) => Math.abs(b - want) < Math.abs(best - want) ? b : best, 5);
-        [...wrap.children].forEach(ch => ch.classList.toggle('active', String(ch.dataset.hours) === String(nearest)));
+        const want = parseFloat(p.hours) || 5;
+        let bestB = buckets[0];
+        let bestDist = Math.abs(buckets[0] - want);
+        for (const b of buckets) {
+          const d = Math.abs(b - want);
+          // Strictly closer wins. Tie → prefer the larger bucket.
+          if (d < bestDist || (d === bestDist && b > bestB)) {
+            bestB = b;
+            bestDist = d;
+          }
+        }
+        [...wrap.children].forEach(ch => ch.classList.toggle('active', String(ch.dataset.hours) === String(bestB)));
       }
     }
     // Step 4: training days (multi-select toggles)
