@@ -38,6 +38,7 @@ export default async function handler(req) {
       defaultModel: DEFAULT_MODEL,
       toolModel: TOOL_MODEL,
       hasKey: !!process.env.MISTRAL_API_KEY,
+      hasGoogleCse: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_ID),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
   // Only POST
@@ -72,8 +73,38 @@ export default async function handler(req) {
   //   'race-suggest' — onboarding race-helper, no tools, asks 1-2 clarifying
   //                    questions max then suggests 2-3 events with rationale.
   const mode = (context && context.mode) || 'coach';
+
+  // Live race-calendar search (Google CSE) — pre-search with the user's last
+  // message and inject results into the system prompt so the AI can verify
+  // catalog suggestions against current data and avoid recommending stale
+  // races. Best-effort: silently skipped if env vars are missing or the
+  // search fails.
+  let liveRaceSearchResults = [];
+  if (mode === 'race-suggest' && process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_ID) {
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
+    const q = lastUser && typeof lastUser.content === 'string' ? lastUser.content.trim() : '';
+    if (q.length >= 4) {
+      const yr = new Date().getFullYear();
+      const fullQ = `${q} race calendar ${yr} ${yr + 1}`;
+      const cseUrl = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(process.env.GOOGLE_CSE_KEY)}&cx=${encodeURIComponent(process.env.GOOGLE_CSE_ID)}&q=${encodeURIComponent(fullQ)}&num=5`;
+      try {
+        const cseRes = await fetch(cseUrl);
+        if (cseRes.ok) {
+          const cseJson = await cseRes.json();
+          liveRaceSearchResults = (cseJson.items || []).slice(0, 5).map(it => ({
+            title: String(it.title || '').slice(0, 140),
+            snippet: String(it.snippet || '').slice(0, 220),
+            url: String(it.link || ''),
+          }));
+        }
+      } catch (e) {
+        // Silent — pre-search is best-effort. Don't break the chat over a CSE failure.
+      }
+    }
+  }
+
   const systemPrompt = mode === 'race-suggest'
-    ? buildRaceSuggestPrompt(context)
+    ? buildRaceSuggestPrompt(context, liveRaceSearchResults)
     : buildSystemPrompt(context);
   const fullMessages = [
     { role: 'system', content: systemPrompt },
@@ -262,7 +293,7 @@ When you call a tool, the app applies the change and returns a result. Then cont
 // what to train for. No plan exists yet; the AI recommends specific real races
 // from the curated catalog and outputs [PICK:race-id] markers so the frontend
 // can render them as clickable buttons that auto-fill the form.
-function buildRaceSuggestPrompt(context) {
+function buildRaceSuggestPrompt(context, liveSearchResults) {
   const ctx = context && typeof context === 'object' ? context : {};
   const today = ctx.today || '';
   const todayMonth = ctx.todayMonth || '';
@@ -271,18 +302,29 @@ function buildRaceSuggestPrompt(context) {
   const catalogText = catalog.length === 0
     ? '(no catalog provided)'
     : catalog.map(r => `${r.id} | ${r.name} | ${r.location} | ${r.event} | ${r.month}`).join('\n');
+  const liveResults = Array.isArray(liveSearchResults) ? liveSearchResults : [];
+  const liveText = liveResults.length === 0
+    ? '(no live results — either Google search returned nothing, or live search is not configured this run)'
+    : liveResults.map((r, i) =>
+        `${i + 1}. ${r.title}\n   ${r.snippet}\n   ${r.url}`
+      ).join('\n');
 
   return `You are Adapt's onboarding race coach. Your only job: help a new user choose a specific real race from the catalog below.
 
 ═══ DATA FRESHNESS — CRITICAL ═══
 
-You have NO internet access. Your only source of races is the catalog below. The catalog was last hand-verified on ${catalogVerifiedDate}. Race calendars change: races get cancelled, dates shift, venues move, and new races appear that you don't know about.
+You have TWO data sources:
 
-Therefore:
-• Recommend ONLY from the catalog. Never invent a race that isn't listed.
-• If the catalog has nothing in the user's location/timeframe/discipline, say so plainly: "The catalog I have doesn't include a [event] near [city] in that window. You may want to search a race calendar like findarace.com or athlinks.com directly."
-• Always include a one-line freshness note in your final recommendation: "Catalog last checked ${catalogVerifiedDate} — tap Verify on Google next to each race to confirm it's still on the calendar."
-• Never claim a race "is still happening" or "is confirmed for [year]" — you can't know that.
+1. **Curated catalog** (below) — hand-verified ${catalogVerifiedDate}. Static, can be stale.
+2. **Live search results** (below) — fresh hits from a Google search restricted to ironman.com, athlinks.com, runsignup.com, findarace.com, raceroster.com using the user's most recent message as the query. May be sparse or empty.
+
+Use them together:
+• When the live results CONFIRM a catalog race is still happening (the race name appears in current-year search hits), prefer it.
+• When the catalog lists a race but live results contain ZERO mentions of it for the current year, treat it as suspect — drop it from your suggestions or warn explicitly.
+• When live results surface a race that is NOT in the catalog (e.g. a local 5K or a non-Ironman event), you may MENTION it textually, but DO NOT emit a [PICK:...] for it (the frontend can only act on catalog IDs).
+• If both catalog AND live results are empty for the user's request, say so plainly: "I don't have anything matching in my catalog or in a fresh search. Try findarace.com or athlinks.com directly to look at their full calendar."
+• Always include a one-line note in your final recommendation: "Catalog last checked ${catalogVerifiedDate} + live search — tap Verify on Google next to each race to confirm it's still on the calendar."
+• Never claim a race "is confirmed for [year]" — even with live results, you only saw a snippet. Verification is the user's last step.
 
 ═══ HOW THE CONVERSATION GOES ═══
 
@@ -398,6 +440,10 @@ You only discuss race selection. Decline anything else with one warm sentence: "
 ═══ RACE CATALOG (id | name | location | event | typical month) ═══
 
 ${catalogText}
+
+═══ LIVE SEARCH RESULTS — fresh from Google CSE for the user's last query ═══
+
+${liveText}
 
 Be warm, direct, and short. The whole conversation should feel like 30-60 seconds, not a quiz.`;
 }
