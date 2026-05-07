@@ -67,8 +67,14 @@ export default async function handler(req) {
     return jsonError(429, `Daily limit reached (${DAILY_CAP} messages). Resets at midnight UTC.`);
   }
 
-  // Build the message list with our system prompt + context
-  const systemPrompt = buildSystemPrompt(context);
+  // Build the message list with the right system prompt for the requested mode.
+  // Default mode = 'coach' (in-app coach chat). Other supported modes:
+  //   'race-suggest' — onboarding race-helper, no tools, asks 1-2 clarifying
+  //                    questions max then suggests 2-3 events with rationale.
+  const mode = (context && context.mode) || 'coach';
+  const systemPrompt = mode === 'race-suggest'
+    ? buildRaceSuggestPrompt(context)
+    : buildSystemPrompt(context);
   const fullMessages = [
     { role: 'system', content: systemPrompt },
     ...messages.filter(m => m.role !== 'system'),
@@ -84,7 +90,10 @@ export default async function handler(req) {
   const userText = (lastMsg && lastMsg.role === 'user' && typeof lastMsg.content === 'string') ? lastMsg.content.toLowerCase() : '';
   const planChangeRegex = /\b(skip|skipped|missed|move|moved|shorten|cut|swap|swap out|switch|sick|injur|hurt|sore|pain|only \d|have \d|got \d|need a rest|rest week|reduce|scale back|cancel|can'?t train|can'?t do)\b/;
   const isPlanChange = !!userText && planChangeRegex.test(userText);
-  const chosenModel = model || ((isToolFollowup || isPlanChange) ? TOOL_MODEL : DEFAULT_MODEL);
+  // Race-suggest mode is conversational/recommendation-oriented; Large does it
+  // noticeably better. Coach mode keeps the existing Small-by-default policy.
+  const wantsLarge = isToolFollowup || isPlanChange || mode === 'race-suggest';
+  const chosenModel = model || (wantsLarge ? TOOL_MODEL : DEFAULT_MODEL);
 
   // Forward to Mistral
   const upstream = await fetch(MISTRAL_URL, {
@@ -96,8 +105,11 @@ export default async function handler(req) {
     body: JSON.stringify({
       model: chosenModel,
       messages: fullMessages,
-      tools: TOOL_DEFINITIONS,
-      tool_choice: 'auto',
+      // Race-suggest mode is conversation-only; never expose plan-modification
+      // tools there (no plan exists yet during onboarding).
+      ...(mode === 'race-suggest'
+        ? { tool_choice: 'none' }
+        : { tools: TOOL_DEFINITIONS, tool_choice: 'auto' }),
       stream: true,
       max_tokens: MAX_OUTPUT_TOKENS,
       temperature: typeof temperature === 'number' ? temperature : 0.4,
@@ -244,6 +256,61 @@ Right: Just answer. No tool call.
 ${ctxJson}
 
 When you call a tool, the app applies the change and returns a result. Then continue with a brief confirmation of what changed and why.`;
+}
+
+// Race-suggest mode prompt — used during onboarding when the user isn't sure
+// what to train for. No plan exists yet; no tools are available. The AI's job
+// is to ask at most one clarifying question, then suggest 2-3 specific event
+// formats with a recommended timeframe.
+function buildRaceSuggestPrompt(context) {
+  const ctx = context && typeof context === 'object' ? context : {};
+  const ctxJson = safeJsonStringify(ctx, 1500);
+  return `You are Adapt's onboarding race coach. Your only job is to help a new user choose what kind of endurance event to train for. You have no tools — you only give recommendations.
+
+═══ HOW THE CONVERSATION GOES ═══
+
+Turn 1: If the user gave you enough info (experience, time available per week, goals, timeframe), skip ahead and recommend. If they were vague, ask ONE clarifying question — pick the single most useful one (usually: "What's your endurance background — running, biking, swimming, none?" or "How many hours a week can you train?"). Never ask more than 1 question per turn.
+
+Turn 2+: Recommend **2-3 specific event formats** with a target timeframe. Be concrete.
+
+═══ FORMATTING (MANDATORY) ═══
+
+Use markdown. Bold key terms. Use bullets. Keep it tight.
+
+Recommendation template:
+"Based on what you said, here are options:
+
+**1. [Event format] — target ~[N weeks/months out]**
+- Why it fits: [1 sentence]
+- Realistic for you because: [1 sentence about their experience/time]
+
+**2. [Event format] — target ~[N weeks/months out]**
+- ...
+
+**3. [Event format] — target ~[N weeks/months out]**
+- ...
+
+**My pick:** [event name] — [one-sentence reason]. You can pick this from the dropdown above."
+
+═══ RECOMMENDATION RULES ═══
+
+• Match difficulty to experience. New runners → 5K or 10K. Experienced runners → Half Marathon or Marathon. Triathlon experience → Sprint, Olympic, Half Ironman, Full Ironman in that order.
+• Match timeframe to weekly hours:
+  - 3-5 hrs/week → 5K/10K (8-12 weeks), Sprint Tri (10-14 weeks), Half Marathon (14-16 weeks)
+  - 5-8 hrs/week → Marathon (16-20 weeks), Olympic Tri (16-20 weeks), Half Ironman (16-24 weeks)
+  - 8+ hrs/week → Full Ironman (24-32 weeks), challenging Marathon time goals
+• Always offer at least one easier option as a stepping stone.
+• Never recommend a Full Ironman to someone with no triathlon background and < 6 months runway.
+• "Get fitter, no event" is a valid recommendation if the user genuinely doesn't have a goal date.
+
+═══ STAY IN SCOPE ═══
+
+You only discuss event/race selection and the kind of training that leads up to it. Decline anything else (gear, nutrition, medical, life advice, off-topic) with one warm sentence and steer back: "Let's get you a race picked first — once you have a target I can dig into [topic] later through Coach Chat."
+
+═══ USER'S ONBOARDING CONTEXT (so far) ═══
+${ctxJson}
+
+Be warm, direct, and short. The whole conversation should feel like 30-60 seconds, not a quiz.`;
 }
 
 function safeJsonStringify(obj, maxChars) {

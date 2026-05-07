@@ -1507,7 +1507,10 @@
         <h1>Your goal.</h1>
         <p class="sub">Pick an event or just say "get fitter." We'll show you an honest timeline either way.</p>
         <div class="field">
-          <label>What are you training for?</label>
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>What are you training for?</span>
+            <button type="button" onclick="openRaceHelper()" style="background:var(--primary-soft); border:0; color:var(--primary-dark); font-weight:700; font-size:12px; padding:4px 10px; border-radius:100px; cursor:pointer; font-family:inherit;">✨ Not sure? Ask the AI</button>
+          </label>
           <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker();">
             <option>Half Ironman</option>
             <option>Full Ironman</option>
@@ -2448,6 +2451,25 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
       You
     </button>
+  </div>
+
+  <!-- RACE HELPER MODAL — AI-assisted race selection during onboarding -->
+  <div class="modal-bg" id="raceHelperModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto; max-width: 460px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <h2 style="font-size:20px; margin:0;">✨ Race Helper</h2>
+        <button onclick="closeRaceHelper()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub">Tell me about your fitness and goals — I'll suggest a few events that fit.</div>
+      <div id="raceHelperChat" style="margin-top:14px; max-height:50vh; overflow-y:auto; padding:8px; background:var(--bg); border-radius:12px; display:flex; flex-direction:column; gap:8px;">
+        <div class="bubble bot" style="max-width:100%;">
+          Hey — I'm here to help you pick a race. Tell me: <strong>what's your endurance background</strong> (running, biking, swimming, none?), <strong>how many hours a week can you train</strong>, and <strong>roughly when do you want to race</strong>?
+        </div>
+      </div>
+      <textarea id="raceHelperInput" placeholder="e.g. I run 3x/week, can train 5 hours total, want to race this fall…" style="width:100%; min-height:64px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:14px; resize:vertical; background:#fff; margin-top:10px;"></textarea>
+      <button class="btn btn-primary btn-full btn-sm" onclick="sendRaceHelper()" style="margin-top:8px;" id="raceHelperSendBtn">Ask</button>
+      <div style="font-size:11px; color:var(--text-soft); margin-top:10px; line-height:1.4;">After the AI suggests an event, pick it from the dropdown above. You can always change it later.</div>
+    </div>
   </div>
 
   <!-- TOUR OVERLAY -->
@@ -10050,6 +10072,111 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       lastCheckin: planState.lastCheckin || null,
       recentActivities: acts,
     };
+  }
+
+  // ─── Race Helper (onboarding AI) ─────────────────────────────────────
+  // A small modal-based chat that helps a new user pick an event format.
+  // Reuses /api/coach/chat with context.mode='race-suggest' so the server
+  // swaps in the race-coach system prompt and disables tool calling.
+  const _raceHelperHistory = [];
+  function openRaceHelper() {
+    const m = document.getElementById('raceHelperModal');
+    if (m) m.classList.add('show');
+    setTimeout(() => {
+      const ta = document.getElementById('raceHelperInput');
+      if (ta) ta.focus();
+    }, 80);
+  }
+  function closeRaceHelper() {
+    const m = document.getElementById('raceHelperModal');
+    if (m) m.classList.remove('show');
+  }
+  function _addRaceHelperBubble(text, kind) {
+    const area = document.getElementById('raceHelperChat');
+    if (!area) return null;
+    const b = document.createElement('div');
+    b.className = 'bubble ' + kind;
+    b.style.maxWidth = '100%';
+    if (kind.indexOf('bot') >= 0) {
+      b.innerHTML = renderMarkdownToHtml(text);
+    } else {
+      b.textContent = text;
+    }
+    area.appendChild(b);
+    area.scrollTop = area.scrollHeight;
+    return b;
+  }
+  async function sendRaceHelper() {
+    const input = document.getElementById('raceHelperInput');
+    const btn = document.getElementById('raceHelperSendBtn');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
+    _addRaceHelperBubble(text, 'user');
+    _raceHelperHistory.push({ role: 'user', content: text });
+    const bubble = _addRaceHelperBubble('…', 'bot typing');
+
+    try {
+      const resp = await fetch('/api/coach/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: _raceHelperHistory.slice(),
+          context: { mode: 'race-suggest' },
+        }),
+      });
+      if (!resp.ok) {
+        const j = await resp.json().catch(() => ({}));
+        throw new Error(j.error || ('HTTP ' + resp.status));
+      }
+      if (!resp.body) throw new Error('No response stream from server.');
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let visible = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let eol;
+        while ((eol = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, eol);
+          buffer = buffer.slice(eol + 2);
+          const dataLines = block.split('\n').filter(l => l.startsWith('data:'));
+          if (!dataLines.length) continue;
+          const payload = dataLines.map(l => l.slice(5).trimStart()).join('');
+          if (!payload || payload === '[DONE]') continue;
+          let evt;
+          try { evt = JSON.parse(payload); } catch (e) { continue; }
+          const delta = evt.choices && evt.choices[0] && evt.choices[0].delta;
+          if (!delta) continue;
+          if (typeof delta.content === 'string' && delta.content.length > 0) {
+            visible += delta.content;
+            if (bubble) {
+              bubble.classList.remove('typing');
+              bubble.innerHTML = renderMarkdownToHtml(visible);
+              const area = document.getElementById('raceHelperChat');
+              if (area) area.scrollTop = area.scrollHeight;
+            }
+          }
+        }
+      }
+      if (!visible) {
+        if (bubble) bubble.textContent = '(no response)';
+      } else {
+        _raceHelperHistory.push({ role: 'assistant', content: visible });
+      }
+    } catch (err) {
+      if (bubble) {
+        bubble.classList.remove('typing');
+        bubble.textContent = 'Something went wrong: ' + err.message;
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Ask'; }
+      if (input) input.focus();
+    }
   }
 
   // Tiny markdown -> HTML renderer for chat bubbles. Handles **bold**,
