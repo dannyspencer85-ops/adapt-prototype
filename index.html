@@ -1375,6 +1375,30 @@
           <button class="btn btn-primary btn-full btn-lg" onclick="doSignup()">Sign up</button>
         </div>
       </div>
+
+      <!-- Demo persona launcher: skip onboarding entirely and load a fully
+           populated app under one of N pre-built athlete profiles. Useful for
+           test-group runs where each tester gets a deterministic starting
+           state without re-typing their fitness history. -->
+      <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border);">
+        <div style="font-size: 12px; color: var(--text-soft); text-align: center; margin-bottom: 10px; line-height: 1.5;">
+          <strong style="color: var(--text);">Reviewing the prototype?</strong><br>Skip onboarding and load a fully populated demo athlete:
+        </div>
+        <button onclick="openDemoPicker()" class="btn btn-ghost btn-full btn-sm">🚀 Try a demo persona</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMO PERSONA PICKER MODAL -->
+  <div class="modal-bg" id="demoPickerModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto; max-width: 480px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <h2 style="font-size: 20px; margin: 0;">Pick a demo athlete</h2>
+        <button onclick="closeDemoPicker()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub" style="margin-bottom: 12px;">Each demo loads a unique starting state — different race, schedule, experience, hours. Tap one to enter the app already populated.</div>
+      <div id="demoPickerList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+      <div style="font-size: 11px; color: var(--text-soft); margin-top: 14px; line-height: 1.4;">Demos use a temp account scoped to your browser. Changes won't affect any other user's state.</div>
     </div>
   </div>
 
@@ -3151,6 +3175,197 @@
   function setConnectedIntegrations(arr) {
     localStorage.setItem('integrations', JSON.stringify(arr));
     saveUserData();
+  }
+
+  // ─── Demo personas ───────────────────────────────────────────────────
+  // Six pre-built athlete profiles testers can load with one tap so they
+  // experience different parts of the app without going through onboarding.
+  // Each persona populates first-name, age, weight, sex, race + date + location,
+  // weekly hours, training days, experience level, sleep, complexity-mode, and
+  // course intel. After loading, AI plan generation runs against the persona's
+  // inputs the same way it would for a real onboard.
+  const DEMO_PERSONAS = [
+    {
+      id: 'alex-sprint',
+      title: 'Alex — first-time triathlete',
+      tagline: 'Sprint Tri · 12 weeks out · 4 hrs/wk · brand new to tri',
+      firstName: 'Alex', age: 32, weight: 165, sex: 'Male',
+      hours: 4, days: ['Tue','Thu','Sat'],
+      event: 'Sprint Triathlon', raceId: null, weeksToRace: 12,
+      location: 'Austin, TX',
+      profile: { exp: 'new', freq: 'mid', injury: 'none', sleep: '7to8' },
+      complexity: 'simple',
+    },
+    {
+      id: 'jordan-marathon',
+      title: 'Jordan — chasing a marathon PR',
+      tagline: 'Marathon · 18 weeks out · 6 hrs/wk · runs 4×/wk',
+      firstName: 'Jordan', age: 38, weight: 150, sex: 'Female',
+      hours: 6, days: ['Mon','Wed','Fri','Sun'],
+      event: 'Marathon', raceId: null, weeksToRace: 18,
+      location: 'Brooklyn, NY',
+      profile: { exp: 'some', freq: 'high', injury: 'none', sleep: '7to8' },
+      complexity: 'detailed',
+    },
+    {
+      id: 'danny-70-3',
+      title: 'Danny — Half Ironman in Boulder',
+      tagline: '70.3 · 14 weeks out · 5 hrs/wk · veteran of two IMs',
+      firstName: 'Danny', age: 40, weight: 175, sex: 'Male',
+      hours: 5, days: ['Wed','Sat','Sun'],
+      event: 'Half Ironman', raceId: 'im703-boulder', weeksToRace: 14,
+      location: 'Boulder, CO',
+      profile: { exp: 'veteran', freq: 'high', injury: 'none', sleep: '7to8' },
+      complexity: 'detailed',
+    },
+    {
+      id: 'sam-im',
+      title: 'Sam — comeback Full Ironman',
+      tagline: 'IM · 24 weeks out · 7 hrs/wk · last did one 5 yrs ago',
+      firstName: 'Sam', age: 45, weight: 180, sex: 'Male',
+      hours: 7, days: ['Tue','Wed','Fri','Sat','Sun'],
+      event: 'Full Ironman', raceId: 'im-coeur-dalene', weeksToRace: 24,
+      location: 'Coeur d\'Alene, ID',
+      profile: { exp: 'some', freq: 'mid', injury: 'none', sleep: '6to7' },
+      complexity: 'detailed',
+    },
+    {
+      id: 'riley-5k',
+      title: 'Riley — first 5K',
+      tagline: '5K · 10 weeks out · 3 hrs/wk · couch-to-5k territory',
+      firstName: 'Riley', age: 28, weight: 135, sex: 'Female',
+      hours: 2.5, days: ['Mon','Wed','Sat'],
+      event: '5K', raceId: null, weeksToRace: 10,
+      location: 'Chicago, IL',
+      profile: { exp: 'new', freq: 'low', injury: 'none', sleep: '7to8' },
+      complexity: 'simple',
+    },
+    {
+      id: 'morgan-injury',
+      title: 'Morgan — easing back from injury',
+      tagline: 'Half Marathon · 16 weeks out · 4 hrs/wk · minor knee niggle',
+      firstName: 'Morgan', age: 42, weight: 160, sex: 'Female',
+      hours: 4, days: ['Tue','Thu','Sun'],
+      event: 'Half Marathon', raceId: null, weeksToRace: 16,
+      location: 'Portland, OR',
+      profile: { exp: 'veteran', freq: 'mid', injury: 'minor', sleep: '7to8' },
+      complexity: 'simple',
+    },
+  ];
+
+  function openDemoPicker() {
+    const list = document.getElementById('demoPickerList');
+    if (!list) return;
+    list.innerHTML = DEMO_PERSONAS.map(p => `
+      <button onclick="loadDemoPersona('${p.id}')" style="text-align:left; background:#fff; border:1px solid var(--border); padding:14px 16px; border-radius:12px; cursor:pointer; font-family:inherit; transition:all 0.15s;">
+        <div style="font-weight:700; font-size:15px; color:var(--text); margin-bottom:4px;">${escapeHtml(p.title)}</div>
+        <div style="font-size:12px; color:var(--text-soft); line-height:1.4;">${escapeHtml(p.tagline)}</div>
+      </button>
+    `).join('');
+    document.getElementById('demoPickerModal').classList.add('show');
+  }
+  function closeDemoPicker() {
+    document.getElementById('demoPickerModal').classList.remove('show');
+  }
+
+  // Load a demo persona: spin up a temp account, set every input localStorage
+  // key the plan engine reads, mark onboarding complete, then route to the
+  // building screen and trigger AI plan generation against the persona's
+  // inputs. After completion the user lands on Today with a populated app.
+  async function loadDemoPersona(id) {
+    const p = DEMO_PERSONAS.find(x => x.id === id);
+    if (!p) return;
+    closeDemoPicker();
+
+    // Compute a race date from weeksToRace (using middle-of-week).
+    const raceDate = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + p.weeksToRace * 7);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    // Spin up a deterministic per-persona account. Username collisions are
+    // fine — we treat the demo account as throwaway, overwriting cleanly.
+    const username = 'demo-' + p.id;
+    const accounts = getAccounts();
+    accounts[username] = accounts[username] || { password: 'demo', data: {} };
+    accounts[username].data = accounts[username].data || {};
+    accounts[username].data.onboardingComplete = true;
+    saveAccounts(accounts);
+    localStorage.setItem('adapt-session', username);
+
+    // Wipe live keys (per-account isolation), then set all the plan inputs.
+    if (typeof _clearUserScopedLocal === 'function') _clearUserScopedLocal();
+    if (typeof chatMessages !== 'undefined') chatMessages.length = 0;
+    localStorage.setItem('first-name', p.firstName);
+    localStorage.setItem('race-event', p.event);
+    localStorage.setItem('race-date', raceDate);
+    localStorage.setItem('race-location', p.location);
+    localStorage.setItem('hours-per-week', String(p.hours));
+    localStorage.setItem('training-days', JSON.stringify(p.days));
+    localStorage.setItem('complexity-mode', p.complexity || 'simple');
+    // Optional curated race auto-fill (terrain/surface/swim/etc.)
+    let courseIntel = null;
+    if (p.raceId && typeof getRaceById === 'function') {
+      const race = getRaceById(p.raceId);
+      if (race) {
+        courseIntel = {
+          raceId: p.raceId,
+          terrain: race.terrain, surface: race.surface, swim: race.swim,
+          climate: race.climate, altitude: race.altitude,
+          notes: race.notes || '', source: 'curated',
+        };
+        localStorage.setItem('course-intel', JSON.stringify(courseIntel));
+      }
+    }
+    planState.raceEvent = p.event;
+    planState.raceDate = raceDate;
+    planState.raceLocation = p.location;
+    planState.courseIntel = courseIntel;
+    if (p.profile.injury && p.profile.injury !== 'none') {
+      planState.injury = { area: 'left knee', severity: p.profile.injury, notes: 'Minor niggle from previous training cycle' };
+    }
+
+    // Show the building screen + run AI plan generation as if it were a real
+    // finishOnboard call. Falls back to the rule engine on any failure.
+    showScreen('onboard');
+    onbStep(6);
+    startStagedPlanStatus();
+    try {
+      const ai = await generatePlanWithAI({
+        event: p.event, eventDate: raceDate, eventLocation: p.location,
+        hours: p.hours, days: p.days, complexity: p.complexity || 'simple',
+      });
+      if (ai && ai.weeks) { applyAIPlan(ai); planState.planSource = 'ai'; }
+      else { generatePlanFromInputs(); planState.planSource = 'fallback'; }
+    } catch (err) {
+      console.warn('Demo AI plan failed, using fallback:', err);
+      planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+      planState.planSource = 'fallback';
+      generatePlanFromInputs();
+    }
+    stopStagedPlanStatus();
+    if (typeof renderTodayGreetingAndRace === 'function') renderTodayGreetingAndRace();
+    if (typeof saveUserData === 'function') saveUserData();
+    renderAll();
+    showScreen('today');
+    if (typeof trackEvent === 'function') trackEvent('demo_persona_loaded', { id: p.id });
+  }
+
+  // Auto-load a demo when the URL has ?demo=<persona-id>. Run once on boot
+  // after the DOM is ready and the persona definitions exist.
+  function autoLoadDemoFromURL() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const demo = params.get('demo');
+      if (!demo) return;
+      // Strip the param so a refresh doesn't keep auto-loading.
+      history.replaceState({}, '', window.location.origin + window.location.pathname);
+      if (DEMO_PERSONAS.some(p => p.id === demo)) {
+        // Defer one tick so the rest of the app finishes booting first.
+        setTimeout(() => loadDemoPersona(demo), 50);
+      }
+    } catch (e) { /* ignore */ }
   }
 
   // Copy the feedback email to clipboard for users whose device has no
@@ -10464,6 +10679,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof loadCoachHistory === 'function') loadCoachHistory();
     // If we just came back from a Strava OAuth redirect, finish the handshake
     if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
+    // Auto-launch a demo if the URL has ?demo=<persona-id>
+    if (typeof autoLoadDemoFromURL === 'function') autoLoadDemoFromURL();
   });
 
   // Coach Chat (Mistral via Adapt's backend) — gated on an explicit one-time
