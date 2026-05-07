@@ -10098,7 +10098,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     b.className = 'bubble ' + kind;
     b.style.maxWidth = '100%';
     if (kind.indexOf('bot') >= 0) {
-      b.innerHTML = renderMarkdownToHtml(text);
+      b.innerHTML = _renderRaceHelperMarkdown(text);
     } else {
       b.textContent = text;
     }
@@ -10106,6 +10106,103 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     area.scrollTop = area.scrollHeight;
     return b;
   }
+  // Variant of the chat markdown renderer that ALSO turns [PICK:race-id]
+  // markers into clickable "Add this race to my plan" buttons. Validates the
+  // raceId against RACE_DATABASE so AI hallucinations don't render dead buttons.
+  function _renderRaceHelperMarkdown(text) {
+    if (!text) return '';
+    // First pre-process [PICK:id] markers BEFORE markdown so the [...] doesn't
+    // get tangled with list-bullet detection. We replace each marker with a
+    // unique placeholder, render markdown, then swap the placeholders for
+    // real buttons.
+    const tokens = [];
+    const replaced = String(text).replace(/\[PICK:([a-zA-Z0-9_\-]+)\]/g, (_match, raceId) => {
+      tokens.push(raceId);
+      return ` PICK${tokens.length - 1} `;
+    });
+    let html = renderMarkdownToHtml(replaced);
+    // Restore each placeholder as a button. Validate ID against the catalog —
+    // if it's not in the database, render a soft "(unknown race)" hint instead.
+    html = html.replace(/ PICK(\d+) /g, (_m, idxStr) => {
+      const raceId = tokens[parseInt(idxStr, 10)];
+      const race = (typeof getRaceById === 'function') ? getRaceById(raceId) : null;
+      if (!race) {
+        return `<span style="color:var(--text-soft); font-size:12px;">(${raceId}: race not in catalog)</span>`;
+      }
+      const safeId = raceId.replace(/"/g, '&quot;');
+      const safeName = String(race.name).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      return `<button type="button" class="race-pick-btn" data-race-id="${safeId}" style="display:inline-flex; align-items:center; gap:6px; background:var(--primary); color:#fff; border:0; padding:8px 14px; margin:6px 0; border-radius:100px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;">✓ Add ${safeName} to my plan</button>`;
+    });
+    return html;
+  }
+  // Click delegation for race-pick buttons inside the modal.
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest && e.target.closest('.race-pick-btn');
+    if (!btn) return;
+    const id = btn.getAttribute('data-race-id');
+    if (id) pickRaceFromHelper(id);
+  });
+  // Compute a sensible target eventDate for a race in the catalog: next
+  // occurrence of the race's typical month that's at least 8 weeks from today.
+  function _computeTargetDateForRace(race) {
+    if (!race || !race.month) return '';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const m = months.indexOf(race.month);
+    if (m < 0) return '';
+    const today = new Date();
+    let yr = today.getFullYear();
+    // Approximate race day: 15th of the month (most ~mid-month).
+    let target = new Date(yr, m, 15);
+    const minRunwayMs = 8 * 7 * 24 * 60 * 60 * 1000; // 8 weeks
+    if (target - today < minRunwayMs) {
+      target = new Date(yr + 1, m, 15);
+    }
+    const yyyy = target.getFullYear();
+    const mm = String(target.getMonth() + 1).padStart(2, '0');
+    const dd = String(target.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  // Apply a catalog race to the onboarding form: event type, race picker,
+  // location, date. Then close the modal and show a small toast.
+  function pickRaceFromHelper(raceId) {
+    const race = (typeof getRaceById === 'function') ? getRaceById(raceId) : null;
+    if (!race) return;
+    const evSel = document.getElementById('eventSelect');
+    if (evSel) {
+      // Find the matching <option> by event name; fall back to current value if not found.
+      const target = Array.from(evSel.options).find(o => o.value === race.event);
+      if (target) {
+        evSel.value = race.event;
+      }
+      if (typeof updateTriFocusVisibility === 'function') updateTriFocusVisibility();
+    }
+    if (typeof refreshRacePicker === 'function') refreshRacePicker();
+    const picker = document.getElementById('racePickerSelect');
+    if (picker) {
+      picker.value = race.id;
+      if (typeof onPickCuratedRace === 'function') onPickCuratedRace();
+    }
+    const locEl = document.getElementById('eventLocation');
+    if (locEl) locEl.value = race.location || '';
+    const dateEl = document.getElementById('eventDate');
+    if (dateEl) dateEl.value = _computeTargetDateForRace(race);
+    closeRaceHelper();
+    // Visual confirmation in the page itself
+    if (picker) picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // Compact race-catalog summary shipped as context to the race-suggest prompt.
+  // Strip notes + course-detail fields; keep only what the AI needs to pick.
+  function buildRaceCatalogForAI() {
+    if (typeof RACE_DATABASE === 'undefined') return [];
+    return RACE_DATABASE.map(r => ({
+      id: r.id,
+      name: r.name,
+      location: r.location,
+      event: r.event,
+      month: r.month,
+    }));
+  }
+
   async function sendRaceHelper() {
     const input = document.getElementById('raceHelperInput');
     const btn = document.getElementById('raceHelperSendBtn');
@@ -10119,12 +10216,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bubble = _addRaceHelperBubble('…', 'bot typing');
 
     try {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
       const resp = await fetch('/api/coach/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: _raceHelperHistory.slice(),
-          context: { mode: 'race-suggest' },
+          context: {
+            mode: 'race-suggest',
+            today: todayStr,
+            todayMonth: today.toLocaleString('en-US', { month: 'short' }),
+            raceCatalog: buildRaceCatalogForAI(),
+          },
         }),
       });
       if (!resp.ok) {
@@ -10156,7 +10260,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
             visible += delta.content;
             if (bubble) {
               bubble.classList.remove('typing');
-              bubble.innerHTML = renderMarkdownToHtml(visible);
+              bubble.innerHTML = _renderRaceHelperMarkdown(visible);
               const area = document.getElementById('raceHelperChat');
               if (area) area.scrollTop = area.scrollHeight;
             }
