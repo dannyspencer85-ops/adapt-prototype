@@ -1348,8 +1348,17 @@
           <input type="password" id="loginPassword" autocomplete="current-password" placeholder="demo">
         </div>
         <div class="auth-error" id="loginError" style="display:none;"></div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 16px; padding: 10px 12px; background: var(--primary-soft); border-radius: 10px;">
-          <strong>Try the demo:</strong> username <code style="background:#fff; padding:2px 6px; border-radius:4px;">demo</code> password <code style="background:#fff; padding:2px 6px; border-radius:4px;">demo</code>
+        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 16px; padding: 10px 12px; background: var(--primary-soft); border-radius: 10px; line-height: 1.6;">
+          <strong style="display:block; color:var(--text); margin-bottom:6px;">Demo accounts (username = password):</strong>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;">
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">alex</code> first-time tri</span>
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">jordan</code> marathon</span>
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">danny</code> 70.3 vet</span>
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">sam</code> Full IM</span>
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">riley</code> first 5K</span>
+            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">morgan</code> injury</span>
+          </div>
+          <div style="margin-top:8px; font-size:11px; color:var(--text-soft);">First login takes 15-30s while we build your plan.</div>
         </div>
         <div class="onboard-actions" style="padding-top: 0;">
           <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">Log in</button>
@@ -8681,6 +8690,46 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       dirty = true;
     }
     if (dirty) saveAccounts(accounts);
+    ensureDemoPersonaAccounts();
+  }
+
+  // Pre-creates one named account per demo persona so testers can log in with
+  // simple credentials (alex/alex, danny/danny, etc.) and land in their
+  // persona's populated app. The first time they log in, hydrateDemoPersona
+  // runs the same setup loadDemoPersona uses (sets first-name + plan inputs,
+  // triggers AI plan generation) and flips onboardingComplete to true.
+  function ensureDemoPersonaAccounts() {
+    if (typeof DEMO_PERSONAS === 'undefined') return;
+    const accounts = getAccounts();
+    let dirty = false;
+    DEMO_PERSONAS.forEach(p => {
+      // Account username = persona first name lowercased.
+      const u = p.firstName.toLowerCase();
+      const pwd = u; // simple credentials: username == password
+      if (!accounts[u]) {
+        accounts[u] = {
+          password: pwd,
+          createdAt: new Date().toISOString(),
+          isDemo: true,
+          data: {
+            demoPersonaId: p.id,
+            onboardingComplete: false, // forces hydration on first login
+            planState: JSON.parse(JSON.stringify(planState)),
+          },
+        };
+        dirty = true;
+      } else {
+        // Self-heal password + persona link in case the account got created
+        // before this code shipped or got corrupted.
+        if (accounts[u].password !== pwd) { accounts[u].password = pwd; dirty = true; }
+        if (!accounts[u].isDemo) { accounts[u].isDemo = true; dirty = true; }
+        if (!accounts[u].data) accounts[u].data = {};
+        if (accounts[u].data.demoPersonaId !== p.id) {
+          accounts[u].data.demoPersonaId = p.id; dirty = true;
+        }
+      }
+    });
+    if (dirty) saveAccounts(accounts);
   }
 
   function switchAuthTab(which) {
@@ -8708,7 +8757,81 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     localStorage.setItem('adapt-session', username);
     loadUserData(username);
     trackEvent('login', { username });
+    // Demo persona accounts: if this is a fresh login for one (no plan yet),
+    // hydrate the persona's inputs + run plan generation before entering.
+    const acct = accounts[username];
+    if (acct && acct.isDemo && acct.data && acct.data.demoPersonaId && !acct.data.onboardingComplete) {
+      hydrateDemoPersonaForLogin(username, acct.data.demoPersonaId);
+      return;
+    }
     enterApp();
+  }
+
+  // Variant of loadDemoPersona that operates on the CURRENTLY LOGGED-IN
+  // account (no temp account creation), used when a tester logs in with a
+  // demo persona's credentials and we need to populate their state.
+  async function hydrateDemoPersonaForLogin(username, personaId) {
+    const p = (typeof DEMO_PERSONAS !== 'undefined') ? DEMO_PERSONAS.find(x => x.id === personaId) : null;
+    if (!p) { enterApp(); return; }
+
+    const raceDate = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + p.weeksToRace * 7);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    if (typeof _clearUserScopedLocal === 'function') _clearUserScopedLocal();
+    if (typeof chatMessages !== 'undefined') chatMessages.length = 0;
+    localStorage.setItem('first-name', p.firstName);
+    localStorage.setItem('race-event', p.event);
+    localStorage.setItem('race-date', raceDate);
+    localStorage.setItem('race-location', p.location);
+    localStorage.setItem('hours-per-week', String(p.hours));
+    localStorage.setItem('training-days', JSON.stringify(p.days));
+    localStorage.setItem('complexity-mode', p.complexity || 'simple');
+    let courseIntel = null;
+    if (p.raceId && typeof getRaceById === 'function') {
+      const race = getRaceById(p.raceId);
+      if (race) {
+        courseIntel = { raceId: p.raceId, terrain: race.terrain, surface: race.surface, swim: race.swim, climate: race.climate, altitude: race.altitude, notes: race.notes || '', source: 'curated' };
+        localStorage.setItem('course-intel', JSON.stringify(courseIntel));
+      }
+    }
+    planState.raceEvent = p.event;
+    planState.raceDate = raceDate;
+    planState.raceLocation = p.location;
+    planState.courseIntel = courseIntel;
+    if (p.profile && p.profile.injury && p.profile.injury !== 'none') {
+      planState.injury = { area: 'left knee', severity: p.profile.injury, notes: 'Minor niggle from previous training cycle' };
+    }
+
+    showScreen('onboard');
+    onbStep(6);
+    startStagedPlanStatus();
+    try {
+      const ai = await generatePlanWithAI({
+        event: p.event, eventDate: raceDate, eventLocation: p.location,
+        hours: p.hours, days: p.days, complexity: p.complexity || 'simple',
+      });
+      if (ai && ai.weeks) { applyAIPlan(ai); planState.planSource = 'ai'; }
+      else { generatePlanFromInputs(); planState.planSource = 'fallback'; }
+    } catch (err) {
+      planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+      planState.planSource = 'fallback';
+      generatePlanFromInputs();
+    }
+    stopStagedPlanStatus();
+
+    // Mark the account as fully hydrated so subsequent logins skip this path.
+    const accounts = getAccounts();
+    if (accounts[username] && accounts[username].data) {
+      accounts[username].data.onboardingComplete = true;
+      saveAccounts(accounts);
+    }
+    if (typeof saveUserData === 'function') saveUserData();
+    renderAll();
+    showScreen('today');
+    if (typeof trackEvent === 'function') trackEvent('demo_persona_loaded', { id: p.id, via: 'login' });
   }
 
   function doSignup() {
