@@ -376,6 +376,11 @@
     /* Bottom inset accounts for iOS home-indicator on devices with safe areas. */
     padding: 10px 0 calc(20px + env(safe-area-inset-bottom, 0px));
   }
+  /* Loading-dots animation used by the plan-building screen. */
+  @keyframes adapt-pulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1); }
+  }
   .nav-btn {
     flex: 1;
     background: none;
@@ -1747,7 +1752,15 @@
         <div style="text-align:center;">
         <div style="font-size: 48px; margin-bottom: 20px;">🎯</div>
         <h1 style="text-align:center;">Building your plan…</h1>
-        <p class="sub" style="text-align:center;">Analyzing your profile, goal, and schedule.</p>
+        <p class="sub" style="text-align:center;" id="planBuildingStatus">
+          Applying Friel block periodization, Daniels VDOT pacing, and Seiler 80/20 to your inputs. This takes 15-30 seconds.
+        </p>
+        <!-- Animated dots while we wait for the AI to respond -->
+        <div style="display: flex; justify-content: center; gap: 6px; margin-top: 20px;">
+          <span class="building-dot" style="width:8px;height:8px;border-radius:50%;background:var(--primary);animation:adapt-pulse 1.4s ease-in-out infinite;"></span>
+          <span class="building-dot" style="width:8px;height:8px;border-radius:50%;background:var(--primary);animation:adapt-pulse 1.4s ease-in-out 0.2s infinite;"></span>
+          <span class="building-dot" style="width:8px;height:8px;border-radius:50%;background:var(--primary);animation:adapt-pulse 1.4s ease-in-out 0.4s infinite;"></span>
+        </div>
         <div id="readinessFlags" style="margin-top: 30px; text-align: left;"></div>
 
         <div class="onboard-actions" style="margin-top: 30px;">
@@ -3267,9 +3280,139 @@
     planState.courseIntel = intel;
     localStorage.setItem('course-intel', JSON.stringify(intel));
 
-    generatePlanFromInputs();
-    computeReadinessFlags();
-    onbStep(6);
+    onbStep(6); // show "Building your plan…" screen immediately
+    // Try AI-generated plan first. If it fails (network, validation, timeout)
+    // we silently fall back to the rule-based engine so the user always lands
+    // on a working plan. The AI engine is the upgrade; the rule engine is the
+    // safety net.
+    generatePlanWithAI({ event, eventDate, eventLocation, hours, days: activeDays, complexity })
+      .then(aiPlan => {
+        if (aiPlan && aiPlan.weeks) {
+          applyAIPlan(aiPlan);
+        } else {
+          generatePlanFromInputs();
+        }
+        computeReadinessFlags();
+        renderAll();
+        // If we're already past the "building" screen (user navigated away),
+        // re-show the home screen.
+        if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
+      })
+      .catch(err => {
+        console.warn('AI plan generation failed; falling back to rule engine:', err);
+        generatePlanFromInputs();
+        computeReadinessFlags();
+        renderAll();
+        if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
+      });
+  }
+
+  // POSTs onboarding inputs to /api/coach/plan (Mistral Large) and returns
+  // the validated plan JSON. Rejects if endpoint is missing/errors. Times
+  // out after 60s — Mistral Large can take 15-30s for a full plan.
+  async function generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity }) {
+    const profile = {
+      exp: getActiveChipVal('bgChips'),
+      freq: getActiveChipVal('freqChips'),
+      injury: getActiveChipVal('injuryChips'),
+      sleep: (() => {
+        const a = document.querySelector('#sleepChips .chip.active');
+        return a ? (a.dataset.sleep || '') : '';
+      })(),
+    };
+    const courseIntel = (typeof readCourseIntelFromInputs === 'function') ? readCourseIntelFromInputs() : null;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      const resp = await fetch('/api/coach/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          event, raceDate: eventDate, location: eventLocation,
+          hours, days, today: todayStr,
+          profile, courseIntel,
+        }),
+      });
+      clearTimeout(timeout);
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        throw new Error(errBody.error || ('HTTP ' + resp.status));
+      }
+      const data = await resp.json();
+      if (!data || !data.ok || !data.plan) throw new Error('Plan response missing plan field');
+      return data.plan;
+    } catch (e) {
+      clearTimeout(timeout);
+      throw e;
+    }
+  }
+
+  // Apply the AI-generated plan to planState. Stores the full multi-week plan
+  // on planState.fullPlan so Coach Chat / week-arc renders can read forward
+  // and backward weeks; current-week sessions get copied into planState.sessions
+  // so the existing Today / Plan screens render unchanged.
+  function applyAIPlan(plan) {
+    planState.fullPlan = plan;
+    planState.aiPlanSummary = plan.summary || '';
+    planState.aiPlanNotes = Array.isArray(plan.notesForUser) ? plan.notesForUser : [];
+    // Pick the active week — if today is past the race date, fall back to last week.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const raceStr = planState.raceDate || localStorage.getItem('race-date') || '';
+    let activeWeekIdx = 0;
+    if (raceStr) {
+      const today = new Date(todayStr + 'T00:00:00');
+      const race = new Date(raceStr + 'T00:00:00');
+      const totalWeeks = plan.weeks.length;
+      const daysToRace = Math.round((race - today) / (24 * 60 * 60 * 1000));
+      const weeksFromEnd = Math.ceil(Math.max(0, daysToRace) / 7);
+      activeWeekIdx = Math.max(0, Math.min(totalWeeks - 1, totalWeeks - weeksFromEnd));
+    }
+    const wk = plan.weeks[activeWeekIdx] || plan.weeks[0];
+    if (wk && wk.sessions) {
+      const newSessions = {};
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d => {
+        const s = wk.sessions[d] || {};
+        newSessions[d] = {
+          name: s.name || 'Rest',
+          meta: buildSessionMeta(s),
+          duration: Number(s.durationMin) || 0,
+          type: s.type || 'rest',
+          // Carry through AI prescription + targets so the workout-detail
+          // modal can show real coaching content instead of a stub.
+          prescription: s.prescription || '',
+          targets: s.targets || '',
+          intensity: s.intensity || '',
+        };
+      });
+      planState.sessions = newSessions;
+    }
+    // Build a week arc for the Plan screen from the AI's weeks. Each entry
+    // gets the existing { dates, hours, focus } shape the renderer expects.
+    planState.weekArc = plan.weeks.map((w, i) => {
+      const m = Number(w.weeklyTotalMin) || 0;
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      return {
+        dates: w.label || `Week ${i + 1}`,
+        hours: `${h}:${String(mm).padStart(2, '0')}`,
+        focus: w.focus || w.phase || 'Build',
+        current: i === activeWeekIdx,
+      };
+    });
+    saveUserData();
+  }
+
+  // Compose a one-line "meta" string for the existing session-card UI from
+  // the AI's structured fields. Falls back gracefully if anything's missing.
+  function buildSessionMeta(s) {
+    if (!s || !s.durationMin) return 'Recovery';
+    const h = Math.floor(s.durationMin / 60);
+    const mm = s.durationMin % 60;
+    const dur = h > 0 ? `${h}:${String(mm).padStart(2, '0')}` : `${mm} min`;
+    const intensity = s.intensity && s.intensity !== 'rest' ? ` · ${s.intensity}` : '';
+    return `${dur}${intensity}`;
   }
   // Coach Chat is now the only mode. Quick Actions/rule-based chat was removed
   // when Mistral-backed Coach Chat became reliable + scope-guarded. These shims
