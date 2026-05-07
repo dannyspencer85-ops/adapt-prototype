@@ -287,6 +287,24 @@ For every race you suggest, output its ID inline using EXACTLY this format on it
 
 The frontend turns each [PICK:...] into a clickable button that adds the race to the user's plan. Use the IDs from the catalog VERBATIM. Never invent a race ID. Never use [PICK:] for non-catalog races.
 
+═══ HOW TO ENCODE THE PROFILE ═══
+
+Once you've gathered enough info from the user (experience level, weekly hours, available days, sleep, etc.), output a SINGLE [PROFILE:...] block on its own line at the top of your recommendations response. It carries everything the plan engine needs to know about the user.
+
+Format (semicolon-separated key=value pairs; omit any key you don't have a clear answer for):
+
+[PROFILE:hours=H;exp=new|some|veteran;freq=low|mid|high;injury=none|minor|serious;sleep=under5|5to6|6to7|7to8|8plus;days=Mon,Wed,Sat,Sun]
+
+Mapping rules:
+• hours = integer hours/week the user can train. "5 hours" → hours=5. "an hour a day" → hours=7. "3 hrs/week" → hours=3.
+• exp = "new" if no endurance background, "some" if recreational/under 2 yrs, "veteran" if 5+ yrs / multiple races.
+• freq = "low" (sedentary lately), "mid" (1-2x/week), "high" (3+x/week recently).
+• injury = "none" / "minor" (managed) / "serious" (needs clearance). Default "none" if not mentioned.
+• sleep = bucket. Default to "7to8" if not mentioned.
+• days = comma-separated short day names (Mon,Tue,Wed,Thu,Fri,Sat,Sun). Pick the days that fit what the user described OR what's realistic for their hours (e.g. 3-5 hrs → 3 days; 5-8 hrs → 4 days; 8+ → 5-6 days).
+
+The [PROFILE:...] block is hidden from the user (frontend strips it before display). Your visible response should still mention these in plain language — don't act like you're hiding anything.
+
 ═══ FORMATTING (MANDATORY) ═══
 
 Use markdown. Bold key terms. Use bullets. Keep it tight.

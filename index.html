@@ -1455,26 +1455,26 @@
         <p class="sub">We'll go at a pace that matches where you are now. Be honest — this keeps you injury-free.</p>
         <div class="field">
           <label>How often have you worked out the last 3 months?</label>
-          <div class="chip-row">
-            <button class="chip" onclick="singleChip(this)">Not much</button>
-            <button class="chip" onclick="singleChip(this)">1-2x / week</button>
-            <button class="chip active" onclick="singleChip(this)">3+x / week</button>
+          <div class="chip-row" id="freqChips">
+            <button class="chip" data-val="low" onclick="singleChipVal(this)">Not much</button>
+            <button class="chip" data-val="mid" onclick="singleChipVal(this)">1-2x / week</button>
+            <button class="chip active" data-val="high" onclick="singleChipVal(this)">3+x / week</button>
           </div>
         </div>
         <div class="field">
           <label>Endurance background</label>
-          <div class="chip-row">
-            <button class="chip" onclick="singleChip(this)">New to this</button>
-            <button class="chip" onclick="singleChip(this)">Some experience</button>
-            <button class="chip active" onclick="singleChip(this)">5+ years</button>
+          <div class="chip-row" id="bgChips">
+            <button class="chip" data-val="new" onclick="singleChipVal(this)">New to this</button>
+            <button class="chip" data-val="some" onclick="singleChipVal(this)">Some experience</button>
+            <button class="chip active" data-val="veteran" onclick="singleChipVal(this)">5+ years</button>
           </div>
         </div>
         <div class="field">
           <label>Any current injuries or pain?</label>
-          <div class="chip-row">
-            <button class="chip active" onclick="singleChip(this)">None</button>
-            <button class="chip" onclick="singleChip(this)">Minor / managed</button>
-            <button class="chip" onclick="singleChip(this)">Yes — get cleared first</button>
+          <div class="chip-row" id="injuryChips">
+            <button class="chip active" data-val="none" onclick="singleChipVal(this)">None</button>
+            <button class="chip" data-val="minor" onclick="singleChipVal(this)">Minor / managed</button>
+            <button class="chip" data-val="serious" onclick="singleChipVal(this)">Yes — get cleared first</button>
           </div>
         </div>
         <div class="field">
@@ -2468,7 +2468,7 @@
       </div>
       <textarea id="raceHelperInput" placeholder="e.g. I run 3x/week, can train 5 hours total, want to race this fall…" style="width:100%; min-height:64px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:14px; resize:vertical; background:#fff; margin-top:10px;"></textarea>
       <button class="btn btn-primary btn-full btn-sm" onclick="sendRaceHelper()" style="margin-top:8px;" id="raceHelperSendBtn">Ask</button>
-      <div style="font-size:11px; color:var(--text-soft); margin-top:10px; line-height:1.4;">After the AI suggests an event, pick it from the dropdown above. You can always change it later.</div>
+      <div style="font-size:11px; color:var(--text-soft); margin-top:10px; line-height:1.4;">When you tap a race button, we'll add the race AND pre-fill your hours, days, and background on the next steps from what you told me. You can change anything before building the plan.</div>
     </div>
   </div>
 
@@ -10109,14 +10109,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Variant of the chat markdown renderer that ALSO turns [PICK:race-id]
   // markers into clickable "Add this race to my plan" buttons. Validates the
   // raceId against RACE_DATABASE so AI hallucinations don't render dead buttons.
+  // Holds the most recently parsed [PROFILE:...] block from the race-helper AI.
+  // Applied to onboarding form fields when the user clicks a race-pick button.
+  let _raceHelperProfile = null;
+
   function _renderRaceHelperMarkdown(text) {
     if (!text) return '';
-    // First pre-process [PICK:id] markers BEFORE markdown so the [...] doesn't
+    // 1. Capture + strip [PROFILE:k=v;...]. Last one wins. Hidden from the user.
+    const profileMatches = String(text).match(/\[PROFILE:([^\]]+)\]/g);
+    if (profileMatches && profileMatches.length > 0) {
+      const lastBlock = profileMatches[profileMatches.length - 1];
+      const inner = lastBlock.slice('[PROFILE:'.length, -1);
+      const obj = {};
+      inner.split(';').forEach(pair => {
+        const eq = pair.indexOf('=');
+        if (eq < 0) return;
+        const k = pair.slice(0, eq).trim();
+        const v = pair.slice(eq + 1).trim();
+        if (k && v) obj[k] = v;
+      });
+      _raceHelperProfile = obj;
+    }
+    const stripped = String(text).replace(/\[PROFILE:[^\]]+\]\s*\n?/g, '');
+    // 2. Pre-process [PICK:id] markers BEFORE markdown so the [...] doesn't
     // get tangled with list-bullet detection. We replace each marker with a
     // unique placeholder, render markdown, then swap the placeholders for
     // real buttons.
     const tokens = [];
-    const replaced = String(text).replace(/\[PICK:([a-zA-Z0-9_\-]+)\]/g, (_match, raceId) => {
+    const replaced = stripped.replace(/\[PICK:([a-zA-Z0-9_\-]+)\]/g, (_match, raceId) => {
       tokens.push(raceId);
       return ` PICK${tokens.length - 1} `;
     });
@@ -10162,8 +10182,50 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const dd = String(target.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   }
+  // Apply the profile the AI inferred during the race-helper chat to the
+  // step-2 + step-4 onboarding form fields, so the plan engine builds with
+  // the user's real background instead of the screen defaults.
+  function _applyRaceHelperProfileToForm() {
+    const p = _raceHelperProfile;
+    if (!p) return;
+    // Step 2: frequency, background, injury, sleep
+    if (p.freq && typeof setActiveChipVal === 'function') setActiveChipVal('freqChips', p.freq);
+    if (p.exp && typeof setActiveChipVal === 'function') setActiveChipVal('bgChips', p.exp);
+    if (p.injury && typeof setActiveChipVal === 'function') setActiveChipVal('injuryChips', p.injury);
+    if (p.sleep) {
+      const wrap = document.getElementById('sleepChips');
+      if (wrap) {
+        [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.sleep === p.sleep));
+      }
+    }
+    // Step 4: hours
+    if (p.hours) {
+      const wrap = document.getElementById('hoursChips');
+      if (wrap) {
+        const hStr = String(p.hours);
+        // Map exact value or nearest bucket: chips are 2.5 / 4 / 5 / 7 / 10
+        const buckets = [2.5, 4, 5, 7, 10];
+        const want = parseFloat(hStr) || 5;
+        const nearest = buckets.reduce((best, b) => Math.abs(b - want) < Math.abs(best - want) ? b : best, 5);
+        [...wrap.children].forEach(ch => ch.classList.toggle('active', String(ch.dataset.hours) === String(nearest)));
+      }
+    }
+    // Step 4: training days (multi-select toggles)
+    if (p.days) {
+      const wrap = document.getElementById('daysChips');
+      if (wrap) {
+        const wantedDays = new Set(p.days.split(',').map(s => s.trim()));
+        [...wrap.children].forEach(ch => {
+          const dayName = (ch.textContent || '').trim().slice(0, 3);
+          ch.classList.toggle('active', wantedDays.has(dayName));
+        });
+      }
+    }
+  }
+
   // Apply a catalog race to the onboarding form: event type, race picker,
-  // location, date. Then close the modal and show a small toast.
+  // location, date — PLUS the inferred profile (hours, experience, days, etc.)
+  // from the chat so step 2 and step 4 are pre-filled. Then close the modal.
   function pickRaceFromHelper(raceId) {
     const race = (typeof getRaceById === 'function') ? getRaceById(raceId) : null;
     if (!race) return;
@@ -10186,8 +10248,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (locEl) locEl.value = race.location || '';
     const dateEl = document.getElementById('eventDate');
     if (dateEl) dateEl.value = _computeTargetDateForRace(race);
+
+    // Apply the inferred profile to step 2 + step 4 chips so the plan engine
+    // builds with the user's real background, hours, days, sleep, etc.
+    _applyRaceHelperProfileToForm();
+
     closeRaceHelper();
-    // Visual confirmation in the page itself
     if (picker) picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   // Compact race-catalog summary shipped as context to the race-suggest prompt.
