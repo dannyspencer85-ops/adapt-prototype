@@ -2376,7 +2376,7 @@
         <div id="integrationsList"></div>
         <div style="margin-top: 14px; padding: 12px; background: var(--bg); border-radius: 10px;">
           <div style="font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Suggest an integration</div>
-          <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 10px;">Don't see your watch, ring, or coaching platform? Tell me what you'd want connected and why — it goes straight to me.</div>
+          <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 10px;">Missing your watch, ring, or platform? Drop us a note — every suggestion shapes what we build next.</div>
           <textarea id="integrationSuggestionText" placeholder="e.g. Garmin Connect direct integration so I don't have to route through Apple Health" style="width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; resize: vertical;"></textarea>
           <button class="btn btn-primary btn-full btn-sm" onclick="sendIntegrationSuggestion()" style="margin-top: 8px;" id="integrationSuggestionBtn">Send suggestion</button>
           <div id="integrationSuggestionMsg" style="margin-top: 8px; font-size: 12px; color: var(--text-soft); min-height: 16px;"></div>
@@ -3156,7 +3156,7 @@
     const text = ta.value.trim();
     if (!text) {
       if (msg) {
-        msg.textContent = 'Tell me what integration you\'d like first.';
+        msg.textContent = 'Add a quick note about what you\'d like to see connected.';
         msg.style.color = 'var(--warn)';
       }
       ta.focus();
@@ -3177,7 +3177,7 @@
       a.click();
     }
     if (msg) {
-      msg.textContent = '✓ Email opened — hit send and it lands with me.';
+      msg.textContent = '✓ Email opened — hit send and your suggestion is on its way to the team.';
       msg.style.color = 'var(--primary-dark)';
     }
     if (typeof trackEvent === 'function') trackEvent('integration_suggested', { length: text.length });
