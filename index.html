@@ -10306,6 +10306,75 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
+  // Compute a compact "adherence" summary that goes into Coach Chat context.
+  // The AI uses it to give honest, plan-aware impact warnings when the user
+  // requests a deviation: "you've already missed 2 of 3 quality sessions this
+  // block — skipping today's puts your race-pace work 50% behind plan."
+  function computeAdherenceContext() {
+    const sessions = planState.sessions || {};
+    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const todayIdx = (typeof getTodayIdx === 'function') ? getTodayIdx() : 0;
+
+    // Week-to-date completion across days that have already passed.
+    let plannedSoFar = 0, plannedMin = 0, completedMin = 0, skippedMin = 0;
+    let qualityPlanned = 0, qualityCompleted = 0, qualitySkipped = 0;
+    for (let i = 0; i <= todayIdx; i++) {
+      const s = sessions[days[i]];
+      if (!s || s.duration === 0 || s.type === 'rest') continue;
+      plannedSoFar += 1;
+      plannedMin += Number(s.duration) || 0;
+      if (s.completed) completedMin += Number(s.actualMins || s.duration) || 0;
+      else if (s.skipped) skippedMin += Number(s.duration) || 0;
+      if (s.type === 'quality' || s.type === 'brick') {
+        qualityPlanned += 1;
+        if (s.completed) qualityCompleted += 1;
+        else if (s.skipped) qualitySkipped += 1;
+      }
+    }
+    const adherencePct = plannedSoFar > 0 ? Math.round(completedMin / Math.max(1, plannedMin) * 100) : null;
+
+    // Where in the plan are we? Pull phase from fullPlan if present.
+    let phase = null;
+    let phaseFocus = null;
+    if (planState.fullPlan && Array.isArray(planState.fullPlan.weeks)) {
+      const cur = planState.fullPlan.weeks.find(w => {
+        // Heuristic: pick whichever week is marked current via weekArc, or first.
+        return false;
+      });
+      // Use the active week from weekArc.current
+      const arcCur = (planState.weekArc || []).findIndex(w => w.current);
+      const wkData = planState.fullPlan.weeks[arcCur >= 0 ? arcCur : 0];
+      if (wkData) {
+        phase = wkData.phase || null;
+        phaseFocus = wkData.focus || null;
+      }
+    }
+
+    // Recent Strava-derived trend (last 14d completion vs planned).
+    const acts = (planState.stravaActivities || []).slice(0, 30);
+
+    return {
+      weekToDate: {
+        plannedSessions: plannedSoFar,
+        plannedMin,
+        completedMin,
+        skippedMin,
+        adherencePct,
+      },
+      qualityWork: {
+        planned: qualityPlanned,
+        completed: qualityCompleted,
+        skipped: qualitySkipped,
+      },
+      currentPhase: phase,
+      currentPhaseFocus: phaseFocus,
+      recentActivityCount: acts.length,
+      lastChange: planState.lastChange || null,
+      injury: planState.injury || null,
+      checkin: planState.lastCheckin || null,
+    };
+  }
+
   // Build the live-state payload that goes into the system prompt every turn.
   // Keep it tight — anything we put here costs tokens on every message.
   // Relative-day mapping is precomputed so the model never has to do
@@ -10350,6 +10419,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
+    // Trim the full AI plan for context: weeks-only, with prescription kept
+    // (it's the "real coaching" the AI needs to reason about adherence).
+    let fullPlanCompact = null;
+    if (planState.fullPlan && Array.isArray(planState.fullPlan.weeks)) {
+      fullPlanCompact = {
+        summary: planState.fullPlan.summary || '',
+        blocks: planState.fullPlan.blocks || [],
+        weeks: planState.fullPlan.weeks.slice(0, 16).map(w => ({
+          weekIndex: w.weekIndex,
+          label: w.label,
+          phase: w.phase,
+          focus: w.focus,
+          weeklyTotalMin: w.weeklyTotalMin,
+          intensityRatio: w.intensityRatio,
+          deload: !!w.deload,
+        })),
+      };
+    }
+
     return {
       today: { day: todayDay, label: todayDateStr },
       timeline,
@@ -10361,6 +10449,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       lastChange: planState.lastChange || null,
       lastCheckin: planState.lastCheckin || null,
       recentActivities: acts,
+      fullPlan: fullPlanCompact,
+      adherence: computeAdherenceContext(),
     };
   }
 
