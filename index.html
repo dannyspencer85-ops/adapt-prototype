@@ -6376,12 +6376,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Categories used for grouping insights in the UI.
   // Order = display order (top to bottom in the panel).
   const INSIGHT_CATEGORIES = [
-    { id: 'today',    label: 'Today\'s check-in', svg: 'sun' },
-    { id: 'load',     label: 'Recovery & load',   svg: 'battery' },
-    { id: 'race',     label: 'Race readiness',    svg: 'flag' },
-    { id: 'balance',  label: 'Plan balance',      svg: 'scale' },
-    { id: 'trends',   label: 'Trends',            svg: 'trendingUp' },
-    { id: 'other',    label: 'Other',             svg: 'lightbulb' },
+    { id: 'today',    label: 'Today\'s check-in', svg: 'sun',         color: 'var(--primary-dark)' },
+    { id: 'load',     label: 'Recovery & load',   svg: 'battery',     color: 'var(--alert)' },
+    { id: 'race',     label: 'Race readiness',    svg: 'flag',        color: 'var(--caution)' },
+    { id: 'balance',  label: 'Plan balance',      svg: 'scale',       color: 'var(--info)' },
+    { id: 'trends',   label: 'Trends',            svg: 'trendingUp',  color: 'var(--secondary)' },
+    { id: 'other',    label: 'Other',             svg: 'lightbulb',   color: 'var(--text-soft)' },
   ];
   // Title-pattern → category. First match wins. The order here is precedence.
   function classifyInsight(insight) {
@@ -6425,7 +6425,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     INSIGHT_CATEGORIES.forEach(cat => {
       const list = grouped[cat.id];
       if (!list || list.length === 0) return;
-      html += `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-soft); margin: 14px 0 8px; display: flex; align-items: center; gap: 6px;">${icon(cat.svg, { size: 14 })} ${cat.label} <span style="background:var(--bg-soft); color:var(--text-soft); padding:1px 7px; border-radius:100px; margin-left:4px; font-weight:700;">${list.length}</span></div>`;
+      const catColor = cat.color || 'var(--text-soft)';
+      html += `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:${catColor}; margin: 14px 0 8px; display: flex; align-items: center; gap: 6px;">${icon(cat.svg, { size: 14, color: catColor })} ${cat.label} <span style="background:${catColor}; color:#fff; padding:1px 7px; border-radius:100px; margin-left:4px; font-weight:700;">${list.length}</span></div>`;
       list.forEach(ins => { html += renderInsightCard(ins, ins._idx); });
     });
     if (hasFixes && insights.length > 1) {
