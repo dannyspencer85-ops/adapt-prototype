@@ -1414,17 +1414,18 @@
         <h1>A bit about you.</h1>
         <p class="sub">So we can set safe intensity zones.</p>
         <div class="field">
-          <label>First name</label>
-          <input type="text" value="Danny">
+          <label>First name <span style="color: var(--alert);">*</span></label>
+          <input type="text" id="firstName" placeholder="e.g. Danny" required autocomplete="given-name" oninput="document.getElementById('firstNameError') && (document.getElementById('firstNameError').style.display='none');">
+          <div id="firstNameError" style="display:none; color:var(--alert); font-size:12px; margin-top:6px;">Please enter your first name to continue.</div>
         </div>
         <div class="two-col">
           <div class="field">
             <label>Age</label>
-            <input type="number" value="30">
+            <input type="number" id="onbAge" value="30">
           </div>
           <div class="field">
             <label>Weight (lbs)</label>
-            <input type="number" value="175">
+            <input type="number" id="onbWeight" value="175">
           </div>
         </div>
         <div class="field">
@@ -1436,7 +1437,7 @@
           </div>
         </div>
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-full btn-lg" onclick="onbStep(2)">Next</button>
+          <button class="btn btn-primary btn-full btn-lg" onclick="advanceFromStep1()">Next</button>
         </div>
       </div>
 
@@ -3057,6 +3058,40 @@
     document.getElementById('onb-' + target).style.display = 'block';
     if (n === 4) populateDisciplineChips();
     if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
+    // Pre-fill the first-name field if we already have it stored (returning user
+    // re-entering onboarding via "Edit goals" or "Start over").
+    if (n === 1) {
+      const fnEl = document.getElementById('firstName');
+      const saved = getFirstName();
+      if (fnEl && saved && !fnEl.value) fnEl.value = saved;
+    }
+  }
+
+  // First name is the canonical greeting handle and is mandatory at step 1.
+  // We store the trimmed value in localStorage under 'first-name'.
+  function getFirstName() {
+    const v = (localStorage.getItem('first-name') || '').trim();
+    return v;
+  }
+  function setFirstName(v) {
+    const trimmed = (v || '').trim();
+    if (trimmed) localStorage.setItem('first-name', trimmed);
+    else localStorage.removeItem('first-name');
+  }
+  function advanceFromStep1() {
+    const fnEl = document.getElementById('firstName');
+    const errEl = document.getElementById('firstNameError');
+    const val = (fnEl && fnEl.value || '').trim();
+    if (!val) {
+      if (errEl) errEl.style.display = 'block';
+      if (fnEl) fnEl.focus();
+      return;
+    }
+    setFirstName(val);
+    if (errEl) errEl.style.display = 'none';
+    if (typeof renderTodayGreetingAndRace === 'function') renderTodayGreetingAndRace();
+    if (typeof renderProfileScreen === 'function') renderProfileScreen();
+    onbStep(2);
   }
 
   // ── Integrations (Apple Health only for v1) ──
@@ -7451,8 +7486,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const greetingDate = document.getElementById('todayGreetingDate');
     const greetingName = document.getElementById('todayGreetingName');
     if (greetingDate) greetingDate.textContent = getTodayDateString();
-    const username = (currentUser && currentUser()) || 'there';
-    const niceName = username.charAt(0).toUpperCase() + username.slice(1);
+    // First name (entered + saved during onboarding step 1) is the canonical
+    // greeting handle. Falls back to the username, then "there".
+    const firstName = getFirstName();
+    const username = (currentUser && currentUser()) || '';
+    const raw = firstName || username || 'there';
+    const niceName = raw.charAt(0).toUpperCase() + raw.slice(1);
     const hour = getToday().getHours();
     const part = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     if (greetingName) greetingName.textContent = `${part}, ${niceName}`;
@@ -9887,7 +9926,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const accounts = getAccounts();
     const acct = accounts[username];
     const greet = document.getElementById('profileGreeting');
-    if (greet) greet.textContent = 'Logged in as ' + username;
+    if (greet) {
+      const firstName = getFirstName();
+      const display = firstName ? (firstName.charAt(0).toUpperCase() + firstName.slice(1)) : username;
+      greet.textContent = 'Logged in as ' + display;
+    }
     if (!acct || !acct.data.onboardingComplete) {
       showScreen('onboard');
       onbStep(0);
