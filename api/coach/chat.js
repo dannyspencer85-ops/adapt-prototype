@@ -15,17 +15,26 @@ const TOOL_MODEL = 'mistral-large-latest';
 const MAX_OUTPUT_TOKENS = 800;
 
 // Per-IP rate limit: simple in-memory map. Resets on cold start.
-// For prototype scale this is plenty; replace with a KV-backed counter when public.
+// Bumped to 200/day for the closed test group (small group, shared offices/WiFi
+// burned through the original 50/day fast). Tighten when this goes public.
+// Also enforces a per-instance global cap as a runaway-loop guard.
 const _rate = new Map(); // key: ip|date, value: count
-const DAILY_CAP = 50;
+const _globalRate = new Map(); // key: date, value: count
+const DAILY_CAP = 200;
+const GLOBAL_DAILY_CAP = 1500; // hard ceiling per-instance to prevent runaway costs
 
 function rateLimitOk(ip) {
   const day = new Date().toISOString().slice(0, 10);
+  // Global ceiling first — any single instance shouldn't exceed this no matter
+  // how many distinct IPs we see (protects against accidental loops or abuse).
+  const gn = _globalRate.get(day) || 0;
+  if (gn >= GLOBAL_DAILY_CAP) return { ok: false, reason: 'global' };
   const key = `${ip}|${day}`;
   const n = _rate.get(key) || 0;
-  if (n >= DAILY_CAP) return false;
+  if (n >= DAILY_CAP) return { ok: false, reason: 'ip' };
   _rate.set(key, n + 1);
-  return true;
+  _globalRate.set(day, gn + 1);
+  return { ok: true };
 }
 
 export default async function handler(req) {
@@ -62,10 +71,14 @@ export default async function handler(req) {
     return jsonError(400, '`messages` array is required');
   }
 
-  // Rate limit
+  // Rate limit (per-IP daily, plus a global per-instance ceiling).
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-  if (!rateLimitOk(ip)) {
-    return jsonError(429, `Daily limit reached (${DAILY_CAP} messages). Resets at midnight UTC.`);
+  const rl = rateLimitOk(ip);
+  if (!rl.ok) {
+    const msg = rl.reason === 'global'
+      ? 'Global daily limit reached for this instance. Try again tomorrow.'
+      : `Daily limit reached (${DAILY_CAP} messages from your IP). Resets at midnight UTC.`;
+    return jsonError(429, msg);
   }
 
   // Build the message list with the right system prompt for the requested mode.
