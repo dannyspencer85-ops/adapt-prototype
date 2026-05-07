@@ -11654,6 +11654,11 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const card = document.getElementById('todayCheckin');
     if (!card) return;
     if (!_checkinFormHTML) _checkinFormHTML = card.innerHTML;
+    // Adapt the CTA copy to whether the check-in signals a likely adjustment.
+    const lowRecovery = (body === 'Exhausted') || (sleep === 'Under 5h') || (sleep === '5-6h') || (stress === 'High');
+    const askLabel = lowRecovery
+      ? '🧠 Ask coach to adjust today'
+      : '🧠 Ask coach for today\'s tweaks';
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;">
         <div>
@@ -11677,7 +11682,40 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
         </div>
       </div>
       ${notes ? `<div style="margin-top:10px; padding:8px 12px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.5; color:var(--text-soft);"><strong style="color:var(--text);">Notes:</strong> "${escapeHtml(notes)}"</div>` : ''}
+      <button onclick="askCoachAboutCheckin()" class="btn btn-primary btn-full btn-sm" style="margin-top:12px;">${askLabel}</button>
+      <div style="font-size:11px; color:var(--text-soft); margin-top:6px; text-align:center; line-height:1.4;">The coach reads your check-in + plan + adherence and proposes adjustments with honest impact warnings.</div>
     `;
+  }
+
+  // Bridge from morning check-in → Coach Chat. Builds a structured prompt
+  // from the saved check-in and sends it through sendChat() so the AI runs
+  // the full acknowledge → impact → cascade → warning flow and executes any
+  // tool calls (shortenSession, swapDiscipline, skipSession) directly.
+  function askCoachAboutCheckin() {
+    const ci = planState.lastCheckin;
+    if (!ci) return;
+    const todayDay = (typeof getTodayDay === 'function') ? getTodayDay() : '';
+    const todayFull = todayDay && DAY_FULL ? DAY_FULL[todayDay] : todayDay;
+    const sess = todayDay ? planState.sessions[todayDay] : null;
+    const sessLine = sess && sess.type !== 'rest'
+      ? `Today (${todayFull}) is scheduled: ${sess.name} · ${sess.meta}.`
+      : `Today (${todayFull}) is scheduled as rest.`;
+    const notesLine = ci.notes ? ` Notes: "${ci.notes}".` : '';
+    const prompt = `Just checked in. Body: ${ci.body}. Sleep: ${ci.sleep}. Stress: ${ci.stress}.${notesLine} ${sessLine} Should we adjust today's plan? If so, make the changes — call the right tools and tell me the impact.`;
+    if (!hasAcceptedCoach || typeof hasAcceptedCoach !== 'function' || !hasAcceptedCoach()) {
+      // Coach Chat hasn't been turned on yet. Send them through the privacy
+      // disclosure first; they can come back to this CTA after accepting.
+      showScreen('ask');
+      if (typeof updateChatState === 'function') updateChatState();
+      return;
+    }
+    showScreen('ask');
+    setTimeout(() => {
+      const input = document.getElementById('chatInput');
+      if (input) input.value = prompt;
+      if (typeof sendChat === 'function') sendChat();
+    }, 150);
+    if (typeof trackEvent === 'function') trackEvent('checkin_to_coach', { body: ci.body, sleep: ci.sleep, stress: ci.stress });
   }
 
   function editCheckin() {
