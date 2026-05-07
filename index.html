@@ -2374,8 +2374,12 @@
         <div class="card-title">Integrations</div>
         <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 14px;">Apple Health pulls in your workouts, sleep, and HR. Most other devices feed into Apple Health automatically — that's why we start there.</div>
         <div id="integrationsList"></div>
-        <div style="margin-top: 14px; padding: 10px 12px; background: var(--bg); border-radius: 8px; font-size: 12px; color: var(--text-soft); line-height: 1.5;">
-          <strong style="color: var(--text);">Coming later:</strong> Garmin Connect, Oura, Whoop, TrainingPeaks (direct integrations). For now, anything that syncs to Apple Health on your phone (Apple Watch, Oura, Garmin, Whoop, Zwift) is already covered.
+        <div style="margin-top: 14px; padding: 12px; background: var(--bg); border-radius: 10px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Suggest an integration</div>
+          <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 10px;">Don't see your watch, ring, or coaching platform? Tell me what you'd want connected and why — it goes straight to me.</div>
+          <textarea id="integrationSuggestionText" placeholder="e.g. Garmin Connect direct integration so I don't have to route through Apple Health" style="width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; resize: vertical;"></textarea>
+          <button class="btn btn-primary btn-full btn-sm" onclick="sendIntegrationSuggestion()" style="margin-top: 8px;" id="integrationSuggestionBtn">Send suggestion</button>
+          <div id="integrationSuggestionMsg" style="margin-top: 8px; font-size: 12px; color: var(--text-soft); min-height: 16px;"></div>
         </div>
       </div>
 
@@ -3139,6 +3143,48 @@
   function setConnectedIntegrations(arr) {
     localStorage.setItem('integrations', JSON.stringify(arr));
     saveUserData();
+  }
+
+  // Suggest-an-integration: opens a mailto: with the user's request prefilled
+  // so the message lands in dannyspencer85@gmail.com without me building a
+  // server-side intake form. Clears the textarea + shows a confirmation.
+  function sendIntegrationSuggestion() {
+    const ta = document.getElementById('integrationSuggestionText');
+    const msg = document.getElementById('integrationSuggestionMsg');
+    const btn = document.getElementById('integrationSuggestionBtn');
+    if (!ta) return;
+    const text = ta.value.trim();
+    if (!text) {
+      if (msg) {
+        msg.textContent = 'Tell me what integration you\'d like first.';
+        msg.style.color = 'var(--warn)';
+      }
+      ta.focus();
+      return;
+    }
+    const subject = encodeURIComponent('Adapt — integration suggestion');
+    const body = encodeURIComponent(
+      `Suggested integration:\n\n${text}\n\n— Sent from the Adapt app`
+    );
+    // Open the mail client. Some browsers block window.location for mailtos
+    // from buttons without user gesture, but a click handler is a gesture so
+    // this is safe. Fall back to a hidden anchor click if needed.
+    try {
+      window.location.href = `mailto:dannyspencer85@gmail.com?subject=${subject}&body=${body}`;
+    } catch (e) {
+      const a = document.createElement('a');
+      a.href = `mailto:dannyspencer85@gmail.com?subject=${subject}&body=${body}`;
+      a.click();
+    }
+    if (msg) {
+      msg.textContent = '✓ Email opened — hit send and it lands with me.';
+      msg.style.color = 'var(--primary-dark)';
+    }
+    if (typeof trackEvent === 'function') trackEvent('integration_suggested', { length: text.length });
+    setTimeout(() => {
+      ta.value = '';
+      if (msg) { msg.textContent = ''; msg.style.color = 'var(--text-soft)'; }
+    }, 4000);
   }
 
   function toggleIntegration(id) {
