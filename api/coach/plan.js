@@ -492,6 +492,20 @@ You MUST output an object exactly matching this shape:
   ]
 }
 
+═══ FIELD CONSISTENCY — CRITICAL ═══
+
+These fields are read by DIFFERENT parts of the UI. If they disagree, the user sees inconsistent info ("card says 15 min walk, modal says 40 min run") — which destroys trust.
+
+• "name" — short label, 1-4 words. Examples: "Easy run", "Tempo intervals", "Long run", "Recovery walk-jog", "Strength + mobility", "Brick (bike + run)".
+  ❌ NEVER include numbers, minutes, miles, pace, or HR. NO "15-min walk", NO "8x400m", NO "Z2". Those go in prescription/targets.
+  ❌ NEVER include "min" or "minute" in the name.
+• "durationMin" — single integer, the TOTAL minutes for the whole session including warmup + cooldown. The card and modal both read this directly. It MUST equal the time covered by your prescription text.
+• "prescription" — full workout text. If you write "5 min walk WU + 8×(60s/90s) + 5 min CD ≈ 28 min", durationMin must equal that total (≈28). If durationMin is 40, the prescription must total 40 min.
+• "intensity" — Z1/Z2/Z3/Z4/Z5 OR the word "rest" for rest days. One value per session.
+• "type" — must match the actual workout: "run" if it's a run, "walk-run" beginner intervals are still type="run".
+
+If you change durationMin, the prescription text must reflect the new total. If you change prescription structure, durationMin must follow. They are tied together.
+
 NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
 }
 
@@ -576,6 +590,10 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
       const sess = wk.sessions[dayName];
       if (!sess) return { ok: false, reason: `week ${wi} ${dayName} missing` };
       if (typeof sess.name !== 'string') sess.name = sess.name || 'Untitled';
+      // Field consistency defense: strip duration/pace/distance numbers from name
+      // so the card label doesn't conflict with durationMin shown beside it.
+      // The prescription field is where numbers belong.
+      sess.name = sanitizeSessionName(sess.name);
       if (typeof sess.durationMin !== 'number') sess.durationMin = 0;
       if (sess.durationMin < 0) sess.durationMin = 0;
       if (sess.durationMin > 360) return { ok: false, reason: `week ${wi} ${dayName} duration > 6h` };
@@ -636,6 +654,30 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
+
+// Strip numbers, durations, paces, and distances from a session name so it's a
+// pure label. Prevents the card showing "15-min walk" while the modal duration
+// shows "40 min" — those numbers belong in prescription/targets, not name.
+function sanitizeSessionName(raw) {
+  if (typeof raw !== 'string') return 'Easy session';
+  let s = raw.trim();
+  // Common patterns to strip:
+  //   "15-min ", "15 min ", "15min ", "15 minute ", "15-minute "
+  //   "8x400m", "10x(2/1)", "30s ", "60s "
+  //   "5K", "10K", "1 mile", "3mi"
+  //   "Z2", "@RPE 6"
+  s = s.replace(/\b\d+\s*(?:-)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hr|hour|hrs|hours)\b\.?/gi, '');
+  s = s.replace(/\b\d+\s*[x×]\s*\([^)]*\)/gi, '');           // "8x(60s/90s)"
+  s = s.replace(/\b\d+\s*[x×]\s*\d+\s*[a-z]*/gi, '');         // "8x400m" / "6x3min"
+  s = s.replace(/\b\d+\s*(?:k|km|mi|mile|miles|m)\b/gi, '');  // "5K", "3mi", "400m"
+  s = s.replace(/\bZ[1-5]\b/gi, '');                           // zones
+  s = s.replace(/\b(?:RPE|HR)\s*\d+(?:\s*-\s*\d+)?\b/gi, '');  // RPE/HR numbers
+  s = s.replace(/\(\s*\)/g, '');                                // empty parens
+  s = s.replace(/\s+/g, ' ').replace(/^[\s\-+:,]+|[\s\-+:,]+$/g, '').trim();
+  // Title-case first letter for visual consistency.
+  if (!s) return 'Easy session';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 function jsonErr(status, message) {
   return new Response(JSON.stringify({ ok: false, error: message }), {

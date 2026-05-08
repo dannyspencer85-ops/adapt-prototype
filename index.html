@@ -2510,6 +2510,15 @@
         </div>
         <div class="suggest-row inline" id="suggestRow"></div>
       </div>
+      <div id="rebuildPlanRow" style="display:none; padding:8px 14px 0; background:#fff; border-top:1px solid var(--border);">
+        <button id="rebuildPlanBtn" onclick="rebuildPlanFromChat()" style="width:100%; padding:10px 14px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <span id="rebuildPlanBtnLabel">Rebuild plan from this chat</span>
+        </button>
+        <div style="font-size:11px; color:var(--text-soft); margin:6px 2px 0; text-align:center; line-height:1.4;">
+          Plan didn't update after the coach said it would? Tap to force a rebuild.
+        </div>
+      </div>
       <div class="chat-input-wrap">
         <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your plan…" onkeydown="if(event.key==='Enter') sendChat()">
         <button class="send-btn" onclick="sendChat()">
@@ -4067,10 +4076,29 @@
   // (shape: { name, meta, duration, type, prescription, targets, intensity }).
   // Used by applyAIPlan AND by the multi-week tool runner so future-week edits
   // round-trip cleanly.
+  // Strip embedded numbers/duration/pace/zone tokens out of a session name so
+  // the card label can never disagree with the displayed duration. Mirror of
+  // the server-side sanitizeSessionName in api/coach/plan.js — defense in depth.
+  function sanitizeSessionName(raw) {
+    if (typeof raw !== 'string') return 'Easy session';
+    let s = raw.trim();
+    s = s.replace(/\b\d+\s*(?:-)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hr|hour|hrs|hours)\b\.?/gi, '');
+    s = s.replace(/\b\d+\s*[x×]\s*\([^)]*\)/gi, '');
+    s = s.replace(/\b\d+\s*[x×]\s*\d+\s*[a-z]*/gi, '');
+    s = s.replace(/\b\d+\s*(?:k|km|mi|mile|miles|m)\b/gi, '');
+    s = s.replace(/\bZ[1-5]\b/gi, '');
+    s = s.replace(/\b(?:RPE|HR)\s*\d+(?:\s*-\s*\d+)?\b/gi, '');
+    s = s.replace(/\(\s*\)/g, '');
+    s = s.replace(/\s+/g, ' ').replace(/^[\s\-+:,]+|[\s\-+:,]+$/g, '').trim();
+    if (!s) return 'Easy session';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   function _aiSessionToRuntime(s) {
     if (!s) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', prescription: '', targets: '', intensity: 'rest' };
+    const cleanName = s.name && /rest/i.test(String(s.name)) ? String(s.name) : sanitizeSessionName(s.name || 'Easy session');
     return {
-      name: s.name || 'Rest',
+      name: cleanName,
       meta: buildSessionMeta(s),
       duration: Number(s.durationMin) || 0,
       type: s.type || 'rest',
@@ -4141,6 +4169,25 @@
     const dur = h > 0 ? `${h}:${String(mm).padStart(2, '0')}` : `${mm} min`;
     const intensity = s.intensity && s.intensity !== 'rest' ? ` · ${s.intensity}` : '';
     return `${dur}${intensity}`;
+  }
+
+  // Display-time reconciliation. Always run a session through this before
+  // showing it in a card or list — guarantees the name doesn't contradict the
+  // duration ("15 min walk" while duration=40 min). Single source of truth:
+  //   - duration drives the meta line
+  //   - name is a clean label, no numbers
+  // Returns a shallow copy; does NOT mutate the underlying planState.sessions.
+  function _safeSession(s) {
+    if (!s) return s;
+    const dur = Number(s.duration || s.durationMin || 0);
+    const isRest = s.type === 'rest' || dur === 0;
+    const name = isRest
+      ? (s.name && /rest/i.test(s.name) ? s.name : 'Rest day')
+      : sanitizeSessionName(s.name || 'Easy session');
+    const meta = isRest
+      ? (s.meta && /recover|rest/i.test(s.meta) ? s.meta : 'Recovery')
+      : buildSessionMeta({ duration: dur, intensity: s.intensity });
+    return { ...s, name, meta };
   }
   // Coach Chat is now the only mode. Quick Actions/rule-based chat was removed
   // when Mistral-backed Coach Chat became reliable + scope-guarded. These shims
@@ -5770,6 +5817,55 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { success: true, message: msg, regenerating: true, reason: reason || '' };
   }
 
+  // Manual override: user taps "Rebuild plan from this chat" because the
+  // coach claimed a change the user can't see. Reads the recent user messages
+  // for context, infers an easier/harder direction if obvious, and forces a
+  // fresh plan build. The button beneath the chat input calls this.
+  function rebuildPlanFromChat() {
+    if (_bgRegenInFlight) return;
+    // Scan the last few user bubbles to detect a difficulty hint. If the user
+    // said "too easy" we save 'harder', "too hard"/"crushed"/"fix this" → 'easier'.
+    try {
+      const area = document.getElementById('chatArea');
+      const userBubbles = area ? Array.from(area.querySelectorAll('.bubble.user')) : [];
+      const recentText = userBubbles.slice(-5).map(b => (b.textContent || '').toLowerCase()).join(' \n ');
+      const easierHints = /too hard|too aggressive|too much|tone it down|crushed|fix the plan|fix this|wrong|i can't|i cannot|too long|too fast|too soon/;
+      const harderHints = /too easy|too soft|not enough|more challenge|step it up|harder|push me|bored/;
+      if (harderHints.test(recentText)) localStorage.setItem('plan-difficulty-adjust', 'harder');
+      else if (easierHints.test(recentText)) localStorage.setItem('plan-difficulty-adjust', 'easier');
+      // else: leave whatever was previously set (or unset) alone.
+    } catch (e) { /* ignore */ }
+    // Visual feedback while regen is in flight.
+    const btn = document.getElementById('rebuildPlanBtn');
+    const lbl = document.getElementById('rebuildPlanBtnLabel');
+    if (btn) btn.disabled = true;
+    if (lbl) lbl.textContent = 'Rebuilding…';
+    // Drop a system bubble so the user sees something happened.
+    const area = document.getElementById('chatArea');
+    if (area) {
+      const b = document.createElement('div');
+      b.className = 'bubble system';
+      b.style.maxWidth = '100%';
+      b.innerHTML = '↻ <strong>Rebuilding plan now…</strong> Give it ~30s, then check the Plan tab.';
+      const sugg = area.querySelector('#suggestRow');
+      if (sugg) area.insertBefore(b, sugg);
+      else area.appendChild(b);
+      area.scrollTop = area.scrollHeight;
+    }
+    _regeneratePlanInBackground();
+  }
+
+  // Show/hide the rebuild button. Visible only when the user has an active
+  // plan AND chat mode is on (visibility of #chatActive controls the parent).
+  function updateRebuildPlanRowVisibility() {
+    const row = document.getElementById('rebuildPlanRow');
+    if (!row) return;
+    const chatActive = document.getElementById('chatActive');
+    const inChatMode = chatActive && chatActive.style.display !== 'none';
+    const hasPlan = !!(planState.fullPlan && planState.fullPlan.length);
+    row.style.display = (inChatMode && hasPlan) ? 'block' : 'none';
+  }
+
   // Quiet plan regen that stays in chat — no navigation away. Runs the same
   // /api/coach/plan call as retryAIPlan but doesn't show the building screen.
   // Surfaces a system bubble in chat when complete (or on error).
@@ -5777,6 +5873,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   async function _regeneratePlanInBackground() {
     if (_bgRegenInFlight) return;
     _bgRegenInFlight = true;
+    // Disable the manual rebuild button while regen is in flight.
+    const _btn = document.getElementById('rebuildPlanBtn');
+    const _lbl = document.getElementById('rebuildPlanBtnLabel');
+    if (_btn) _btn.disabled = true;
+    if (_lbl) _lbl.textContent = 'Rebuilding…';
     const event = localStorage.getItem('race-event') || planState.raceEvent || '';
     const eventDate = localStorage.getItem('race-date') || planState.raceDate || '';
     const eventLocation = localStorage.getItem('race-location') || planState.raceLocation || '';
@@ -5814,6 +5915,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     } finally {
       _bgRegenInFlight = false;
+      // Restore the manual rebuild button.
+      const _btn2 = document.getElementById('rebuildPlanBtn');
+      const _lbl2 = document.getElementById('rebuildPlanBtnLabel');
+      if (_btn2) _btn2.disabled = false;
+      if (_lbl2) _lbl2.textContent = 'Rebuild plan from this chat';
     }
   }
 
@@ -5976,7 +6082,125 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { success: true, message: msg, reason: reason || '' };
   }
 
-  function executeTool(name, input) {
+  // ──────────────────────────────────────────────────────────────────────
+  // CONFIRM-BEFORE-APPLY GATE
+  // Some tools are reversible micro-edits (skipSession, completeSession,
+  // flagInjury) — those fire immediately. Others reshape the plan
+  // (adjustPlanDifficulty, setTrainingFocus, addRestWeek, etc.) — those go
+  // through a confirmation card in chat. The user clicks Apply or Cancel.
+  // ──────────────────────────────────────────────────────────────────────
+  const _GATED_TOOLS = new Set([
+    'adjustPlanDifficulty',
+    'setTrainingFocus',
+    'addRestWeek',
+    'adjustVolume',
+    'moveSession',
+    'shortenSession',
+    'swapDiscipline',
+    'openTrainingDay',
+    'closeTrainingDay',
+  ]);
+  // Pending changes by id. id → { tool, input, description, ts }
+  const _pendingChanges = new Map();
+  let _pendingChangeSeq = 0;
+
+  // Pretty descriptions for each gated tool — what we show on the confirm card.
+  function _describePendingChange(tool, input) {
+    const safe = input || {};
+    const dayShort = (d) => (typeof DAY_FULL === 'object' && DAY_FULL[d]) ? DAY_FULL[d] : d;
+    switch (tool) {
+      case 'adjustPlanDifficulty':
+        return safe.direction === 'easier'
+          ? `Rebuild the whole plan with lighter sessions and a slower progression.${safe.reason ? ' Why: ' + safe.reason : ''}`
+          : `Rebuild the whole plan with sharper progression and earlier quality work.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'setTrainingFocus': {
+        const lim = safe.limiter === 'balanced' ? 'an even split across all three' : `${String(safe.limiter || '').toUpperCase()} as your limiter`;
+        return `Rebuild the plan with ${lim} (strategy: ${safe.strategy || 'focus'}).${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      }
+      case 'addRestWeek':
+        return `Insert an extra rest week after week ${(safe.afterWeekIndex || 0) + 1}.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'adjustVolume': {
+        const pct = safe.percentChange ? `${safe.percentChange > 0 ? '+' : ''}${safe.percentChange}%` : 'TBD';
+        return `Adjust weekly volume by ${pct} from week ${(safe.fromWeekIndex || 0) + 1} through week ${(safe.toWeekIndex || 0) + 1}.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      }
+      case 'moveSession':
+        return `Move ${dayShort(safe.fromDay)}'s session to ${dayShort(safe.toDay)}.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'shortenSession':
+        return `Shorten ${dayShort(safe.day)} to ${safe.newMinutes} min.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'swapDiscipline':
+        return `Change ${dayShort(safe.day)} to a ${safe.newType} session.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'openTrainingDay':
+        return `Add ${dayShort(safe.day)} as a regular training day.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'closeTrainingDay':
+        return `Drop ${dayShort(safe.day)} from your training days (becomes rest).${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      default:
+        return `Apply change: ${tool}`;
+    }
+  }
+
+  // Render a confirmation card in the chat area for a pending change.
+  function _renderPendingChangeCard(id) {
+    const pc = _pendingChanges.get(id);
+    if (!pc) return;
+    const area = document.getElementById('chatArea');
+    if (!area) return;
+    const card = document.createElement('div');
+    card.className = 'bubble system';
+    card.style.maxWidth = '100%';
+    card.id = 'pendingChange-' + id;
+    card.innerHTML = `
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px; color:var(--text);">⏳ Change ready — tap to apply</div>
+      <div style="font-size:13px; line-height:1.5; color:var(--text); margin-bottom:10px;">${escapeHtml(pc.description)}</div>
+      <div style="display:flex; gap:8px;">
+        <button onclick="applyPendingChange('${id}')" style="flex:1; padding:9px 12px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">✓ Apply</button>
+        <button onclick="cancelPendingChange('${id}')" style="flex:1; padding:9px 12px; background:#fff; color:var(--text-soft); border:1px solid var(--border); border-radius:100px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Cancel</button>
+      </div>`;
+    const sugg = area.querySelector('#suggestRow');
+    if (sugg) area.insertBefore(card, sugg);
+    else area.appendChild(card);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  // User clicked Apply — actually run the tool and update the card.
+  function applyPendingChange(id) {
+    const pc = _pendingChanges.get(id);
+    if (!pc) return;
+    const card = document.getElementById('pendingChange-' + id);
+    let result;
+    try {
+      result = _runToolDirect(pc.tool, pc.input);
+    } catch (err) {
+      result = { success: false, message: 'Apply failed: ' + err.message };
+    }
+    if (card) {
+      const ok = result && result.success !== false;
+      card.style.background = ok ? 'var(--secondary-soft)' : '#fde8e8';
+      card.innerHTML = `
+        <div style="font-weight:700; font-size:13px; color:${ok ? 'var(--primary-dark)' : '#a33'};">${ok ? '✓ Applied' : '⚠ Failed'}</div>
+        <div style="font-size:13px; line-height:1.5; color:var(--text); margin-top:4px;">${escapeHtml(pc.description)}</div>
+        ${result && result.message ? `<div style="font-size:12px; color:var(--text-soft); margin-top:6px;">${escapeHtml(result.message)}</div>` : ''}`;
+    }
+    _pendingChanges.delete(id);
+    if (typeof renderAll === 'function') renderAll();
+  }
+
+  // User clicked Cancel — drop the change without running the tool.
+  function cancelPendingChange(id) {
+    const pc = _pendingChanges.get(id);
+    if (!pc) return;
+    const card = document.getElementById('pendingChange-' + id);
+    if (card) {
+      card.style.background = 'var(--bg-soft)';
+      card.innerHTML = `
+        <div style="font-weight:700; font-size:13px; color:var(--text-soft);">✕ Cancelled</div>
+        <div style="font-size:13px; line-height:1.5; color:var(--text-soft); margin-top:4px;">${escapeHtml(pc.description)}</div>`;
+    }
+    _pendingChanges.delete(id);
+  }
+
+  // Direct tool execution (no gating). Used internally by applyPendingChange
+  // AND by the legacy callers that already passed through their own UI.
+  function _runToolDirect(name, input) {
     trackEvent('plan_modified', { tool: name, ...input });
     try {
       switch (name) {
@@ -5999,6 +6223,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     } catch (err) {
       return { success: false, message: 'Tool error: ' + err.message };
     }
+  }
+
+  // Public dispatch — gates structural tools through the confirm card and
+  // runs reversible/acute tools immediately. Returns a result the model can
+  // see (when gated, the result tells the model the change is PENDING).
+  function executeTool(name, input) {
+    // Acute / reversible / report-style tools fire immediately.
+    if (!_GATED_TOOLS.has(name)) return _runToolDirect(name, input);
+    // Structural change — queue it and render the confirm card.
+    const id = 'pc-' + (++_pendingChangeSeq) + '-' + Date.now();
+    const description = _describePendingChange(name, input);
+    _pendingChanges.set(id, { tool: name, input, description, ts: Date.now() });
+    _renderPendingChangeCard(id);
+    return {
+      success: true,
+      pending: true,
+      message: 'Change prepared. The user must tap Apply in the chat to commit it. Do NOT claim the change is done — say "Tap Apply when you\'re ready" or similar. If they decline, ask if they want a different approach.',
+    };
   }
 
   let pendingRecalc = null;
@@ -6246,11 +6488,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const muted = (isPast && !isCompleted) ? 'opacity: 0.55;' : '';
 
       // For past + uncompleted non-rest sessions, show prescribed plan name but with "(not logged)" tone
-      let nameToShow = s.name;
-      let metaToShow = s.meta;
+      // Single source of truth: pull a sanitized display copy so the row's
+      // name and meta line up with the modal's duration field. Without this,
+      // a stale name like "15-min walk" can sit beside a 40-min duration.
+      const safeS = _safeSession(s);
+      let nameToShow = safeS.name;
+      let metaToShow = safeS.meta;
       if (isPast && !isCompleted && s.type !== 'rest') {
-        nameToShow = s.name + ' (planned)';
-        metaToShow = 'Not logged · ' + s.meta;
+        nameToShow = safeS.name + ' (planned)';
+        metaToShow = 'Not logged · ' + safeS.meta;
       }
       // For past + completed (real Strava match), show actual data
       if (isCompleted && s.stravaName) {
@@ -6405,6 +6651,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'Suffer': { full: 'Suffer Score / Relative Effort', def: 'Strava\'s metric for cardiovascular load — same as "Effort". Higher = more time at high HR.' },
     'Taper': { full: 'Taper', def: 'The 1–3 weeks before a race when training volume drops 30–60% (intensity stays sharp). Lets accumulated fatigue clear so you arrive fresh on race day.' },
     'Z2 base': { full: 'Aerobic Base / Zone 2', def: 'Easy aerobic training — the foundation of endurance fitness. 70–80% of weekly time should be at this intensity.' },
+    'WU': { full: 'Warm-up', def: 'The first 5–15 minutes of a workout — easy effort that gradually raises heart rate, opens up blood flow to working muscles, and prepares joints. Skipping it is the fastest way to get hurt or have a flat session.' },
+    'CD': { full: 'Cool-down', def: 'The last 5–10 minutes — easy effort to bring heart rate down gradually. Helps clear metabolic waste and starts the recovery process. Don\'t skip it after hard sessions.' },
+    'Tempo': { full: 'Tempo Run / Effort', def: 'A sustained "comfortably hard" effort, ~20–40 minutes, around Zone 3. Choppy talking, can hold for ~1 hour at the upper edge. Builds the ability to sustain pace under fatigue.' },
+    'Strides': { full: 'Strides', def: '4–8 short (15–30 second) accelerations near the end of an easy run — fast but smooth, 90–95% effort. Improves running economy without adding fatigue.' },
+    'Fartlek': { full: 'Fartlek', def: 'Swedish for "speed play" — unstructured intervals where you alternate harder/easier efforts based on feel (e.g. "push to that lamppost, recover to the next"). A relaxed way to add intensity.' },
+    'Cadence': { full: 'Cadence', def: 'How fast you turn over — running steps per minute (~170–180 is efficient) or cycling pedal revolutions per minute (~85–95 on flats). Higher cadence reduces ground-contact time and impact stress.' },
+    'SPM': { full: 'Steps Per Minute', def: 'Running cadence. ~170–180 steps/min is the efficient range. Below 160 usually means you\'re overstriding (landing with the foot ahead of your hips).' },
+    'RPM': { full: 'Revolutions Per Minute', def: 'Cycling cadence — pedal turns per minute. 85–95 rpm on flats is the efficient range for most riders. Lower = grinding (harder on knees), higher = spinning (more cardio cost).' },
+    'VDOT': { full: 'VDOT (Daniels)', def: 'Coach Jack Daniels\' running fitness number, derived from a recent race time. Used to set training paces — easy, marathon, threshold, interval, repetition. Higher = faster.' },
+    'Splits': { full: 'Splits', def: 'Your time at each segment of a run/race (every mile or kilometer). "Even splits" = same pace throughout. "Negative split" = second half faster than first.' },
+    'Negative split': { full: 'Negative Split', def: 'Running the second half of a workout/race faster than the first. The classic smart-pacing strategy — start conservative, finish strong.' },
+    'Easy': { full: 'Easy effort', def: 'Conversational pace. You can speak in full sentences. Roughly Zone 2 / RPE 3–4. The MOST important intensity in endurance training — most weekly time should be here.' },
+    'PB': { full: 'Personal Best', def: 'Your best time at a distance — same as PR (Personal Record). The number to beat.' },
+    'AeT': { full: 'Aerobic Threshold', def: 'The boundary between Zone 2 and Zone 3 — the point where talking starts to get choppy. The upper edge of "easy" aerobic training.' },
+    'LT': { full: 'Lactate Threshold', def: 'The highest effort you can sustain for ~1 hour. Above it, lactate accumulates faster than your body can clear it. Same as Threshold.' },
+    'LTHR': { full: 'Lactate Threshold Heart Rate', def: 'Your average heart rate during a 1-hour all-out effort. Used to anchor HR training zones (Z2 ≈ 70–80% LTHR, Z4 ≈ 95–100% LTHR).' },
+    'CTL': { full: 'Chronic Training Load', def: 'Your 42-day rolling fitness average — what your body has adapted to. Rises slowly with consistent training. The higher it is, the more stress you can absorb.' },
+    'ATL': { full: 'Acute Training Load', def: 'Your 7-day rolling fatigue average — recent stress. Rises fast with hard weeks. When it\'s much higher than CTL, you\'re digging a hole.' },
+    'TSB': { full: 'Training Stress Balance / Form', def: 'CTL minus ATL — how fresh you feel. Positive = rested (good for racing). Negative = fatigued (good for building, bad for racing). Aim for slightly positive on race day.' },
   };
   // ──────────────────────────────────────────────────────────────────────
   // LEARN TOPICS — body-education content cards. Plain-language + short.
@@ -7625,7 +7890,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const fix = pendingFixes[idx];
     if (!fix) return;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool(fix.tool, fix.input);
+    // Insight cards are themselves a confirmation surface (user tapped "Apply
+    // fix") — skip the chat-confirm gate to avoid double-confirming.
+    _runToolDirect(fix.tool, fix.input);
   }
 
   function applyAllFixes() {
@@ -7633,7 +7900,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!confirm(`Apply all ${pendingFixes.length} suggested adjustments? You can undo.`)) return;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     const fixesCopy = [...pendingFixes];
-    fixesCopy.forEach(fix => executeTool(fix.tool, fix.input));
+    fixesCopy.forEach(fix => _runToolDirect(fix.tool, fix.input));
   }
 
   // ── Past session data (simulated — in prod this comes from Apple Health / Garmin / Strava) ──
@@ -7970,7 +8237,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const notif = planState.notifications[idx];
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     planState.notifications.splice(idx, 1);
-    executeTool(notif.fix.tool, notif.fix.input);
+    // Notification "Accept" is already an explicit user confirmation — skip
+    // the chat-confirm gate.
+    _runToolDirect(notif.fix.tool, notif.fix.input);
     renderNotifList();
     renderNotifBadge();
   }
@@ -8063,16 +8332,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── Session detail content generator ──
   function sessionDetail(session, day) {
-    const base = { title: session.name, duration: session.duration, day, date: planState.dates[day], type: session.type };
+    // Sanitize the title the same way the cards do — keeps title and duration
+    // visually consistent even if the upstream session.name has stale numbers.
+    const titleClean = session && session.type === 'rest'
+      ? (session.name && /rest/i.test(session.name) ? session.name : 'Rest day')
+      : sanitizeSessionName(session && session.name ? session.name : 'Easy session');
+    const base = { title: titleClean, duration: session.duration, day, date: planState.dates[day], type: session.type };
 
     // AI plan engine path: if the session was generated by Mistral with a real
     // prescription + targets, use those instead of the heuristic templates
     // below. This is what makes "AI plan" actually different from the rule
     // engine — show the structured workout the AI prescribed.
     if (session && (session.prescription || session.targets) && session.type !== 'rest') {
-      const main = session.prescription
+      // Anchor the prescription to the canonical duration so the body text can
+      // never disagree with the duration shown in the modal header (e.g. body
+      // says "40 min run" while header says "15 min").
+      const dur = Number(session.duration) || 0;
+      const presBody = session.prescription
         ? String(session.prescription)
-        : `${session.duration} min ${session.name}. ${session.meta || ''}`;
+        : `${session.name}. ${session.meta || ''}`;
+      const main = dur > 0
+        ? `${dur} min total — ${presBody}`
+        : presBody;
       const targetsArr = session.targets
         ? String(session.targets).split(/\s*[•·]\s*|\s*\n\s*/).map(t => t.trim()).filter(Boolean)
         : [];
@@ -8218,12 +8499,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     } else if (weekOffset < 0) {
       html += `<div style="background: var(--bg); border-left: 3px solid var(--text-soft); padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 14px;"><strong>Past week reference.</strong> See Progress tab for actual completed session data.</div>`;
     }
-    if (d.warmup) html += `<div class="detail-section"><div class="detail-label">Warm-up</div><div class="detail-body">${escapeHtml(d.warmup)}</div></div>`;
-    if (d.main) html += `<div class="detail-section"><div class="detail-label">Main set</div><div class="detail-body" style="white-space:pre-line;">${escapeHtml(d.main)}</div></div>`;
-    if (d.cooldown) html += `<div class="detail-section"><div class="detail-label">Cool-down</div><div class="detail-body">${escapeHtml(d.cooldown)}</div></div>`;
-    if (d.targets && d.targets.length) html += `<div class="detail-section"><div class="detail-label">Targets</div><ul class="detail-list">${d.targets.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>`;
-    if (d.cues && d.cues.length) html += `<div class="detail-section"><div class="detail-label">Cues</div><ul class="detail-list">${d.cues.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>`;
-    if (d.alternatives && d.alternatives.length) html += `<div class="detail-section"><div class="detail-label">If life gets in the way</div><ul class="detail-list">${d.alternatives.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>`;
+    // Linkify training acronyms (Z2, RPE, HR, FTP, CSS, etc.) in every body
+     // field so the user can tap any term to see its plain-language definition.
+    // markupGlossaryTerms() runs escapeHtml() internally, so it's safe HTML.
+    if (d.warmup) html += `<div class="detail-section"><div class="detail-label">Warm-up</div><div class="detail-body">${markupGlossaryTerms(d.warmup)}</div></div>`;
+    if (d.main) html += `<div class="detail-section"><div class="detail-label">Main set</div><div class="detail-body" style="white-space:pre-line;">${markupGlossaryTerms(d.main)}</div></div>`;
+    if (d.cooldown) html += `<div class="detail-section"><div class="detail-label">Cool-down</div><div class="detail-body">${markupGlossaryTerms(d.cooldown)}</div></div>`;
+    if (d.targets && d.targets.length) html += `<div class="detail-section"><div class="detail-label">Targets <span style="font-size:10px; color:var(--text-soft); font-weight:500; text-transform:none; letter-spacing:0; margin-left:6px;">tap any underlined term</span></div><ul class="detail-list">${d.targets.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
+    if (d.cues && d.cues.length) html += `<div class="detail-section"><div class="detail-label">Cues</div><ul class="detail-list">${d.cues.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
+    if (d.alternatives && d.alternatives.length) html += `<div class="detail-section"><div class="detail-label">If life gets in the way</div><ul class="detail-list">${d.alternatives.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
     document.getElementById('sdContent').innerHTML = html;
     document.getElementById('sdView').style.display = 'block';
     document.getElementById('sdEdit').style.display = 'none';
@@ -9035,9 +9319,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Name + duration: show actual workout when completed, prescribed when not
     // heroName contains a span (text) + chevron SVG. Update only the span text.
+    // Use _safeSession so a stale name like "15-min walk" doesn't contradict
+    // the duration field shown right below it.
+    const safeS = _safeSession(s);
     if (name) {
       const textSpan = name.querySelector('span');
-      const newText = completed && s.stravaName ? s.stravaName : s.name;
+      const newText = completed && s.stravaName ? s.stravaName : safeS.name;
       if (textSpan) textSpan.textContent = newText;
       else name.textContent = newText;
     }
@@ -9048,7 +9335,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
         duration.textContent = `${dStr}${s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : ''}`;
       } else {
-        duration.textContent = s.meta;
+        duration.textContent = safeS.meta;
       }
     }
 
@@ -9061,7 +9348,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const showPrescription = !completed && s.type !== 'rest' && (s.prescription || s.targets);
     if (presEl) {
       if (showPrescription && s.prescription) {
-        presEl.textContent = s.prescription;
+        // Linkify acronyms (Z2, HR, RPE, FTP, CSS, etc.) so the user can tap
+        // for a definition. Use innerHTML because markupGlossaryTerms returns
+        // safe HTML (it escapes the source string before wrapping known terms).
+        presEl.innerHTML = markupGlossaryTerms(String(s.prescription));
         presEl.style.display = 'block';
       } else {
         presEl.style.display = 'none';
@@ -9069,7 +9359,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     if (tgtEl) {
       if (showPrescription && s.targets) {
-        tgtEl.textContent = '🎯 ' + s.targets;
+        tgtEl.innerHTML = '🎯 ' + markupGlossaryTerms(String(s.targets));
         tgtEl.style.display = 'block';
       } else {
         tgtEl.style.display = 'none';
@@ -9152,17 +9442,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       slot.innerHTML = '<div style="font-size:13px; color:var(--text-soft); padding:6px 0;">No more sessions this week.</div>';
       return;
     }
-    slot.innerHTML = upcoming.map(({ day, s }) => `
+    slot.innerHTML = upcoming.map(({ day, s }) => {
+      const safe = _safeSession(s);
+      return `
       <div class="session-row" onclick="openSessionModal('${day}')" style="cursor:pointer;">
-        <div class="session-icon">${ICON[s.type] || '•'}</div>
+        <div class="session-icon">${ICON[safe.type] || '•'}</div>
         <div class="session-info">
           <div class="session-day">${DAY_FULL[day]} · ${planState.dates[day] || ''}</div>
-          <div class="session-name">${escapeHtml(s.name)}</div>
-          <div class="session-meta">${escapeHtml(s.meta)}</div>
+          <div class="session-name">${escapeHtml(safe.name)}</div>
+          <div class="session-meta">${escapeHtml(safe.meta)}</div>
         </div>
         <div style="color:var(--text-soft); font-size:18px; align-self:center;">›</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
   // Render the rationale text on Today tab dynamically
   function renderTodayRationaleSlot() {
@@ -11762,6 +12055,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       setup.style.display = 'block';
       active.style.display = 'none';
     }
+    // Show/hide the manual rebuild-plan button row alongside the chat.
+    if (typeof updateRebuildPlanRowVisibility === 'function') updateRebuildPlanRowVisibility();
     // Suggestion chips — a tight mix of common questions and quick-change prompts.
     // The prompt text is stored in a data-prompt attribute (HTML-escaped) and
     // read by a delegated click handler — this avoids the JSON-in-onclick
@@ -12968,7 +13263,8 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const { intent, bubble } = pendingAction;
     bubble.remove();
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    const result = executeTool(intent.tool, intent.input);
+    // confirmAction IS the user's confirmation — skip the chat-confirm gate.
+    const result = _runToolDirect(intent.tool, intent.input);
     const area = document.getElementById('chatArea');
     const b = document.createElement('div');
     b.className = 'bubble bot';
