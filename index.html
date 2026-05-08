@@ -5536,6 +5536,93 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { success: true, message: msg, reason: reason || '' };
   }
 
+  // Sets the user's discipline limiter + strategy and triggers a background
+  // plan regeneration. For triathlon events this rebuilds the whole plan
+  // weighted toward the limiter. For non-tri events the plan is already
+  // running-focused — we save the value but tell the user no rebuild is
+  // needed. Async regen runs in the background; the tool returns immediately.
+  function tool_setTrainingFocus({ limiter, strategy, reason }) {
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const isTri = /Ironman|Triathlon/i.test(event);
+    const validLimiters = ['run', 'bike', 'swim', 'balanced'];
+    const validStrategies = ['focus', 'maintain', 'balanced'];
+    if (!validLimiters.includes(limiter)) limiter = 'balanced';
+    if (!validStrategies.includes(strategy)) strategy = 'balanced';
+
+    if (!isTri) {
+      // Single-discipline event. Save the value for record but no rebuild.
+      localStorage.setItem('tri-limiter', limiter);
+      localStorage.setItem('tri-strategy', strategy);
+      planState.triFocus = { limiter, strategy };
+      const msg = `Your ${event} plan is already focused on ${/Marathon|10K|5K|Half Marathon/i.test(event) ? 'running' : event.toLowerCase()}. I noted your preference but no rebuild is needed — every session is already discipline-specific.`;
+      return { success: true, message: msg, needsGoalChange: false };
+    }
+
+    // Tri event — save and kick off async regen with the new focus.
+    localStorage.setItem('tri-limiter', limiter);
+    localStorage.setItem('tri-strategy', strategy);
+    planState.triFocus = { limiter, strategy };
+    saveUserData();
+
+    // Fire-and-forget regeneration. We don't await — the tool needs to
+    // return so the AI can write its confirmation message immediately.
+    if (typeof retryAIPlan === 'function') {
+      // retryAIPlan navigates to the building screen which would interrupt
+      // the chat. Use a quieter regen path that stays in chat.
+      _regeneratePlanInBackground();
+    }
+
+    const msg = `Updated your training focus: ${limiter === 'balanced' ? 'balanced across all three disciplines' : `${limiter.toUpperCase()} as your limiter, with a "${strategy}" strategy`}. The plan is rebuilding in the background — give it ~30 seconds, then check the Plan tab.`;
+    return { success: true, message: msg, regenerating: true, reason: reason || '' };
+  }
+
+  // Quiet plan regen that stays in chat — no navigation away. Runs the same
+  // /api/coach/plan call as retryAIPlan but doesn't show the building screen.
+  // Surfaces a system bubble in chat when complete (or on error).
+  let _bgRegenInFlight = false;
+  async function _regeneratePlanInBackground() {
+    if (_bgRegenInFlight) return;
+    _bgRegenInFlight = true;
+    const event = localStorage.getItem('race-event') || planState.raceEvent || '';
+    const eventDate = localStorage.getItem('race-date') || planState.raceDate || '';
+    const eventLocation = localStorage.getItem('race-location') || planState.raceLocation || '';
+    const hours = parseFloat(localStorage.getItem('hours-per-week') || '5');
+    let days = [];
+    try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
+    if (!Array.isArray(days) || days.length === 0) days = ['Wed','Sat','Sun'];
+    const complexity = localStorage.getItem('complexity-mode') || 'simple';
+    try {
+      const ai = await generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity });
+      if (ai && ai.weeks) { applyAIPlan(ai); planState.planSource = 'ai'; }
+      else { generatePlanFromInputs(); planState.planSource = 'fallback'; }
+      renderAll();
+      // System-style chat bubble so the user sees it landed.
+      const area = document.getElementById('chatArea');
+      if (area) {
+        const b = document.createElement('div');
+        b.className = 'bubble system';
+        b.style.maxWidth = '100%';
+        b.innerHTML = '✓ <strong>Plan rebuilt</strong> with the new focus. Open the Plan tab to see the new distribution.';
+        const sugg = area.querySelector('#suggestRow');
+        if (sugg) area.insertBefore(b, sugg);
+        else area.appendChild(b);
+        area.scrollTop = area.scrollHeight;
+      }
+    } catch (err) {
+      console.warn('Background plan regen failed:', err);
+      const area = document.getElementById('chatArea');
+      if (area) {
+        const b = document.createElement('div');
+        b.className = 'bubble system';
+        b.style.maxWidth = '100%';
+        b.innerHTML = '⚠ Plan rebuild hit an error. Try Profile → Start over with a new plan if you want to force a fresh build.';
+        area.appendChild(b);
+      }
+    } finally {
+      _bgRegenInFlight = false;
+    }
+  }
+
   function tool_flagInjury({ area, severity, notes }) {
     planState.injury = { area, severity, notes: notes || '' };
     if (severity === 'high') {
@@ -5599,6 +5686,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         case 'skipSession': return tool_skipSession(input);
         case 'openTrainingDay': return tool_openTrainingDay(input);
         case 'closeTrainingDay': return tool_closeTrainingDay(input);
+        case 'setTrainingFocus': return tool_setTrainingFocus(input);
         default: return { success: false, message: `Unknown tool: ${name}` };
       }
     } catch (err) {
