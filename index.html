@@ -2586,6 +2586,50 @@
           </details>
         </div>
         <div id="stravaDisconnected">
+          <!-- Step-by-step setup instructions for testers who haven't connected
+               Strava before. Collapsible because experienced users don't need
+               them; opening defaults to closed. -->
+          <details style="margin-bottom:12px; padding:10px 12px; background:var(--bg); border-radius:10px;">
+            <summary style="cursor:pointer; font-size:13px; color:var(--primary-dark); font-weight:700; padding:2px 0;">📋 First-time setup — show me how (3 minutes)</summary>
+            <div style="padding-top:10px; font-size:12px; line-height:1.6; color:var(--text);">
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">You'll need a free Strava account. The "API app" you're about to create is a one-time thing that lets Adapt read your training history.</div>
+
+              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span>
+                <div>Open <a href="https://www.strava.com/settings/api" target="_blank" style="color:var(--primary); font-weight:600;">strava.com/settings/api</a> in a new tab and sign in.</div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span>
+                <div>If it's your first time, you'll need to create an API app. Fill in any name (e.g. "Adapt"), any website (your Strava profile is fine), and for <strong>Authorization Callback Domain</strong> enter exactly:<br><code style="background:#fff; padding:3px 8px; border-radius:6px; font-size:11px; display:inline-block; margin-top:4px; user-select:all;">adapt-prototype-aiu3.vercel.app</code><br>That last one is critical — getting it wrong is the most common reason setup fails.</div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</span>
+                <div>Strava shows you a <strong>Client ID</strong> (a number) and <strong>Client Secret</strong> (a long string — you may need to tap "Show" to reveal it). Copy both into the fields below.</div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">4</span>
+                <div>Tap <strong>Authorize via Strava</strong> below. Strava will open a consent screen.</div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--alert); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">5</span>
+                <div><strong style="color:var(--alert);">CRITICAL:</strong> on the consent screen, scroll through the permissions list and <strong>tick the box for "View data about your private activities and segment efforts."</strong> If you skip this, sync silently fails — Strava will return only public data, which most users don't have. Then tap the orange Authorize button.</div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-bottom:0; align-items:flex-start;">
+                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">6</span>
+                <div>Strava redirects you back to Adapt and starts pulling your activity history. First sync takes ~10-30 seconds depending on how much you've logged.</div>
+              </div>
+
+              <div style="margin-top:14px; padding:8px 12px; background:var(--secondary-soft); border-radius:8px; font-size:11px; color:var(--text-soft); line-height:1.5;">
+                <strong style="color:var(--text);">Stuck?</strong> Tap the "Diagnose" button (visible after you connect) — it'll tell you whether your token has the right scope, or open <a href="https://www.strava.com/settings/apps" target="_blank" style="color:var(--primary); font-weight:600;">strava.com/settings/apps</a> and revoke "Adapt", then retry from step 4.
+              </div>
+            </div>
+          </details>
+
           <div class="field" style="margin-bottom:8px;">
             <label style="font-size:12px;">Client ID</label>
             <input type="text" id="stravaClientId" placeholder="e.g. 123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
@@ -2596,7 +2640,7 @@
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Authorize via Strava (recommended)</button>
           <div style="font-size: 11px; color: var(--text-soft); margin-bottom:14px; line-height: 1.5;">
-            Get Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary); font-weight:600;">strava.com/settings/api</a>. On Strava's consent screen, <strong>tick "View data about your private activities"</strong> — without it sync will fail.
+            New here? Tap <strong>📋 First-time setup</strong> above for a 3-minute walkthrough.
           </div>
 
           <!-- Manual token fallback for users where the OAuth redirect won't
