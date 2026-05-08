@@ -242,6 +242,17 @@ If the user describes a multi-day situation, CALL MULTIPLE TOOLS in the same tur
 
 Use the timeline field in USER'S CURRENT STATE to translate words like "yesterday", "tomorrow", "the next day", "day after" into actual day names (Mon/Tue/etc). Never guess day-of-week math.
 
+═══ MULTI-WEEK CHANGES ═══
+
+Most tools accept an optional weekOffset parameter:
+• weekOffset=0 (default) → THIS week
+• weekOffset=1 → NEXT week
+• weekOffset=2 → the week AFTER next
+
+When the user says "next week" / "Saturday next week" / "in two weeks" / "two weeks from now", use the appropriate weekOffset. Example: "move next week's long run from Saturday to Sunday" → moveSession(fromDay='Sat', toDay='Sun', weekOffset=1).
+
+You can only modify the next 2 weeks (weekOffset 0, 1, or 2). For changes further out, tell the user honestly that it's too early to lock those in — the plan adapts to what they actually train in the next two weeks anyway.
+
 ═══ ADHERENCE FLEXIBILITY — THIS IS THE APP'S CORE VALUE ═══
 
 The differentiator isn't generating a plan. It's helping the athlete adapt the plan when life happens — honestly. Every time the user reports a deviation (skip / shortening / swap / "I don't feel like it"), produce a 4-part response in this exact structure:
@@ -306,6 +317,25 @@ EXAMPLE — answering "why" cleanly:
 6. Never give medical diagnosis. For pain or unusual symptoms, say "talk to a healthcare professional."
 
 PERSONA: Direct, caring, evidence-based. Think experienced coach, not Alexa. Use second person ("you"). Avoid "I'd recommend" filler — just say what to do.
+
+═══ RACE WEEK + POST-RACE — HARD RULES ═══
+
+Check context.raceWeek and context.postRace BEFORE making any plan changes.
+
+If context.raceWeek is true (race is ≤7 days out):
+• NEVER add intensity. Never call swapDiscipline to a higher-intensity discipline. Never call shortenSession to make a session HARDER.
+• Volume should be DROPPING, not climbing. If the user asks "should I add a hard interval session?" the answer is no — the work is done; protect the body now.
+• Focus advice on race execution: pacing, fueling, sleep, race-morning routine, transition prep.
+• Sharpening sessions (short race-pace primers) are OK; threshold/VO2 sessions are NOT.
+• Acceptable tool calls: shortenSession (to scale down), skipSession (if sick/exhausted), moveSession (logistics). Avoid swapDiscipline unless user is injured.
+• Open every race-week response with: "Race is in [N] days." Then keep it short.
+
+If context.postRace is true (race date has passed):
+• You are in recovery / decompression mode. The plan structure no longer applies.
+• Acknowledge the race. Ask how it went if user hasn't said.
+• Recovery prescription: 7-14 days of unstructured easy aerobic + sleep priority. Walking, light spin, easy swim are all fine. No structure, no intensity.
+• If the user wants a new goal, encourage tapping "Set new goal" on the Today banner. Don't tool-modify the old plan.
+• Refuse to prescribe hard work for at least 2 weeks post-race regardless of how good they feel.
 
 ═══ COACHING DETAIL LEVEL — RESPECT IT ═══
 
@@ -513,17 +543,28 @@ function safeJsonStringify(obj, maxChars) {
 // (See the executeTool function in adapt-prototype.html.)
 const DAYS_ENUM = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// Optional weekOffset prop reused across tools that operate on a specific
+// week. 0 = this week, 1 = next, 2 = the week after. Anything beyond 2 is
+// rejected by the browser-side tool runner — we don't lock changes that far
+// out because the plan adapts week-to-week.
+const WEEK_OFFSET_PROP = {
+  type: 'integer',
+  enum: [0, 1, 2],
+  description: 'Which week to modify. 0 = this week (default), 1 = next week, 2 = the week after next. Use when user says "next week" or "in two weeks".',
+};
+
 const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
       name: 'moveSession',
-      description: 'Move a scheduled training session from one day of this week to another. The session on the destination day swaps back to the origin day.',
+      description: 'Move a scheduled training session from one day to another within a single week. Defaults to this week; pass weekOffset=1 or 2 for next week or the week after. The session on the destination day swaps back to the origin day.',
       parameters: {
         type: 'object',
         properties: {
           fromDay: { type: 'string', enum: DAYS_ENUM, description: 'Day to move session FROM' },
           toDay: { type: 'string', enum: DAYS_ENUM, description: 'Day to move session TO' },
+          weekOffset: WEEK_OFFSET_PROP,
           reason: { type: 'string', description: 'Brief reason for the move (one sentence)' },
         },
         required: ['fromDay', 'toDay'],
@@ -534,7 +575,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'shortenSession',
-      description: 'Reduce a planned session\'s duration on a given day. Use when the user has limited time or wants an easier day.',
+      description: 'Reduce a planned session\'s duration on a given day. Defaults to this week; pass weekOffset for next-week / week-after changes. Use when the user has limited time or wants an easier day.',
       parameters: {
         type: 'object',
         properties: {
@@ -542,6 +583,7 @@ const TOOL_DEFINITIONS = [
           newMinutes: { type: 'number', description: 'New duration in minutes' },
           newName: { type: 'string', description: 'Optional updated session name' },
           newMeta: { type: 'string', description: 'Optional updated session description' },
+          weekOffset: WEEK_OFFSET_PROP,
           reason: { type: 'string' },
         },
         required: ['day', 'newMinutes'],
@@ -552,7 +594,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'swapDiscipline',
-      description: 'Change the discipline (run/bike/swim/strength/etc.) of a session for a given day. Use when the user can\'t do the originally-prescribed discipline.',
+      description: 'Change the discipline (run/bike/swim/strength/etc.) of a session for a given day. Defaults to this week; pass weekOffset for next-week / week-after changes. Use when the user can\'t do the originally-prescribed discipline.',
       parameters: {
         type: 'object',
         properties: {
@@ -560,6 +602,7 @@ const TOOL_DEFINITIONS = [
           newType: { type: 'string', enum: ['run', 'bike', 'swim', 'strength', 'brick', 'mobility', 'rest', 'quality'] },
           newName: { type: 'string' },
           newMeta: { type: 'string' },
+          weekOffset: WEEK_OFFSET_PROP,
           reason: { type: 'string' },
         },
         required: ['day', 'newType'],
@@ -618,13 +661,14 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'completeSession',
-      description: 'Mark a session as completed (with optional RPE).',
+      description: 'Mark a session as completed (with optional RPE). Almost always weekOffset=0 (this week).',
       parameters: {
         type: 'object',
         properties: {
           day: { type: 'string', enum: DAYS_ENUM },
           rpe: { type: 'number', description: '1-10 perceived effort' },
           notes: { type: 'string' },
+          weekOffset: WEEK_OFFSET_PROP,
         },
         required: ['day'],
       },
@@ -634,12 +678,13 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'skipSession',
-      description: 'Mark a session as skipped (deliberate rest, illness, etc.).',
+      description: 'Mark a session as skipped (deliberate rest, illness, etc.). Defaults to this week.',
       parameters: {
         type: 'object',
         properties: {
           day: { type: 'string', enum: DAYS_ENUM },
           reason: { type: 'string' },
+          weekOffset: WEEK_OFFSET_PROP,
         },
         required: ['day'],
       },

@@ -85,13 +85,14 @@ export default async function handler(req) {
   const todayStr = inputs.today || new Date().toISOString().slice(0, 10);
   const profile = inputs.profile || {};
   const courseIntel = inputs.courseIntel || {};
+  const triFocus = inputs.triFocus || {};
   const location = inputs.location || '';
 
   // Compute weeks-to-race so we can pick a credible block layout.
   const weeksToRace = computeWeeksToRace(todayStr, raceDate);
 
-  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, location, todayStr });
-  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, location });
+  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, location, todayStr });
+  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, location });
 
   // Force a JSON-shaped response. Mistral supports response_format = {type:'json_object'}.
   const payload = {
@@ -157,14 +158,42 @@ export default async function handler(req) {
 
 // ─── Prompt construction ──────────────────────────────────────────────────
 
-function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, location, todayStr }) {
+function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, location, todayStr }) {
   const isTri = /Ironman|Triathlon/i.test(event);
-  const isRun = /Marathon|10K|5K/i.test(event);
-  const disciplineNote = isTri
-    ? 'Triathlon: balance swim, bike, run. The bike is the longest leg in distance terms; protect it. Run-off-bike is the most race-specific quality. Swim volume is hardest to keep up with low hours but maintain at least 1x/week.'
-    : isRun
-    ? 'Running event: long run is the keystone. Quality day = intervals or tempo. Easy days fill aerobic volume.'
-    : 'General fitness — variety matters more than specificity. Mix run + bike + strength. No race taper.';
+  const isRun = /Marathon|10K|5K|Half Marathon/i.test(event);
+  const limiter = (triFocus && triFocus.limiter) || 'balanced';
+  const strategy = (triFocus && triFocus.strategy) || 'balanced';
+
+  // Build a discipline-allocation note that the plan engine MUST respect.
+  // When the user says one discipline is their weakness ("limiter") AND
+  // they want to focus on it, allocate disproportionate weekly volume
+  // there. This is the single biggest driver of plan quality for athletes
+  // who know what they need to work on.
+  let disciplineNote;
+  if (isTri) {
+    if (strategy === 'focus' && limiter !== 'balanced') {
+      const allocation = (() => {
+        if (limiter === 'swim') return 'swim 35% / bike 35% / run 30% (heavy on swim — the user said this is their weakness)';
+        if (limiter === 'bike') return 'swim 15% / bike 55% / run 30% (heavy on bike — the user said this is their weakness)';
+        if (limiter === 'run')  return 'swim 15% / bike 35% / run 50% (heavy on run — the user said this is their weakness)';
+        return 'swim 20% / bike 45% / run 35% (default tri allocation)';
+      })();
+      disciplineNote = `Triathlon, weakness-focused build. The user identified ${limiter.toUpperCase()} as their LIMITER and chose a FOCUS strategy. Allocate weekly time roughly ${allocation}. ` +
+        `This means: in every week, the prescribed minutes for ${limiter} sessions should be the largest discipline bucket. ` +
+        `Add an extra ${limiter} session if the day count allows. ` +
+        `Quality day prescription should target ${limiter}-specific intensity (${limiter==='swim' ? 'CSS sets, technique work' : limiter==='bike' ? 'sweet spot / threshold intervals' : 'I-pace / threshold intervals'}). ` +
+        `Long session: if it would normally be a brick, weight the ${limiter} portion ~60% of total session time. ` +
+        `Race-specificity DOES NOT override this — the user knows their gap and is paying for the focus.`;
+    } else if (strategy === 'maintain' && limiter !== 'balanced') {
+      disciplineNote = `Triathlon, maintenance mode for ${limiter.toUpperCase()}. Hold ${limiter} volume steady (~1 session/wk minimum, technique-focused) while building the other two disciplines toward race specificity.`;
+    } else {
+      disciplineNote = 'Triathlon: balance swim, bike, run. The bike is the longest leg in distance terms; protect it. Run-off-bike is the most race-specific quality. Swim volume is hardest to keep up with low hours but maintain at least 1x/week.';
+    }
+  } else if (isRun) {
+    disciplineNote = 'Running event: long run is the keystone. Quality day = intervals or tempo. Easy days fill aerobic volume.';
+  } else {
+    disciplineNote = 'General fitness — variety matters more than specificity. Mix run + bike + strength. No race taper.';
+  }
 
   return `You are Adapt's training plan engine. You build periodized endurance training plans grounded in established sport science. You output ONLY valid JSON conforming to the schema described below — no prose, no markdown, no comments.
 
@@ -270,7 +299,9 @@ You MUST output an object exactly matching this shape:
 NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
 }
 
-function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, location }) {
+function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, location }) {
+  const limiter = (triFocus && triFocus.limiter) || '';
+  const strategy = (triFocus && triFocus.strategy) || '';
   return `Generate a complete periodized training plan for me.
 
 Inputs:
@@ -281,11 +312,18 @@ Inputs:
 - Training days: ${days.join(', ')}
 - Location: ${location || 'unspecified'}
 ${courseIntel && courseIntel.terrain ? '- Course terrain: ' + courseIntel.terrain : ''}
+${courseIntel && courseIntel.surface ? '- Course surface: ' + courseIntel.surface : ''}
+${courseIntel && courseIntel.swim ? '- Swim type: ' + courseIntel.swim : ''}
 ${courseIntel && courseIntel.climate ? '- Course climate: ' + courseIntel.climate : ''}
+${courseIntel && courseIntel.altitude ? '- Course altitude: ' + courseIntel.altitude : ''}
 ${profile && profile.exp ? '- Experience level: ' + profile.exp : ''}
 ${profile && profile.freq ? '- Recent training frequency: ' + profile.freq : ''}
 ${profile && profile.injury ? '- Injury status: ' + profile.injury : ''}
 ${profile && profile.sleep ? '- Sleep: ' + profile.sleep : ''}
+${limiter && limiter !== 'balanced' ? '- WEAKNESS / limiter discipline: ' + limiter.toUpperCase() : ''}
+${strategy ? '- Strategy on the limiter: ' + strategy : ''}
+
+${limiter && limiter !== 'balanced' && strategy === 'focus' ? `IMPORTANT: I identified ${limiter.toUpperCase()} as my weakness and asked for a FOCUS strategy. Build the plan with disproportionate weekly time on ${limiter} per the rules in your system prompt. Don't water this down — I want to see ${limiter} as the largest discipline bucket every week.` : ''}
 
 Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) plan now. Output the JSON only.`;
 }

@@ -3295,11 +3295,15 @@
 
     // Spin up a deterministic per-persona account. Username collisions are
     // fine — we treat the demo account as throwaway, overwriting cleanly.
+    // NB: onboardingComplete stays FALSE until plan generation actually
+    // succeeds, so a closed-tab-mid-gen revisit re-runs setup instead of
+    // landing the user on an empty plan.
     const username = 'demo-' + p.id;
     const accounts = getAccounts();
     accounts[username] = accounts[username] || { password: 'demo', data: {} };
     accounts[username].data = accounts[username].data || {};
-    accounts[username].data.onboardingComplete = true;
+    accounts[username].data.onboardingComplete = false;
+    accounts[username].data.demoPersonaId = p.id;
     saveAccounts(accounts);
     localStorage.setItem('adapt-session', username);
 
@@ -3354,6 +3358,12 @@
       generatePlanFromInputs();
     }
     stopStagedPlanStatus();
+    // Now that the plan is in place (AI or fallback), mark onboarding done.
+    const accts = getAccounts();
+    if (accts[username] && accts[username].data) {
+      accts[username].data.onboardingComplete = true;
+      saveAccounts(accts);
+    }
     if (typeof renderTodayGreetingAndRace === 'function') renderTodayGreetingAndRace();
     if (typeof saveUserData === 'function') saveUserData();
     renderAll();
@@ -3651,6 +3661,14 @@
       })(),
     };
     const courseIntel = (typeof readCourseIntelFromInputs === 'function') ? readCourseIntelFromInputs() : null;
+    // Triathlon focus: which discipline is the user's limiter (weakest /
+    // most needs work) and what strategy do they want — focus on it,
+    // maintain it, or balance across all three. Drives volume distribution
+    // across swim/bike/run in the plan engine.
+    const triFocus = {
+      limiter: localStorage.getItem('tri-limiter') || (planState.triFocus && planState.triFocus.limiter) || 'balanced',
+      strategy: localStorage.getItem('tri-strategy') || (planState.triFocus && planState.triFocus.strategy) || 'balanced',
+    };
     const todayStr = new Date().toISOString().slice(0, 10);
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 60000);
@@ -3662,7 +3680,7 @@
         body: JSON.stringify({
           event, raceDate: eventDate, location: eventLocation,
           hours, days, today: todayStr,
-          profile, courseIntel,
+          profile, courseIntel, triFocus,
         }),
       });
       clearTimeout(timeout);
@@ -3683,6 +3701,24 @@
   // on planState.fullPlan so Coach Chat / week-arc renders can read forward
   // and backward weeks; current-week sessions get copied into planState.sessions
   // so the existing Today / Plan screens render unchanged.
+  // Convert one AI session (shape: { name, type, durationMin, intensity,
+  // prescription, targets }) into the runtime shape planState.sessions uses
+  // (shape: { name, meta, duration, type, prescription, targets, intensity }).
+  // Used by applyAIPlan AND by the multi-week tool runner so future-week edits
+  // round-trip cleanly.
+  function _aiSessionToRuntime(s) {
+    if (!s) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', prescription: '', targets: '', intensity: 'rest' };
+    return {
+      name: s.name || 'Rest',
+      meta: buildSessionMeta(s),
+      duration: Number(s.durationMin) || 0,
+      type: s.type || 'rest',
+      prescription: s.prescription || '',
+      targets: s.targets || '',
+      intensity: s.intensity || '',
+    };
+  }
+
   function applyAIPlan(plan) {
     planState.fullPlan = plan;
     planState.aiPlanSummary = plan.summary || '';
@@ -3699,25 +3735,23 @@
       const weeksFromEnd = Math.ceil(Math.max(0, daysToRace) / 7);
       activeWeekIdx = Math.max(0, Math.min(totalWeeks - 1, totalWeeks - weeksFromEnd));
     }
+    planState.activeWeekIdx = activeWeekIdx;
     const wk = plan.weeks[activeWeekIdx] || plan.weeks[0];
     if (wk && wk.sessions) {
       const newSessions = {};
       ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d => {
-        const s = wk.sessions[d] || {};
-        newSessions[d] = {
-          name: s.name || 'Rest',
-          meta: buildSessionMeta(s),
-          duration: Number(s.durationMin) || 0,
-          type: s.type || 'rest',
-          // Carry through AI prescription + targets so the workout-detail
-          // modal can show real coaching content instead of a stub.
-          prescription: s.prescription || '',
-          targets: s.targets || '',
-          intensity: s.intensity || '',
-        };
+        newSessions[d] = _aiSessionToRuntime(wk.sessions[d]);
       });
       planState.sessions = newSessions;
     }
+    // Also normalize EVERY week's sessions to the runtime shape so multi-week
+    // tool calls don't have to deal with the AI's durationMin format.
+    plan.weeks.forEach(w => {
+      if (!w.sessions) return;
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d => {
+        if (w.sessions[d]) w.sessions[d] = _aiSessionToRuntime(w.sessions[d]);
+      });
+    });
     // Build a week arc for the Plan screen from the AI's weeks. Each entry
     // gets the existing { dates, hours, focus } shape the renderer expects.
     planState.weekArc = plan.weeks.map((w, i) => {
@@ -3735,11 +3769,14 @@
   }
 
   // Compose a one-line "meta" string for the existing session-card UI from
-  // the AI's structured fields. Falls back gracefully if anything's missing.
+  // the AI's structured fields. Handles both the AI's raw shape (durationMin)
+  // and the normalized runtime shape (duration). Falls back gracefully.
   function buildSessionMeta(s) {
-    if (!s || !s.durationMin) return 'Recovery';
-    const h = Math.floor(s.durationMin / 60);
-    const mm = s.durationMin % 60;
+    if (!s) return 'Recovery';
+    const m = Number(s.durationMin || s.duration || 0);
+    if (!m) return 'Recovery';
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
     const dur = h > 0 ? `${h}:${String(mm).padStart(2, '0')}` : `${mm} min`;
     const intensity = s.intensity && s.intensity !== 'rest' ? ` · ${s.intensity}` : '';
     return `${dur}${intensity}`;
@@ -5257,38 +5294,68 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     saveUserData();
   }
 
-  function tool_moveSession({ fromDay, toDay, reason }) {
-    const from = planState.sessions[fromDay];
-    const to = planState.sessions[toDay];
-    if (!from) return { success: false, message: `No session on ${fromDay}.` };
-    planState.sessions[toDay] = from;
-    planState.sessions[fromDay] = to;
-    renderWeekSessions();
-    const msg = `Moved ${from.name} from ${fromDay} to ${toDay}. ${to ? `${to.name} now on ${fromDay}.` : ''}`;
+  // Resolve the right sessions object for a given weekOffset:
+  //   0 → planState.sessions (this week — the live, rendered surface)
+  //   1 → next week's sessions in fullPlan.weeks[active+1]
+  //   2 → fullPlan.weeks[active+2]
+  // Returns { sessions, label, isCurrent } or null if the offset is out of
+  // range (no fullPlan, no such week, etc.). Caller should error helpfully.
+  function _resolveWeekSessions(weekOffset) {
+    const off = Math.max(0, Math.min(2, Number(weekOffset) || 0));
+    if (off === 0) {
+      return { sessions: planState.sessions, label: 'this week', isCurrent: true };
+    }
+    if (!planState.fullPlan || !Array.isArray(planState.fullPlan.weeks)) {
+      return null;
+    }
+    const arc = planState.weekArc || [];
+    let curIdx = arc.findIndex(w => w.current);
+    if (curIdx < 0) curIdx = (typeof planState.activeWeekIdx === 'number') ? planState.activeWeekIdx : 0;
+    const target = planState.fullPlan.weeks[curIdx + off];
+    if (!target || !target.sessions) return null;
+    const label = off === 1 ? 'next week' : 'in 2 weeks';
+    return { sessions: target.sessions, label, isCurrent: false };
+  }
+
+  function tool_moveSession({ fromDay, toDay, reason, weekOffset }) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
+    const sess = slot.sessions;
+    const from = sess[fromDay];
+    const to = sess[toDay];
+    if (!from) return { success: false, message: `No session on ${fromDay} (${slot.label}).` };
+    sess[toDay] = from;
+    sess[fromDay] = to;
+    if (slot.isCurrent) renderWeekSessions();
+    const msg = `Moved ${from.name} from ${fromDay} to ${toDay} (${slot.label}). ${to ? `${to.name} now on ${fromDay}.` : ''}`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
 
-  function tool_shortenSession({ day, newMinutes, newName, newMeta, reason }) {
-    const s = planState.sessions[day];
-    if (!s) return { success: false, message: `No session on ${day}.` };
+  function tool_shortenSession({ day, newMinutes, newName, newMeta, reason, weekOffset }) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
+    const s = slot.sessions[day];
+    if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.duration = newMinutes;
-    renderWeekSessions();
-    const msg = `Shortened ${day} to ${newMinutes} min: ${s.name}`;
+    if (slot.isCurrent) renderWeekSessions();
+    const msg = `Shortened ${day} to ${newMinutes} min (${slot.label}): ${s.name}`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
 
-  function tool_swapDiscipline({ day, newType, newName, newMeta, reason }) {
-    const s = planState.sessions[day];
-    if (!s) return { success: false, message: `No session on ${day}.` };
+  function tool_swapDiscipline({ day, newType, newName, newMeta, reason, weekOffset }) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
+    const s = slot.sessions[day];
+    if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.type = newType;
-    renderWeekSessions();
-    const msg = `${day} is now ${s.name} (${newType}).`;
+    if (slot.isCurrent) renderWeekSessions();
+    const msg = `${day} (${slot.label}) is now ${s.name} (${newType}).`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
@@ -8077,21 +8144,39 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!banner) return;
 
     if (days < 0) {
+      // POST-RACE — racefinished. Lock the banner into a celebratory + new-goal
+      // CTA. Other parts of the app should also reach this state via
+      // planState.postRace flag so insights/coach behave appropriately.
       banner.style.background = 'linear-gradient(135deg, var(--secondary), #B8862E)';
       if (count) count.textContent = '✓';
       if (top) top.textContent = 'Race complete';
       if (bottom) bottom.innerHTML = `${escapeHtml(event)} ${location ? '· ' + escapeHtml(location) : ''} <a onclick="resetForNewGoal()" style="color:#fff; text-decoration:underline; cursor:pointer;">Set new goal →</a>`;
+      planState.postRace = true;
+      planState.raceWeek = false;
     } else if (days === 0) {
       banner.style.background = 'linear-gradient(135deg, #F5A623, #F27B22)';
       if (count) count.textContent = '0';
       if (top) top.textContent = 'Race day';
       if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''} — go execute the plan.`;
+      planState.postRace = false;
+      planState.raceWeek = true;
+    } else if (days <= 7) {
+      // RACE WEEK — distinct visual treatment + intensity-lockout signal.
+      // Coach Chat reads planState.raceWeek and refuses to add intensity.
+      banner.style.background = 'linear-gradient(135deg, #C44545, #8E2A2A)'; // alert red — keep your eye on the prize
+      if (count) count.textContent = days;
+      if (top) top.textContent = `RACE WEEK · ${days} day${days === 1 ? '' : 's'} out`;
+      if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''} — taper protocol active. Sharpen, don't strain.`;
+      planState.postRace = false;
+      planState.raceWeek = true;
     } else {
       const weekIdx = getCurrentWeekIdx();
       const arc = planState.weekArc[weekIdx] || planState.weekArc[0];
       if (count) count.textContent = days;
       if (top) top.textContent = days === 1 ? 'day to your race' : 'days to your race';
       if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''}${arc ? ' · ' + arc.focus : ''}`;
+      planState.postRace = false;
+      planState.raceWeek = false;
     }
   }
 
@@ -8282,8 +8367,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // Toggle action rows: pending vs done vs rest
-    const isRest = !completed && s.type === 'rest';
+    // Toggle action rows: pending vs done vs rest. Rest now also covers any
+    // zero-duration session even if its type wasn't explicitly "rest" — so
+    // Done/Reschedule/Skip can never appear on a session there's nothing to do.
+    const isRest = !completed && (s.type === 'rest' || !s.duration || Number(s.duration) === 0);
     if (actionsPending) actionsPending.style.display = (completed || isRest) ? 'none' : 'grid';
     if (logActions) logActions.style.display = (completed || isRest) ? 'none' : 'flex';
     if (syncNote) syncNote.style.display = (completed || isRest) ? 'none' : 'block';
@@ -10748,6 +10835,55 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     saveAccounts(accounts);
   }
 
+  // Detects "marked-complete-but-empty-plan" state: a user who was flagged
+  // onboardingComplete but has no real session data (e.g., closed the tab
+  // mid-plan-generation last time). True plan = fullPlan present OR at
+  // least one non-rest session in the current week.
+  function _hasRealPlan() {
+    if (planState.fullPlan && Array.isArray(planState.fullPlan.weeks) && planState.fullPlan.weeks.length > 0) return true;
+    const sessions = planState.sessions || {};
+    return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].some(d => {
+      const s = sessions[d];
+      return s && s.duration > 0 && s.type !== 'rest';
+    });
+  }
+
+  // Recover from the "complete but empty" state without making the user
+  // redo onboarding from scratch. Tries to re-run AI plan generation using
+  // their saved inputs; if those inputs are missing, sends them back to
+  // onboarding step 0.
+  async function _attemptStaleStatePlanRecovery() {
+    const event = localStorage.getItem('race-event') || '';
+    const eventDate = localStorage.getItem('race-date') || '';
+    const hours = parseFloat(localStorage.getItem('hours-per-week') || '0');
+    let days = [];
+    try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
+    if (!event || !eventDate || !hours || !Array.isArray(days) || days.length === 0) {
+      // Not enough info to recover. Send them to onboarding to re-enter.
+      showScreen('onboard');
+      onbStep(0);
+      return;
+    }
+    const eventLocation = localStorage.getItem('race-location') || '';
+    const complexity = localStorage.getItem('complexity-mode') || 'simple';
+    showScreen('onboard');
+    onbStep(6);
+    startStagedPlanStatus();
+    try {
+      const ai = await generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity });
+      if (ai && ai.weeks) { applyAIPlan(ai); planState.planSource = 'ai'; }
+      else { generatePlanFromInputs(); planState.planSource = 'fallback'; }
+    } catch (err) {
+      planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+      planState.planSource = 'fallback';
+      generatePlanFromInputs();
+    }
+    stopStagedPlanStatus();
+    saveUserData();
+    renderAll();
+    showScreen('today');
+  }
+
   function enterApp() {
     const username = currentUser();
     const accounts = getAccounts();
@@ -10761,6 +10897,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!acct || !acct.data.onboardingComplete) {
       showScreen('onboard');
       onbStep(0);
+    } else if (!_hasRealPlan()) {
+      // Account is "complete" but we have no real plan data (sessions all
+      // empty/rest, no fullPlan). This happens if a previous plan-gen run
+      // failed silently or the user closed the tab mid-generation. Send
+      // them through plan regeneration instead of dumping them on a
+      // skeleton home screen.
+      console.warn('Onboarded account has no real plan; regenerating.');
+      _attemptStaleStatePlanRecovery();
     } else {
       goHome();
       setTimeout(startTour, 600);
@@ -11006,8 +11150,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Trim the full AI plan for context: weeks-only, with prescription kept
     // (it's the "real coaching" the AI needs to reason about adherence).
+    // Also include detailed sessions for the next 2 weeks so the AI can
+    // intelligently modify them via tool calls with weekOffset=1 or 2.
     let fullPlanCompact = null;
     if (planState.fullPlan && Array.isArray(planState.fullPlan.weeks)) {
+      const arc = planState.weekArc || [];
+      let curIdx = arc.findIndex(w => w.current);
+      if (curIdx < 0) curIdx = (typeof planState.activeWeekIdx === 'number') ? planState.activeWeekIdx : 0;
+      const nextWeek = planState.fullPlan.weeks[curIdx + 1];
+      const weekAfter = planState.fullPlan.weeks[curIdx + 2];
       fullPlanCompact = {
         summary: planState.fullPlan.summary || '',
         blocks: planState.fullPlan.blocks || [],
@@ -11020,6 +11171,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           intensityRatio: w.intensityRatio,
           deload: !!w.deload,
         })),
+        nextWeekSessions: nextWeek ? nextWeek.sessions : null,
+        weekAfterSessions: weekAfter ? weekAfter.sessions : null,
       };
     }
 
@@ -11028,6 +11181,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       timeline,
       daysToRace,
       raceDate: planState.raceDate || null,
+      raceWeek: !!planState.raceWeek,    // <=7 days out — intensity lockout
+      postRace: !!planState.postRace,    // race date passed — recovery mode
       sessions: planState.sessions || {},
       weekArc: (planState.weekArc || []).slice(0, 8),
       injury: planState.injury || null,
@@ -12072,21 +12227,25 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     addBubble('Reverted the last change.', 'bot');
   }
 
-  function tool_completeSession({ day }) {
-    const s = planState.sessions[day];
-    if (!s) return { success: false, message: `No session on ${day}.` };
+  function tool_completeSession({ day, weekOffset }) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
+    const s = slot.sessions[day];
+    if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
     s.completed = true;
-    renderWeekSessions();
-    const msg = `Marked ${day}'s ${s.name} as completed.`;
+    if (slot.isCurrent) renderWeekSessions();
+    const msg = `Marked ${day}'s ${s.name} as completed (${slot.label}).`;
     setChange(msg);
-    setTimeout(() => {
-      maybeCelebrate('first-session');
-      if (s.type === 'brick') maybeCelebrate('first-brick');
-      if (s.type === 'run' && s.duration >= 75) maybeCelebrate('first-long-run');
-      const streak = computeStreak();
-      if (streak.days === 3) maybeCelebrate('streak-3');
-      if (streak.days === 7) maybeCelebrate('streak-7');
-    }, 300);
+    if (slot.isCurrent) {
+      setTimeout(() => {
+        maybeCelebrate('first-session');
+        if (s.type === 'brick') maybeCelebrate('first-brick');
+        if (s.type === 'run' && s.duration >= 75) maybeCelebrate('first-long-run');
+        const streak = computeStreak();
+        if (streak.days === 3) maybeCelebrate('streak-3');
+        if (streak.days === 7) maybeCelebrate('streak-7');
+      }, 300);
+    }
     return { success: true, message: msg };
   }
 
@@ -12118,14 +12277,16 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     return { success: true, message: msg };
   }
 
-  function tool_skipSession({ day }) {
-    const s = planState.sessions[day];
-    if (!s) return { success: false, message: `No session on ${day}.` };
+  function tool_skipSession({ day, weekOffset }) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
+    const s = slot.sessions[day];
+    if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
     s.name = `Skipped: ${s.name}`;
     s.meta = 'Skipped · plan adapted';
     s.type = 'rest';
-    renderWeekSessions();
-    const msg = `Noted ${day} as skipped. Adaptive recommendations will factor this in — we won't try to cram the missed work.`;
+    if (slot.isCurrent) renderWeekSessions();
+    const msg = `Noted ${day} as skipped (${slot.label}). Adaptive recommendations will factor this in — we won't try to cram the missed work.`;
     setChange(msg);
     return { success: true, message: msg };
   }
