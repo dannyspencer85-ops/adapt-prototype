@@ -1451,6 +1451,7 @@
           <div class="step-dot"></div>
           <div class="step-dot"></div>
           <div class="step-dot"></div>
+          <div class="step-dot"></div>
         </div>
         <h1>A bit about you.</h1>
         <p class="sub">So we can set safe intensity zones.</p>
@@ -1490,6 +1491,7 @@
         <div class="step-progress">
           <div class="step-dot done"></div>
           <div class="step-dot active"></div>
+          <div class="step-dot"></div>
           <div class="step-dot"></div>
           <div class="step-dot"></div>
         </div>
@@ -1544,6 +1546,7 @@
           <div class="step-dot done"></div>
           <div class="step-dot done"></div>
           <div class="step-dot active"></div>
+          <div class="step-dot"></div>
           <div class="step-dot"></div>
         </div>
         <h1>Your goal.</h1>
@@ -1720,6 +1723,7 @@
           <div class="step-dot done"></div>
           <div class="step-dot done"></div>
           <div class="step-dot active"></div>
+          <div class="step-dot"></div>
         </div>
         <h1>Your schedule.</h1>
         <p class="sub">Tell us the truth. We'll build around real life, not an imagined one.</p>
@@ -1772,13 +1776,101 @@
           </div>
         </div>
         <div class="onboard-actions">
+          <button class="btn btn-primary btn-full btn-lg" onclick="onbStep(5)">Next</button>
+        </div>
+      </div>
+
+      <!-- STEP 5 — fitness markers (all optional, drives calibrated zones in the plan) -->
+      <div id="onb-5" style="display:none;">
+        <button class="back-btn" onclick="onbStep(4)" style="display:inline-flex; margin-bottom: 14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Back
+        </button>
+        <div class="step-progress">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+        </div>
+        <h1>How fit are you right now?</h1>
+        <p class="sub">All optional — pick anything you know, skip the rest. Concrete numbers let me prescribe real paces and zones instead of generic ones. Don't know any? That's fine — I'll start with conservative estimates.</p>
+
+        <div class="field">
+          <label>🏃 Most recent run race</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">A recent race time gives me your run-pace zones (Daniels VDOT). Skip if you haven't raced recently.</div>
+          <div class="chip-row" id="fmRunDist">
+            <button class="chip" data-val="" onclick="singleChipVal(this)">— None</button>
+            <button class="chip" data-val="5K" onclick="singleChipVal(this)">5K</button>
+            <button class="chip" data-val="10K" onclick="singleChipVal(this)">10K</button>
+            <button class="chip" data-val="HM" onclick="singleChipVal(this)">Half</button>
+            <button class="chip" data-val="M" onclick="singleChipVal(this)">Marathon</button>
+          </div>
+          <div class="two-col" style="margin-top:8px;">
+            <div class="field" style="margin:0;">
+              <label style="font-size:12px;">Time</label>
+              <input type="text" id="fmRunTime" placeholder="e.g. 22:30 or 1:42:18" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size:12px;">When</label>
+              <select id="fmRunWhen" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+                <option value="">—</option>
+                <option value="last-month">Last month</option>
+                <option value="3-months">Last 3 months</option>
+                <option value="6-months">Last 6 months</option>
+                <option value="1-year">Within last year</option>
+                <option value="older">Older</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>🫀 Heart rate</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">If you know either. Resting HR = morning bpm. Max HR = highest you've seen on a hard effort.</div>
+          <div class="two-col">
+            <div class="field" style="margin:0;">
+              <label style="font-size:12px;">Resting HR</label>
+              <input type="number" id="fmRhr" min="30" max="100" placeholder="e.g. 52" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size:12px;">Max HR</label>
+              <input type="number" id="fmHrMax" min="120" max="220" placeholder="e.g. 188" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🚴 🏊 Advanced markers</span>
+            <button type="button" onclick="toggleFmAdvanced()" id="fmAdvancedToggle" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Show</button>
+          </label>
+          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">FTP and CSS — only if you've tested them. Skip if you haven't.</div>
+        </div>
+        <div id="fmAdvancedFields" style="display:none;">
+          <div class="field">
+            <label style="font-size:12px;">🚴 Bike FTP (watts) — 1-hour sustainable power</label>
+            <input type="number" id="fmFtp" min="80" max="500" placeholder="e.g. 245" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+          </div>
+          <div class="field">
+            <label style="font-size:12px;">🏊 Swim CSS — threshold pace per 100m</label>
+            <input type="text" id="fmCss" placeholder="e.g. 1:38" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:var(--text-soft); margin-top:10px; padding:10px 12px; background:var(--bg-soft); border-radius:8px; line-height:1.5;">
+          <strong style="color:var(--text);">After you've trained for a week or two,</strong> I'll suggest a quick 5-min field test to refine these. For now, use what you know or skip.
+        </div>
+
+        <div class="onboard-actions" style="margin-top:14px;">
           <button class="btn btn-primary btn-full btn-lg" onclick="finishOnboard()">Build my plan</button>
+          <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="finishOnboard()">Skip — I'll add later</button>
         </div>
       </div>
 
 
       <div id="onb-building" style="display:none; padding-top:20px;">
-        <button class="back-btn" onclick="onbStep(4)" style="display:inline-flex; margin-bottom: 20px;">
+        <button class="back-btn" onclick="onbStep(5)" style="display:inline-flex; margin-bottom: 20px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           Back
         </button>
@@ -3132,6 +3224,7 @@
     document.getElementById('onb-' + target).style.display = 'block';
     if (n === 4) populateDisciplineChips();
     if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
+    if (n === 5) prefillFitnessMarkers();
     // Pre-fill the first-name field if we already have it stored (returning user
     // re-entering onboarding via "Edit goals" or "Start over").
     if (n === 1) {
@@ -3139,6 +3232,65 @@
       const saved = getFirstName();
       if (fnEl && saved && !fnEl.value) fnEl.value = saved;
     }
+  }
+
+  // Toggle the advanced FTP/CSS section in step 5.
+  function toggleFmAdvanced() {
+    const wrap = document.getElementById('fmAdvancedFields');
+    const toggle = document.getElementById('fmAdvancedToggle');
+    if (!wrap || !toggle) return;
+    if (wrap.style.display === 'none') { wrap.style.display = 'block'; toggle.textContent = 'Hide'; }
+    else { wrap.style.display = 'none'; toggle.textContent = 'Show'; }
+  }
+
+  // Restore step-5 fields if a returning user re-enters this step (back button,
+  // edit-from-profile, etc.) and we have markers saved.
+  function prefillFitnessMarkers() {
+    const m = readFitnessMarkers();
+    if (!m) return;
+    if (m.runRace && m.runRace.distance) {
+      const wrap = document.getElementById('fmRunDist');
+      if (wrap) [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === m.runRace.distance));
+    }
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    setVal('fmRunTime', m.runRace && m.runRace.time);
+    setVal('fmRunWhen', m.runRace && m.runRace.when);
+    setVal('fmRhr', m.restingHr);
+    setVal('fmHrMax', m.maxHr);
+    setVal('fmFtp', m.ftp);
+    setVal('fmCss', m.css);
+    if (m.ftp || m.css) {
+      // Auto-expand advanced section if any advanced fields are populated.
+      const wrap = document.getElementById('fmAdvancedFields');
+      const toggle = document.getElementById('fmAdvancedToggle');
+      if (wrap && toggle) { wrap.style.display = 'block'; toggle.textContent = 'Hide'; }
+    }
+  }
+
+  // Read the step-5 form into a normalized markers object. Skips empties.
+  function harvestFitnessMarkers() {
+    const distChip = document.querySelector('#fmRunDist .chip.active');
+    const dist = distChip ? (distChip.dataset.val || '') : '';
+    const runTime = (document.getElementById('fmRunTime')?.value || '').trim();
+    const runWhen = (document.getElementById('fmRunWhen')?.value || '').trim();
+    const rhr = parseInt(document.getElementById('fmRhr')?.value || '', 10);
+    const hrmax = parseInt(document.getElementById('fmHrMax')?.value || '', 10);
+    const ftp = parseInt(document.getElementById('fmFtp')?.value || '', 10);
+    const css = (document.getElementById('fmCss')?.value || '').trim();
+    const m = {};
+    if (dist && runTime) m.runRace = { distance: dist, time: runTime, when: runWhen || null };
+    if (Number.isFinite(rhr) && rhr > 30 && rhr < 100) m.restingHr = rhr;
+    if (Number.isFinite(hrmax) && hrmax > 120 && hrmax < 220) m.maxHr = hrmax;
+    if (Number.isFinite(ftp) && ftp > 60 && ftp < 600) m.ftp = ftp;
+    if (css && /^\d{1,2}:\d{2}$/.test(css)) m.css = css;
+    return Object.keys(m).length > 0 ? m : null;
+  }
+  function readFitnessMarkers() {
+    try { return JSON.parse(localStorage.getItem('fitness-markers') || 'null'); } catch (e) { return null; }
+  }
+  function writeFitnessMarkers(m) {
+    if (m) localStorage.setItem('fitness-markers', JSON.stringify(m));
+    else localStorage.removeItem('fitness-markers');
   }
 
   // First name is the canonical greeting handle and is mandatory at step 1.
@@ -3204,6 +3356,8 @@
       location: 'Austin, TX',
       profile: { exp: 'new', freq: 'mid', injury: 'none', sleep: '7to8' },
       complexity: 'simple',
+      // No markers — Alex is brand new and hasn't tested anything. Tests
+      // that the plan engine works with zero calibration data.
     },
     {
       id: 'jordan-marathon',
@@ -3215,6 +3369,9 @@
       location: 'Brooklyn, NY',
       profile: { exp: 'some', freq: 'high', injury: 'none', sleep: '7to8' },
       complexity: 'detailed',
+      // Recent half-marathon + measured max HR — engine will derive VDOT
+      // and prescribe specific run paces.
+      fitnessMarkers: { runRace: { distance: 'HM', time: '1:42:18', when: '3-months' }, maxHr: 184, restingHr: 54 },
     },
     {
       id: 'danny-70-3',
@@ -3226,6 +3383,8 @@
       location: 'Boulder, CO',
       profile: { exp: 'veteran', freq: 'high', injury: 'none', sleep: '7to8' },
       complexity: 'detailed',
+      // Veteran with everything dialed in — tests the full calibrated path.
+      fitnessMarkers: { runRace: { distance: '10K', time: '46:30', when: '3-months' }, ftp: 245, maxHr: 178, restingHr: 48, css: '1:38' },
     },
     {
       id: 'sam-im',
@@ -3237,6 +3396,8 @@
       location: 'Coeur d\'Alene, ID',
       profile: { exp: 'some', freq: 'mid', injury: 'none', sleep: '6to7' },
       complexity: 'detailed',
+      // Some markers from his earlier IM cycle, slightly stale.
+      fitnessMarkers: { runRace: { distance: '10K', time: '52:00', when: '6-months' }, maxHr: 175, restingHr: 60 },
     },
     {
       id: 'riley-5k',
@@ -3248,6 +3409,7 @@
       location: 'Chicago, IL',
       profile: { exp: 'new', freq: 'low', injury: 'none', sleep: '7to8' },
       complexity: 'simple',
+      // No markers — first race ever.
     },
     {
       id: 'morgan-injury',
@@ -3259,6 +3421,8 @@
       location: 'Portland, OR',
       profile: { exp: 'veteran', freq: 'mid', injury: 'minor', sleep: '7to8' },
       complexity: 'simple',
+      // Has HR data from past training but no recent race time (was injured).
+      fitnessMarkers: { maxHr: 182, restingHr: 56 },
     },
   ];
 
@@ -3330,6 +3494,12 @@
         };
         localStorage.setItem('course-intel', JSON.stringify(courseIntel));
       }
+    }
+    // Apply persona's pre-set fitness markers so calibrated zones come out
+    // of plan generation right away. Skipped for personas that left them
+    // empty (Alex, Riley) — those exercise the no-calibration code path.
+    if (p.fitnessMarkers && typeof writeFitnessMarkers === 'function') {
+      writeFitnessMarkers(p.fitnessMarkers);
     }
     planState.raceEvent = p.event;
     planState.raceDate = raceDate;
@@ -3585,6 +3755,11 @@
     planState.courseIntel = intel;
     localStorage.setItem('course-intel', JSON.stringify(intel));
 
+    // Save fitness markers (step 5) so they ride the plan generation + every
+    // future Coach Chat context payload. All fields are optional.
+    const markers = harvestFitnessMarkers();
+    if (markers) writeFitnessMarkers(markers);
+
     onbStep(6); // show "Building your plan…" screen immediately
     // Try AI-generated plan first. If it fails (network, validation, timeout)
     // we silently fall back to the rule-based engine so the user always lands
@@ -3681,6 +3856,7 @@
           event, raceDate: eventDate, location: eventLocation,
           hours, days, today: todayStr,
           profile, courseIntel, triFocus,
+          fitnessMarkers: readFitnessMarkers(),
         }),
       });
       clearTimeout(timeout);
@@ -8884,6 +9060,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         localStorage.setItem('course-intel', JSON.stringify(courseIntel));
       }
     }
+    if (p.fitnessMarkers && typeof writeFitnessMarkers === 'function') {
+      writeFitnessMarkers(p.fitnessMarkers);
+    }
     planState.raceEvent = p.event;
     planState.raceDate = raceDate;
     planState.raceLocation = p.location;
@@ -8978,6 +9157,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'perf-range',
     'trend-disc',
     'integrations',
+    'fitness-markers',
+    'tri-limiter',
+    'tri-strategy',
   ];
 
   function _clearUserScopedLocal() {
@@ -11194,6 +11376,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // User's preferred coaching detail level. Server prompt branches on this.
       coachingDetail: localStorage.getItem('complexity-mode') || 'simple',
       planSource: planState.planSource || 'unknown',
+      // Calibrated fitness markers from onboarding step 5 (race time, HR, FTP,
+      // CSS). When present, Coach Chat quotes real paces/HR/power.
+      fitnessMarkers: readFitnessMarkers(),
     };
   }
 

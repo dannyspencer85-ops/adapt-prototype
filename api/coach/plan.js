@@ -86,13 +86,14 @@ export default async function handler(req) {
   const profile = inputs.profile || {};
   const courseIntel = inputs.courseIntel || {};
   const triFocus = inputs.triFocus || {};
+  const fitnessMarkers = inputs.fitnessMarkers || {};
   const location = inputs.location || '';
 
   // Compute weeks-to-race so we can pick a credible block layout.
   const weeksToRace = computeWeeksToRace(todayStr, raceDate);
 
-  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, location, todayStr });
-  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, location });
+  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location, todayStr });
+  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location });
 
   // Force a JSON-shaped response. Mistral supports response_format = {type:'json_object'}.
   const payload = {
@@ -158,7 +159,37 @@ export default async function handler(req) {
 
 // ─── Prompt construction ──────────────────────────────────────────────────
 
-function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, location, todayStr }) {
+// Render the user's calibrated fitness markers as a prompt block. Empty
+// string when nothing is set — the AI falls back to estimated zones.
+function buildFitnessMarkersBlock(m) {
+  if (!m || typeof m !== 'object') return '';
+  const lines = [];
+  if (m.runRace && m.runRace.distance && m.runRace.time) {
+    lines.push(`• Recent run race: ${m.runRace.distance} in ${m.runRace.time}${m.runRace.when ? ' (' + m.runRace.when + ')' : ''}`);
+    lines.push('  → Derive Daniels VDOT from this. Use it to prescribe specific run paces (E / M / T / I / R) in every run session\'s targets.');
+  }
+  if (m.maxHr) {
+    lines.push(`• Max HR: ${m.maxHr} bpm`);
+    lines.push(`  → HR zones from this: Z1 ${Math.round(m.maxHr*0.60)}-${Math.round(m.maxHr*0.70)}, Z2 ${Math.round(m.maxHr*0.70)}-${Math.round(m.maxHr*0.80)}, Z3 ${Math.round(m.maxHr*0.80)}-${Math.round(m.maxHr*0.87)}, Z4 ${Math.round(m.maxHr*0.87)}-${Math.round(m.maxHr*0.93)}, Z5 ${Math.round(m.maxHr*0.93)}-${m.maxHr}.`);
+  }
+  if (m.restingHr) {
+    lines.push(`• Resting HR: ${m.restingHr} bpm`);
+    lines.push('  → Use as a baseline. Coach Chat compares morning HR readings against this.');
+  }
+  if (m.ftp) {
+    const f = m.ftp;
+    lines.push(`• Bike FTP: ${f}W`);
+    lines.push(`  → Zones: Z2 ${Math.round(f*0.55)}-${Math.round(f*0.75)}W, Sweet Spot ${Math.round(f*0.88)}-${Math.round(f*0.94)}W, Threshold ${Math.round(f*0.95)}-${Math.round(f*1.05)}W, VO2max ${Math.round(f*1.06)}-${Math.round(f*1.20)}W. Use these specific watts in every bike session's targets.`);
+  }
+  if (m.css) {
+    lines.push(`• Swim CSS: ${m.css} per 100m`);
+    lines.push('  → Easy: CSS + 8-10s/100m. Threshold sets: at CSS. Fast: CSS - 3s/100m. Use these specific paces in every swim session\'s targets.');
+  }
+  if (lines.length === 0) return '';
+  return `\n\n═══ CALIBRATED FITNESS MARKERS — USE THESE EXACT NUMBERS ═══\n\n${lines.join('\n')}\n\nWhen prescribing sessions, USE THESE NUMBERS. Don't write "Z2" — write the actual HR range "${m.maxHr ? Math.round(m.maxHr*0.70) + '-' + Math.round(m.maxHr*0.80) + ' bpm' : 'their HR Z2 range'}". Don't write "threshold pace" — derive it from VDOT and write "~7:15/mi" or whatever's correct. The user gave us real data; reflect that in every prescription and target line.`;
+}
+
+function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location, todayStr }) {
   const isTri = /Ironman|Triathlon/i.test(event);
   const isRun = /Marathon|10K|5K|Half Marathon/i.test(event);
   const limiter = (triFocus && triFocus.limiter) || 'balanced';
@@ -261,7 +292,7 @@ ${courseIntel && courseIntel.terrain ? 'Course terrain: ' + courseIntel.terrain 
 ${courseIntel && courseIntel.climate ? 'Course climate: ' + courseIntel.climate : ''}
 ${profile && profile.exp ? 'Experience: ' + profile.exp : ''}
 ${profile && profile.injury ? 'Injury status: ' + profile.injury : ''}
-${profile && profile.sleep ? 'Typical sleep: ' + profile.sleep : ''}
+${profile && profile.sleep ? 'Typical sleep: ' + profile.sleep : ''}${buildFitnessMarkersBlock(fitnessMarkers)}
 
 ═══ OUTPUT JSON SCHEMA — STRICT ═══
 
