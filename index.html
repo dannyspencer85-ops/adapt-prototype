@@ -4041,6 +4041,7 @@
           profile, courseIntel, triFocus,
           availableDisciplines: disciplines,
           fitnessMarkers: readFitnessMarkers(),
+          difficultyAdjust: localStorage.getItem('plan-difficulty-adjust') || null,
         }),
       });
       clearTimeout(timeout);
@@ -5816,6 +5817,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
+  // User feedback that the current plan feels too easy / too hard. Saves the
+  // direction, kicks off a background plan regen with the new signal. Mirrors
+  // setTrainingFocus structure — same fire-and-forget regen path.
+  function tool_adjustPlanDifficulty({ direction, reason }) {
+    const valid = ['easier', 'harder'];
+    if (!valid.includes(direction)) return { success: false, message: 'Direction must be "easier" or "harder".' };
+    localStorage.setItem('plan-difficulty-adjust', direction);
+    if (typeof _regeneratePlanInBackground === 'function') _regeneratePlanInBackground();
+    const msg = direction === 'easier'
+      ? `Got it — pulling the plan back. Rebuilding now with lighter sessions and a slower progression. Give it ~30s, then check the Plan tab.`
+      : `Got it — stepping it up. Rebuilding now with sharper progression and earlier quality work. Give it ~30s.`;
+    return { success: true, message: msg, regenerating: true, reason: reason || '' };
+  }
+
   function tool_flagInjury({ area, severity, notes }) {
     const now = Date.now();
     // Preserve existing timeline if same injury was previously flagged.
@@ -5978,6 +5993,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         case 'openTrainingDay': return tool_openTrainingDay(input);
         case 'closeTrainingDay': return tool_closeTrainingDay(input);
         case 'setTrainingFocus': return tool_setTrainingFocus(input);
+        case 'adjustPlanDifficulty': return tool_adjustPlanDifficulty(input);
         default: return { success: false, message: `Unknown tool: ${name}` };
       }
     } catch (err) {

@@ -245,6 +245,8 @@ Pattern → tool mapping (memorize this):
 • "Make my plan balanced across all three" → setTrainingFocus(limiter='balanced', strategy='balanced')
 • "Add a workout on [day]" / "I can train [day] too" / "Use [day] from now on" → openTrainingDay(day=X) — NOT swapDiscipline. swapDiscipline just relabels; openTrainingDay actually adds duration + a sensible default session.
 • "Drop [day]" / "I can't train [day] anymore" → closeTrainingDay(day=X)
+• "This is too easy" / "Plan feels too soft" / "I want more challenge" → adjustPlanDifficulty(direction='harder', reason=…)
+• "This is too hard" / "Too aggressive" / "I'm crushed" / "Tone it down" → adjustPlanDifficulty(direction='easier', reason=…)
 
 If the user describes a multi-day situation, CALL MULTIPLE TOOLS in the same turn. Don't ask "should I do that?" — just do it.
 
@@ -673,6 +675,21 @@ const TOOL_DEFINITIONS = [
           reason: { type: 'string', description: 'Brief reason in one sentence' },
         },
         required: ['limiter', 'strategy'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'adjustPlanDifficulty',
+      description: 'Triggers a full plan rebuild with a difficulty adjustment when the user says the current plan is too easy or too hard. Use when user says: "this is too easy / too soft / not enough", or "this is too hard / too aggressive / too much". Always pair with a one-sentence reason. The plan rebuilds in the background (~30s). Only the most recent direction wins; calling again overrides the previous adjustment.',
+      parameters: {
+        type: 'object',
+        properties: {
+          direction: { type: 'string', enum: ['easier', 'harder'], description: '"easier" if the user wants a lighter plan; "harder" if they want more challenge.' },
+          reason: { type: 'string', description: 'One sentence explaining what the user said.' },
+        },
+        required: ['direction', 'reason'],
       },
     },
   },

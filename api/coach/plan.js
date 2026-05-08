@@ -88,13 +88,14 @@ export default async function handler(req) {
   const triFocus = inputs.triFocus || {};
   const fitnessMarkers = inputs.fitnessMarkers || {};
   const availableDisciplines = Array.isArray(inputs.availableDisciplines) ? inputs.availableDisciplines : [];
+  const difficultyAdjust = inputs.difficultyAdjust || null;
   const location = inputs.location || '';
 
   // Compute weeks-to-race so we can pick a credible block layout.
   const weeksToRace = computeWeeksToRace(todayStr, raceDate);
 
-  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location, todayStr });
-  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location });
+  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, todayStr });
+  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location });
 
   // Force a JSON-shaped response. Mistral supports response_format = {type:'json_object'}.
   const payload = {
@@ -200,7 +201,7 @@ function buildFitnessMarkersBlock(m) {
   return `\n\n═══ CALIBRATED FITNESS MARKERS — USE THESE EXACT NUMBERS ═══\n\n${lines.join('\n')}\n\nWhen prescribing sessions, USE THESE NUMBERS. Don't write "Z2" — write the actual HR range "${m.maxHr ? Math.round(m.maxHr*0.70) + '-' + Math.round(m.maxHr*0.80) + ' bpm' : 'their HR Z2 range'}". Don't write "threshold pace" — derive it from VDOT and write "~7:15/mi" or whatever's correct. The user gave us real data; reflect that in every prescription and target line.`;
 }
 
-function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location, todayStr }) {
+function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, todayStr }) {
   const isTri = /Ironman|Triathlon/i.test(event);
   const isMarathon = /Marathon/i.test(event) && !/Half/i.test(event);
   const isHalfMar = /Half Marathon/i.test(event);
@@ -263,24 +264,70 @@ Pace anchor: T-pace (threshold) is the most important number for HM athletes.`;
     const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
     const isBeginner = expLevel === 'new' || runAbility === 'walk-run' || runAbility === 'under-15';
     if (isBeginner) {
-      disciplineNote = `Short-distance run event (${event}) — BEGINNER PATH. The user's experience or current run ability is limited (exp=${expLevel || 'unknown'}, runAbility=${runAbility || 'unknown'}). DO NOT prescribe continuous easy runs longer than they can currently do. Use Couch-to-5K-style walk/run progressions.
+      disciplineNote = `Short-distance run event (${event}) — BEGINNER PATH. The user's experience or current run ability is limited (exp=${expLevel || 'unknown'}, runAbility=${runAbility || 'unknown'}).
 
-Run-ability-anchored prescriptions (use the user's actual capacity):
-• runAbility='walk-run' (just walking + short jogs): start at "5 min walk WU + 8×(60s jog / 90s walk) + 5 min walk CD ≈ 30 min". Add 15 sec jog / drop 15 sec walk per week. By week 6-8 they should be running 20-25 min continuously.
-• runAbility='under-15' (can run up to 15 min): start at "5 min walk + 4×(3 min jog / 90s walk) + 5 min walk ≈ 30 min", building toward 20-30 min continuous runs by week 4-6.
-• runAbility='15-30' (can run 15-30 min): start at 20-25 min continuous easy with one walk break mid-session, build to 30-35 min by week 3-4.
+═══ CANONICAL REFERENCES — anchor the progression here ═══
 
-DO NOT prescribe:
-• Threshold or interval work in the first 4 weeks (joints + tendons need adaptation first)
-• Continuous runs longer than the user's current capacity × 1.25
-• Long runs over 45 min for a beginner training for a 5K
+Calibrate the build against established Couch-to-5K / Couch-to-10K programs. Do not invent your own progression — match these proven structures:
 
-DO prescribe:
-• Strides (4-6×20s at fast-feeling pace with full walk recovery) starting week 3
-• Strength sessions if available (huge injury-protection win for new runners)
-• 2-3 run sessions per week max; cross-train (bike/walk) on remaining days
+• NHS Couch to 5K (9 weeks, 3 sessions/wk): the gold standard. Week 1: 60s jog / 90s walk × 8. Week 5 day 3: 20 min continuous run. Week 9: 30 min continuous (~5K).
+• Hal Higdon Novice 5K (8 weeks): blends walk/run with strength + cross-train days. Conservative for true beginners.
+• Hal Higdon Novice 10K (12 weeks): for runners who already complete 5K. Adds a longer run and one quality day.
+• Jeff Galloway Run-Walk-Run: a sustainable approach for everyone — even race finishers can use 4:1 run/walk ratios indefinitely.
 
-Weekly TOTAL run time should grow ≤10% per week. The plan is "build the runner first, sharpen second."`;
+Use these programs as templates. If the user's runAbility says they cannot run 10 min continuously, START where NHS C25K week 1 starts — not at "30 min easy run."
+
+═══ ADJUSTMENT MECHANISM ═══
+
+If the user has signaled difficulty preferences (context.difficultyAdjust):
+• 'too-easy' / 'easier' (negative adjustment): The user explicitly said the previous plan was too easy. Step the progression up by 1 week — start where the previous plan was at week 2-3. Add quality earlier (week 3 instead of week 5).
+• 'too-hard' / 'harder' (positive adjustment from user perspective is "make it easier"): Walk the progression back. Lengthen walk intervals, shorten run intervals.
+Default: no adjustment, follow the canonical NHS C25K curve.
+
+═══ HARD CAPS FOR BEGINNERS — DO NOT EXCEED ═══
+
+These are not guidelines, they are LIMITS. The user said ${hours} hrs/week are "available" but DO NOT FILL THAT TIME. Filling time the user can't physically run is how new runners get injured. The plan should USE LESS TIME than they have available in early weeks.
+
+• Maximum session duration: **30 min in weeks 1-2, 35 min in weeks 3-4, 40 min in weeks 5+**. NEVER go over even if the user has 5+ hrs/week available.
+• Maximum sessions per week: **3 run sessions**. Even if user picked 5 days, the other 2 are rest, mobility, or strength (if available).
+• Maximum total weekly RUN time: **week 1: 60-75 min**, **week 2: 75-85 min**, **week 3: 85-95 min**, **week 4: deload to 70 min**. Build ≤10%/week. NEVER exceed these caps in the first 6 weeks even if hrs/week says 4 or 5.
+• If hrs/week × 60 > weekly run cap, fill the gap with REST or STRENGTH (if available) or MOBILITY — not more running.
+
+═══ SESSION TEMPLATES (use these — don't invent something else) ═══
+
+runAbility='walk-run' (walking + short jogs):
+• Week 1 sessions: "5 min walk WU + 8×(60s jog / 90s walk) + 5 min walk CD ≈ 28 min"
+• Week 2: "5 min walk + 8×(75s jog / 75s walk) + 5 min walk ≈ 30 min"
+• Week 3: "5 min walk + 6×(2 min jog / 90s walk) + 5 min walk ≈ 31 min"
+• Week 4 (deload): "5 min walk + 5×(2 min jog / 2 min walk) + 5 min walk ≈ 30 min"
+• Week 5+: gradually extend jog / shorten walk toward 20-25 min continuous by week 8
+
+runAbility='under-15' (can run up to 15 min continuous):
+• Week 1: "5 min walk + 4×(3 min jog / 90s walk) + 5 min walk ≈ 28 min"
+• Week 2: "5 min walk + 3×(5 min jog / 90s walk) + 5 min walk ≈ 30 min"
+• Week 3: "5 min walk + 15-18 min easy continuous + 3 min walk ≈ 25 min"
+• Week 4+: build continuous 20-30 min toward race week
+
+runAbility='15-30':
+• Week 1: 20-25 min continuous easy with one optional walk break.
+• Build to 30-35 min by week 3-4.
+
+═══ ABSOLUTELY DO NOT PRESCRIBE ═══
+
+• Threshold or interval work in weeks 1-4 (joints/tendons need adaptation)
+• Continuous runs > user's current capacity × 1.25
+• Sessions over 45 min — even long runs — for a beginner training for a 5K
+• Brick sessions (this is not a triathlon)
+• Bike or swim sessions (this is a run event)
+• "Quality" type sessions until week 5+
+
+═══ DO PRESCRIBE ═══
+
+• Strides (4-6×20s fast feel + full walk recovery) starting week 3
+• Strength sessions if available (huge injury-protection win)
+• 2-3 run days/wk max; remaining days = rest, mobility, or strength
+
+The plan is "build the runner first, sharpen second." Patience over volume.`;
     } else {
       disciplineNote = `Short-distance run event (${event}). Speed and V̇O2max dominate — long aerobic capacity is the FLOOR, not the ceiling.
 
@@ -448,7 +495,7 @@ You MUST output an object exactly matching this shape:
 NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
 }
 
-function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location }) {
+function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location }) {
   const limiter = (triFocus && triFocus.limiter) || '';
   const strategy = (triFocus && triFocus.strategy) || '';
   const discList = Array.isArray(availableDisciplines) && availableDisciplines.length > 0 ? availableDisciplines.join(', ') : '';
@@ -478,6 +525,8 @@ ${limiter && limiter !== 'balanced' && strategy === 'focus' ? `IMPORTANT: I iden
 
 ${discList && discList.includes('strength') ? 'I have strength/gym access — please include 1-2 specific strength sessions per week with concrete exercise prescriptions, phase-appropriate.' : ''}
 
+${difficultyAdjust === 'easier' ? 'IMPORTANT: I told you my last plan was TOO HARD. Build the new plan with lighter sessions, longer walk intervals, slower progression. Defer quality work by 1-2 weeks. Treat me as a notch less experienced than my profile suggests.' : difficultyAdjust === 'harder' ? 'IMPORTANT: I told you my last plan was TOO EASY. Build the new plan with sharper progression, earlier quality work (week 3 instead of week 5), longer continuous run intervals from week 1. Treat me as a notch more experienced than my profile suggests.' : ''}
+
 Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) plan now. Output the JSON only.`;
 }
 
@@ -486,7 +535,7 @@ Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) p
 const VALID_TYPES = ['run','bike','swim','strength','brick','mobility','rest','quality'];
 const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-function validatePlan(parsed, { event, hours, days, weeksToRace }) {
+function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnessMarkers }) {
   if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'plan is not an object' };
   if (typeof parsed.summary !== 'string') return { ok: false, reason: 'missing summary' };
   if (!Array.isArray(parsed.weeks) || parsed.weeks.length === 0) return { ok: false, reason: 'missing weeks array' };
@@ -501,6 +550,19 @@ function validatePlan(parsed, { event, hours, days, weeksToRace }) {
   // (training data leakage from triathlon plans). Coerce them back to run
   // here so the user gets a coherent run plan even if the AI slipped up.
   const isRunOnly = /Marathon|10K|5K|Half Marathon/i.test(event) && !/Triathlon|Ironman/i.test(event);
+  const isShortRun = /\b(5K|10K)\b/i.test(event);
+  const exp = profile && profile.exp;
+  const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
+  const isBeginnerRunner = isShortRun && (exp === 'new' || runAbility === 'walk-run' || runAbility === 'under-15');
+  // Hard session-duration cap for beginners on a 5K plan. The AI sometimes
+  // fills the user's stated weekly hours with too-long sessions; cap each
+  // session here regardless of what the AI prescribed.
+  const beginnerSessionCapMin = (weekIdx) => {
+    if (!isBeginnerRunner) return Infinity;
+    if (weekIdx <= 1) return 32;      // weeks 1-2
+    if (weekIdx <= 3) return 38;      // weeks 3-4
+    return 45;                         // weeks 5+ — never beyond this for beginners
+  };
 
   let prevWeekMin = null;
   for (let wi = 0; wi < parsed.weeks.length; wi++) {
@@ -526,6 +588,14 @@ function validatePlan(parsed, { event, hours, days, weeksToRace }) {
         sess.type = 'run';
         sess.name = sess.name && !/run/i.test(sess.name) ? `Easy run (was ${original})` : (sess.name || 'Easy run');
         sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from ${original} to run — this is a run-only event.]`;
+      }
+      // Beginner runner: cap any non-rest session at the week-appropriate max.
+      // The AI keeps slipping into "fill the available hours" — defend in depth.
+      const cap = beginnerSessionCapMin(wi);
+      if (sess.durationMin > cap && sess.type !== 'rest') {
+        const original = sess.durationMin;
+        sess.durationMin = cap;
+        sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Capped from ${original} to ${cap} min — beginner-runner session limit for week ${wi + 1}. The remaining time is intentional rest, not missing.]`;
       }
       if (!sess.intensity) sess.intensity = sess.type === 'rest' ? 'rest' : 'Z2';
       if (typeof sess.prescription !== 'string') sess.prescription = '';
