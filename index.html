@@ -2588,19 +2588,37 @@
             <label style="font-size:12px;">Client ID</label>
             <input type="text" id="stravaClientId" placeholder="e.g. 123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
           </div>
-          <div class="field" style="margin-bottom:10px;">
+          <div class="field" style="margin-bottom:8px;">
             <label style="font-size:12px;">Client Secret</label>
             <input type="password" id="stravaClientSecret" placeholder="paste secret" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
           </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()">Authorize via Strava</button>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.5;">
-            Get Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary);">strava.com/settings/api</a>. On Strava's consent screen, <strong>tick "View data about your private activities"</strong> — without it sync will fail.
+          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Authorize via Strava (recommended)</button>
+          <div style="font-size: 11px; color: var(--text-soft); margin-bottom:14px; line-height: 1.5;">
+            Get Client ID + Secret from <a href="https://www.strava.com/settings/api" target="_blank" style="color: var(--primary); font-weight:600;">strava.com/settings/api</a>. On Strava's consent screen, <strong>tick "View data about your private activities"</strong> — without it sync will fail.
           </div>
-          <!-- Hidden inputs so legacy access/refresh-token paths still compile.
-               No UI for them — pasting the static read-only tokens from Strava's
-               settings page was the #1 source of confusion. OAuth handles tokens. -->
-          <input type="hidden" id="stravaAccessToken">
-          <input type="hidden" id="stravaRefreshToken">
+
+          <!-- Manual token fallback for users where the OAuth redirect won't
+               complete (corporate networks, deep-link issues, etc.). Hidden
+               behind an expander because pasting the static read-only tokens
+               from Strava's API page is a known footgun — they always have
+               scope:read only and can't list activities. -->
+          <details style="margin-bottom:8px;">
+            <summary style="cursor:pointer; font-size:12px; color:var(--text-soft); font-weight:600; padding:6px 0;">Authorize button not working? Paste tokens manually ▾</summary>
+            <div style="padding:10px 12px; background:var(--bg); border-radius:8px; margin-top:6px;">
+              <div style="font-size:11px; color:var(--alert); font-weight:700; margin-bottom:6px; line-height:1.5;">
+                ⚠ The Access + Refresh tokens shown on Strava's API page are <strong>read-only</strong> — they can't list activities. Use this only if you have <strong>OAuth-issued</strong> tokens (scope <code>activity:read_all</code>) from Postman or your own OAuth call.
+              </div>
+              <div class="field" style="margin-bottom:8px;">
+                <label style="font-size:12px;">Access Token</label>
+                <input type="password" id="stravaAccessToken" placeholder="paste access token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+              </div>
+              <div class="field" style="margin-bottom:10px;">
+                <label style="font-size:12px;">Refresh Token</label>
+                <input type="password" id="stravaRefreshToken" placeholder="paste refresh token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
+              </div>
+              <button class="btn btn-ghost btn-full btn-sm" onclick="saveStravaConfig()">Save tokens manually</button>
+            </div>
+          </details>
         </div>
         <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
       </div>
