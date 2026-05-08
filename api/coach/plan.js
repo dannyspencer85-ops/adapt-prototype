@@ -87,13 +87,14 @@ export default async function handler(req) {
   const courseIntel = inputs.courseIntel || {};
   const triFocus = inputs.triFocus || {};
   const fitnessMarkers = inputs.fitnessMarkers || {};
+  const availableDisciplines = Array.isArray(inputs.availableDisciplines) ? inputs.availableDisciplines : [];
   const location = inputs.location || '';
 
   // Compute weeks-to-race so we can pick a credible block layout.
   const weeksToRace = computeWeeksToRace(todayStr, raceDate);
 
-  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location, todayStr });
-  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location });
+  const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location, todayStr });
+  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location });
 
   // Force a JSON-shaped response. Mistral supports response_format = {type:'json_object'}.
   const payload = {
@@ -189,17 +190,22 @@ function buildFitnessMarkersBlock(m) {
   return `\n\n═══ CALIBRATED FITNESS MARKERS — USE THESE EXACT NUMBERS ═══\n\n${lines.join('\n')}\n\nWhen prescribing sessions, USE THESE NUMBERS. Don't write "Z2" — write the actual HR range "${m.maxHr ? Math.round(m.maxHr*0.70) + '-' + Math.round(m.maxHr*0.80) + ' bpm' : 'their HR Z2 range'}". Don't write "threshold pace" — derive it from VDOT and write "~7:15/mi" or whatever's correct. The user gave us real data; reflect that in every prescription and target line.`;
 }
 
-function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, location, todayStr }) {
+function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location, todayStr }) {
   const isTri = /Ironman|Triathlon/i.test(event);
-  const isRun = /Marathon|10K|5K|Half Marathon/i.test(event);
+  const isMarathon = /Marathon/i.test(event) && !/Half/i.test(event);
+  const isHalfMar = /Half Marathon/i.test(event);
+  const isShortRun = /\b(5K|10K)\b/i.test(event);
+  const isRun = isMarathon || isHalfMar || isShortRun;
+  const isGeneral = /General fitness/i.test(event);
   const limiter = (triFocus && triFocus.limiter) || 'balanced';
   const strategy = (triFocus && triFocus.strategy) || 'balanced';
 
+  const hasStrength = Array.isArray(availableDisciplines) && availableDisciplines.includes('strength');
+  const hasSwim = Array.isArray(availableDisciplines) && availableDisciplines.includes('swim');
+  const hasBike = Array.isArray(availableDisciplines) && availableDisciplines.includes('bike');
+  const hasTrainer = Array.isArray(availableDisciplines) && availableDisciplines.includes('trainer');
+
   // Build a discipline-allocation note that the plan engine MUST respect.
-  // When the user says one discipline is their weakness ("limiter") AND
-  // they want to focus on it, allocate disproportionate weekly volume
-  // there. This is the single biggest driver of plan quality for athletes
-  // who know what they need to work on.
   let disciplineNote;
   if (isTri) {
     if (strategy === 'focus' && limiter !== 'balanced') {
@@ -220,11 +226,85 @@ function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, cours
     } else {
       disciplineNote = 'Triathlon: balance swim, bike, run. The bike is the longest leg in distance terms; protect it. Run-off-bike is the most race-specific quality. Swim volume is hardest to keep up with low hours but maintain at least 1x/week.';
     }
-  } else if (isRun) {
-    disciplineNote = 'Running event: long run is the keystone. Quality day = intervals or tempo. Easy days fill aerobic volume.';
+    if (!hasSwim) disciplineNote += '\n⚠ User has no swim access — replace prescribed swim sessions with bike trainer or strength. Note this clearly in session notes.';
+    if (!hasBike && !hasTrainer) disciplineNote += '\n⚠ User has no bike/trainer access — bike sessions get replaced with run cross-training. Note clearly.';
+  } else if (isMarathon) {
+    disciplineNote = `Marathon training. The LONG RUN is THE keystone session — everything else exists to protect and build it.
+
+Weekly structure (typical):
+• Long run — progressive, builds from current ability toward race distance × 80% (~21 mi peak, 3-4 weeks pre-race). Add ≤10% per week. Deload week (cut 25-30%) every 4 weeks.
+• Quality (1×/wk in Build, 2×/wk in Peak): tempo runs (T-pace, 20-40 min cruise intervals), marathon-pace blocks (M-pace, 6-12 mi within long run), hill repeats early, V̇O2 intervals occasionally.
+• Easy aerobic — 60-80% of weekly volume at conversational Z2.
+• Race-pace work in Build/Peak: include marathon-pace segments INSIDE the long run (e.g., last 60 min at goal pace) — the most specific session in marathon training.
+
+Pace anchor: derive everything from VDOT (from user's recent race time when present).`;
+  } else if (isHalfMar) {
+    disciplineNote = `Half marathon training. Mix of aerobic base and threshold work — the half is fundamentally a threshold race.
+
+Weekly structure (typical):
+• Long run — builds toward race distance × 80% (~10-11 mi peak). Slightly shorter than marathon long-runs but still the keystone.
+• Threshold session — T-pace cruise intervals (5-15 min reps with 1-3 min jog recovery), or steady tempo runs (20-40 min at threshold). 1×/wk minimum in Build.
+• Easy aerobic — fills volume.
+• Race-pace work in Peak: half-marathon-pace blocks within the long run (e.g., 5 mi at goal pace).
+
+Pace anchor: T-pace (threshold) is the most important number for HM athletes.`;
+  } else if (isShortRun) {
+    disciplineNote = `Short-distance run event (${event}). Speed and V̇O2max dominate — long aerobic capacity is the FLOOR, not the ceiling.
+
+Weekly structure (typical):
+• Long run — capped at 60-75 min progressive Z2-Z3 (this isn't a marathon).
+• Quality — at least 1×/wk in Build; intervals at I-pace (V̇O2max, 3-5 min reps with equal recovery) or repetitions at R-pace (30s-2min very fast with full recovery). Hill repeats are excellent for both speed AND strength.
+• Easy aerobic — supports recovery between hard sessions.
+• Race-pace work in Peak: short reps at goal 5K/10K pace.
+
+Pace anchor: I-pace and R-pace (Daniels), derived from VDOT.`;
+  } else if (isGeneral) {
+    disciplineNote = `General fitness — no race target. Goal is consistency + variety + injury-free year-round training.
+
+Weekly structure:
+• Mix run + bike (or trainer) + ${hasStrength ? 'strength' : 'mobility'} on rotating days.
+• 80/20 polarized still applies — most sessions easy, ~20% time at quality.
+• No taper. No peaks. Build a 4-week microcycle (3 build + 1 deload at -25%) and repeat.
+• Allow holiday/vacation flexibility — the goal is showing up consistently, not hitting peaks.
+• Each session has clear intent (aerobic / quality / strength / recovery), not "go run for 45 min".`;
   } else {
-    disciplineNote = 'General fitness — variety matters more than specificity. Mix run + bike + strength. No race taper.';
+    disciplineNote = `Event: ${event}. Apply standard endurance principles: long-effort keystone, 1-2 quality sessions per week, easy aerobic volume, deload every 3-4 weeks.`;
   }
+
+  // Strength integration. Endurance research consistently shows 1-2 strength
+  // sessions per week reduces injury risk + improves running economy/power.
+  // Only prescribe when the user has access; never force.
+  let strengthNote = '';
+  if (hasStrength) {
+    strengthNote = `
+
+═══ STRENGTH SESSIONS — USER HAS ACCESS, USE THEM ═══
+
+The user indicated they have strength/gym access. Prescribe 1-2 strength sessions per week per Friel/Lydiard guidance. NEVER skip strength entirely just because the focus is endurance — research is clear: 1-2x/wk strength reduces injury risk by 30-50% and improves running economy 4-8%.
+
+Phase-specific prescriptions (use in session.prescription field — be SPECIFIC, not generic):
+
+• PREP / BASE 1: foundational strength. Compound movements 3×8-12. Example prescription: "Goblet squats 3×10 @ moderate, single-leg deadlift 3×8/side, push-ups 3×10, plank 3×45s, hip bridges 3×12. 60-75s rest between sets. Form > weight."
+
+• BASE 2-3: max strength. Heavier load, lower reps. Example: "Back squat 4×5 @ 80% 1RM, deadlift 3×5, bench/press 3×6, pull-ups 3×6, plank variations 3×45s. 2-3 min rest. Move slowly under load."
+
+• BUILD 1-2: strength endurance + power. Lighter load, plyometrics. Example: "Box jumps 4×5, squats 3×8 @ 70%, single-leg RDL 3×10/side, push-ups 3×AMRAP, lateral lunges 3×10/side, core circuit. 60-90s rest."
+
+• PEAK: maintenance only. Every 5-7 days. Example: "Squats 3×6 @ moderate, RDL 3×6, push 3×6, pull 3×6, core 3×30s plank. Quick + sharp, no failure."
+
+• TAPER (race week and the week before): drop strength entirely. The legs need to be fresh.
+
+Place strength sessions:
+• Same day as a quality session (ideally afternoon, with quality in the morning)
+• Or on an "easy" day (after the easy aerobic session, not before)
+• NEVER day before a long session
+• NEVER day before/after race-pace work in build phase
+
+For session type, use 'strength' in the session.type field. Duration: 30-50 min. Intensity: 'mixed' (it's neither cardio Z nor zoneless rest).`;
+  } else {
+    strengthNote = `\n\nNo strength access — do NOT prescribe strength sessions. If a user-typical week would include strength, replace with mobility (15-20 min stretching + dynamic) or skip.`;
+  }
+  disciplineNote += strengthNote;
 
   return `You are Adapt's training plan engine. You build periodized endurance training plans grounded in established sport science. You output ONLY valid JSON conforming to the schema described below — no prose, no markdown, no comments.
 
@@ -330,9 +410,10 @@ You MUST output an object exactly matching this shape:
 NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
 }
 
-function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, location }) {
+function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, location }) {
   const limiter = (triFocus && triFocus.limiter) || '';
   const strategy = (triFocus && triFocus.strategy) || '';
+  const discList = Array.isArray(availableDisciplines) && availableDisciplines.length > 0 ? availableDisciplines.join(', ') : '';
   return `Generate a complete periodized training plan for me.
 
 Inputs:
@@ -342,6 +423,7 @@ Inputs:
 - Weekly hours available: ${hours}
 - Training days: ${days.join(', ')}
 - Location: ${location || 'unspecified'}
+${discList ? '- Available disciplines (only prescribe these): ' + discList : ''}
 ${courseIntel && courseIntel.terrain ? '- Course terrain: ' + courseIntel.terrain : ''}
 ${courseIntel && courseIntel.surface ? '- Course surface: ' + courseIntel.surface : ''}
 ${courseIntel && courseIntel.swim ? '- Swim type: ' + courseIntel.swim : ''}
@@ -355,6 +437,8 @@ ${limiter && limiter !== 'balanced' ? '- WEAKNESS / limiter discipline: ' + limi
 ${strategy ? '- Strategy on the limiter: ' + strategy : ''}
 
 ${limiter && limiter !== 'balanced' && strategy === 'focus' ? `IMPORTANT: I identified ${limiter.toUpperCase()} as my weakness and asked for a FOCUS strategy. Build the plan with disproportionate weekly time on ${limiter} per the rules in your system prompt. Don't water this down — I want to see ${limiter} as the largest discipline bucket every week.` : ''}
+
+${discList && discList.includes('strength') ? 'I have strength/gym access — please include 1-2 specific strength sessions per week with concrete exercise prescriptions, phase-appropriate.' : ''}
 
 Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) plan now. Output the JSON only.`;
 }

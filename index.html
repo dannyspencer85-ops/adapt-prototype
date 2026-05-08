@@ -3917,6 +3917,18 @@
       limiter: localStorage.getItem('tri-limiter') || (planState.triFocus && planState.triFocus.limiter) || 'balanced',
       strategy: localStorage.getItem('tri-strategy') || (planState.triFocus && planState.triFocus.strategy) || 'balanced',
     };
+    // Available disciplines from onboarding step 4 — what the user actually
+    // has access to. Drives whether the plan can prescribe strength, swim
+    // (pool access), bike (vs trainer), etc. Persisted so plan regen can
+    // read it later.
+    const availableDisciplines = [...document.querySelectorAll('#discChips .chip.active')]
+      .map(c => c.dataset.disc).filter(Boolean);
+    if (availableDisciplines.length > 0) {
+      localStorage.setItem('available-disciplines', JSON.stringify(availableDisciplines));
+    }
+    let savedDisc = [];
+    try { savedDisc = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
+    const disciplines = availableDisciplines.length > 0 ? availableDisciplines : savedDisc;
     const todayStr = new Date().toISOString().slice(0, 10);
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 60000);
@@ -3929,6 +3941,7 @@
           event, raceDate: eventDate, location: eventLocation,
           hours, days, today: todayStr,
           profile, courseIntel, triFocus,
+          availableDisciplines: disciplines,
           fitnessMarkers: readFitnessMarkers(),
         }),
       });
@@ -9490,6 +9503,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'fitness-markers',
     'tri-limiter',
     'tri-strategy',
+    'available-disciplines',
   ];
 
   function _clearUserScopedLocal() {
