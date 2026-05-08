@@ -242,6 +242,8 @@ Pattern → tool mapping (memorize this):
 • "Shift my plan to be more [discipline]-focused" → setTrainingFocus(limiter='[discipline]', strategy='focus')
 • "I want to focus on [discipline]" → setTrainingFocus(limiter='[discipline]', strategy='focus')
 • "Make my plan balanced across all three" → setTrainingFocus(limiter='balanced', strategy='balanced')
+• "Add a workout on [day]" / "I can train [day] too" / "Use [day] from now on" → openTrainingDay(day=X) — NOT swapDiscipline. swapDiscipline just relabels; openTrainingDay actually adds duration + a sensible default session.
+• "Drop [day]" / "I can't train [day] anymore" → closeTrainingDay(day=X)
 
 If the user describes a multi-day situation, CALL MULTIPLE TOOLS in the same turn. Don't ask "should I do that?" — just do it.
 
@@ -692,6 +694,36 @@ const TOOL_DEFINITIONS = [
           reason: { type: 'string' },
         },
         required: ['fromWeekIndex', 'toWeekIndex', 'percentChange'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'openTrainingDay',
+      description: 'Add a training session to a day that was previously rest. Use when the user says "I want to add a workout on Tuesday" / "Friday is open now" / "use Thursday too".',
+      parameters: {
+        type: 'object',
+        properties: {
+          day: { type: 'string', enum: DAYS_ENUM },
+          reason: { type: 'string' },
+        },
+        required: ['day'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'closeTrainingDay',
+      description: 'Convert a training day to rest. Use when the user says "I cant train on Wednesdays anymore" / "drop Friday from the schedule" / "Tuesday is off the table".',
+      parameters: {
+        type: 'object',
+        properties: {
+          day: { type: 'string', enum: DAYS_ENUM },
+          reason: { type: 'string' },
+        },
+        required: ['day'],
       },
     },
   },

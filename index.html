@@ -5527,11 +5527,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
     const s = slot.sessions[day];
     if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
+    // Defensive: if the source was a rest day (duration 0), the AI is really
+    // trying to add a session on a previously-rest day. Set a sane default
+    // duration so the new session is actually trainable. The AI should be
+    // calling openTrainingDay for this — but make swapDiscipline robust too.
+    if ((!s.duration || s.duration === 0) && newType !== 'rest') {
+      s.duration = 45;
+      if (!newName) newName = 'Easy ' + newType;
+      if (!newMeta) newMeta = '45 min · Zone 2';
+    }
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.type = newType;
     if (slot.isCurrent) renderWeekSessions();
-    const msg = `${day} (${slot.label}) is now ${s.name} (${newType}).`;
+    const msg = `${day} (${slot.label}) is now ${s.name} (${newType}, ${s.duration} min).`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
   }
