@@ -1229,6 +1229,38 @@
     font-size: 13px;
     font-weight: 700;
   }
+  /* Compact injury chip — single horizontal row, dot + body + actions.
+     Kept low-visual-weight on Today (it's just a status), promoted to
+     a fuller card on the Plan tab where users go to actively manage it. */
+  .injury-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 10px 6px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .injury-chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--warn);
+    flex-shrink: 0;
+  }
+  .injury-chip.high .dot { background: var(--alert); }
+  .injury-chip.low  .dot { background: var(--secondary); }
+  .injury-chip .body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); }
+  .injury-chip .body strong { color: var(--text); font-weight: 700; }
+  .injury-chip .clear-btn {
+    background: none; border: 0; color: var(--text-soft);
+    font-size: 16px; cursor: pointer; padding: 2px 6px;
+    line-height: 1; flex-shrink: 0;
+  }
+  .injury-chip .clear-btn:hover { color: var(--alert); }
+  /* Full injury banner on the Plan tab — the place to read + act. */
   .injury-banner {
     background: var(--warn-soft);
     border-left: 4px solid var(--warn);
@@ -1914,9 +1946,10 @@
       </div>
     </div>
     <div class="screen-inner">
-      <!-- Banners (only render when something's actually wrong/changed) -->
+      <!-- Banners (only render when something's actually wrong/changed).
+           Note: todayInjuryBanner moved DOWN below the check-in card so the
+           injury chip sits next to where status updates happen. -->
       <div id="planSourceBanner"></div>
-      <div id="todayInjuryBanner"></div>
       <div id="todayChangeBanner"></div>
 
       <!-- 1. Race countdown — slim strip, sets context without dominating -->
@@ -2000,6 +2033,10 @@
         </button>
       </div>
 
+      <!-- Compact injury chip — appears next to the check-in card so the
+           status update lives where the user already goes to log their day. -->
+      <div id="todayInjuryBanner"></div>
+
       <!-- Check-in form (collapsed by default, opened via button above) -->
       <div class="card" id="todayCheckin" style="display: none; margin-top: 10px;">
         <div class="card-title">Morning check-in</div>
@@ -2034,6 +2071,10 @@
           <label>Soreness or concerns (optional)</label>
           <input type="text" id="ciNotes" placeholder="e.g. right calf tight, or leave blank">
         </div>
+        <!-- Conditional: only shows when an injury is active. Populated by
+             renderInjuryCheckinField() which is called when the check-in
+             form opens. -->
+        <div id="ciInjuryWrap" style="display:none;"></div>
         <button class="btn btn-primary btn-full" onclick="saveMorningCheckin()">Save check-in</button>
       </div>
 
@@ -2362,6 +2403,10 @@
           <label>Soreness or concerns (optional)</label>
           <input type="text" id="ciNotes" placeholder="e.g. right calf tight, or leave blank">
         </div>
+        <!-- Conditional: only shows when an injury is active. Populated by
+             renderInjuryCheckinField() which is called when the check-in
+             form opens. -->
+        <div id="ciInjuryWrap" style="display:none;"></div>
         <button class="btn btn-primary btn-full" onclick="saveMorningCheckin()">Save check-in</button>
       </div>
 
@@ -2501,34 +2546,14 @@
         <div id="profileScheduleSummary"></div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Integrations</div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 14px;">Apple Health pulls in your workouts, sleep, and HR. Most other devices feed into Apple Health automatically — that's why we start there.</div>
-        <div id="integrationsList"></div>
-        <div style="margin-top: 14px; padding: 12px; background: var(--bg); border-radius: 10px;">
-          <div style="font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Suggest an integration</div>
-          <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 10px;">Missing your watch, ring, or platform? Drop us a note — every suggestion shapes what we build next.</div>
-          <textarea id="integrationSuggestionText" placeholder="e.g. Garmin Connect direct integration so I don't have to route through Apple Health" style="width: 100%; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; resize: vertical;"></textarea>
-          <button class="btn btn-primary btn-full btn-sm" onclick="sendIntegrationSuggestion()" style="margin-top: 8px;" id="integrationSuggestionBtn">Send suggestion</button>
-          <div id="integrationSuggestionMsg" style="margin-top: 8px; font-size: 12px; color: var(--text-soft); min-height: 16px;"></div>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px; line-height: 1.4;">No email client? Copy your note and email it to <a href="#" onclick="copyFeedbackEmail(event)" style="color: var(--primary); font-weight: 600; text-decoration: underline;">dannyspencer85@gmail.com</a> directly.</div>
-        </div>
-      </div>
+      <!-- Integrations + Suggest-an-integration card removed by request. -->
 
-      <!-- STRAVA CONNECTION -->
+      <!-- STRAVA CONNECTION — full UI restored. -->
       <div class="card">
         <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>Strava</span>
-          <span style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg-soft); color:var(--text-soft);">Coming soon</span>
+          <span id="stravaStatusPill" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg); color:var(--text-soft);">Not connected</span>
         </div>
-        <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5;">
-          Strava integration is being polished and will be re-enabled shortly. The plan engine and Coach Chat work without it — they just won't see your Strava activity history yet.
-        </div>
-        <!-- Hidden Strava UI preserved below so Profile-screen Strava code paths
-             still run without erroring. Re-enable by removing the wrapper div's
-             style="display:none;" below. -->
-        <div style="display:none;">
-        <span id="stravaStatusPill"></span>
         <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 12px; line-height: 1.5;">
           Pulls in your activities so the coach can read your real training. Credentials live only in this browser.
         </div>
@@ -2578,7 +2603,6 @@
           <input type="hidden" id="stravaRefreshToken">
         </div>
         <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
-        </div><!-- /hidden Strava wrapper -->
       </div>
 
       <!-- Analytics moved into Settings modal (gear icon) -->
@@ -2586,10 +2610,9 @@
 
       <!-- Settings now lives in the gear (⚙️) button at the top of every screen -->
 
-      <a href="mailto:dannyspencer85@gmail.com?subject=Adapt%20feedback&body=What%20worked%2C%20what%20didn't%2C%20what%20you%20wish%20it%20did%3A%0A%0A" class="btn btn-ghost btn-full" style="margin-top: 14px; text-decoration: none;">📨 Send feedback</a>
-      <div style="text-align: center; font-size: 11px; color: var(--text-soft); margin-top: 6px; line-height: 1.4;">No email client? Email <a href="#" onclick="copyFeedbackEmail(event)" style="color: var(--primary); font-weight: 600;">dannyspencer85@gmail.com</a> directly (tap to copy).</div>
+      <a href="mailto:dannyspencer85@gmail.com?subject=Adapt%20feedback&body=What%20worked%2C%20what%20didn't%2C%20what%20you%20wish%20it%20did%3A%0A%0A" class="btn btn-ghost btn-full" style="margin-top: 14px; text-decoration: none;">Send feedback</a>
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 10px;">Start over with a new plan</button>
-      <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--warn); border-color: var(--warn);">Log out</button>
+      <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--text-soft);">Log out</button>
     </div>
   </div>
 
@@ -3651,21 +3674,51 @@
     const connected = getConnectedIntegrations();
     const banner = document.getElementById('watchAutofilledBanner');
     const sleepLabel = document.getElementById('ciSleepAutoLabel');
-    if (!banner || !sleepLabel) return;
-    if (!connected.includes('apple-health')) {
-      banner.style.display = 'none';
-      sleepLabel.style.display = 'none';
+    if (banner && sleepLabel) {
+      if (!connected.includes('apple-health')) {
+        banner.style.display = 'none';
+        sleepLabel.style.display = 'none';
+      } else {
+        const sleepChip = document.querySelector('#ciSleep .chip:nth-child(4)');
+        if (sleepChip) {
+          document.querySelectorAll('#ciSleep .chip').forEach(c => c.classList.remove('active'));
+          sleepChip.classList.add('active');
+        }
+        banner.style.display = 'block';
+        banner.innerHTML = `<strong>✓ Synced from Apple Health</strong><br>Last night: 7h 48m sleep, HRV 62ms, morning HR 45. Values pre-filled — adjust if anything feels off.`;
+        sleepLabel.style.display = 'inline';
+        sleepLabel.textContent = 'auto from Apple Health';
+      }
+    }
+    // Render the conditional injury question (only if an injury is active).
+    renderInjuryCheckinField();
+  }
+
+  // Conditional check-in field: when an injury is active, ask how it's
+  // tracking today (improved / same / worse). Hidden otherwise. The wrap
+  // div has duplicates due to legacy form structure; querySelectorAll
+  // populates both safely.
+  function renderInjuryCheckinField() {
+    const wraps = document.querySelectorAll('#ciInjuryWrap');
+    if (!wraps || wraps.length === 0) return;
+    const inj = planState.injury;
+    if (!inj || !inj.area) {
+      wraps.forEach(w => { w.style.display = 'none'; w.innerHTML = ''; });
       return;
     }
-    const sleepChip = document.querySelector('#ciSleep .chip:nth-child(4)');
-    if (sleepChip) {
-      document.querySelectorAll('#ciSleep .chip').forEach(c => c.classList.remove('active'));
-      sleepChip.classList.add('active');
-    }
-    banner.style.display = 'block';
-    banner.innerHTML = `<strong>✓ Synced from Apple Health</strong><br>Last night: 7h 48m sleep, HRV 62ms, morning HR 45. Values pre-filled — adjust if anything feels off.`;
-    sleepLabel.style.display = 'inline';
-    sleepLabel.textContent = 'auto from Apple Health';
+    const days = (typeof injuryDaysFlagged === 'function') ? injuryDaysFlagged() : null;
+    const sinceTxt = days != null ? (days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`) : '';
+    const html = `
+      <div class="field" style="background:var(--alert-soft); border:1px solid var(--alert); border-radius:10px; padding:12px;">
+        <label style="color:var(--alert); font-weight:700;">${escapeHtml(inj.area)} — how is it today?</label>
+        <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px;">Flagged ${sinceTxt} (${escapeHtml(inj.severity)}). Your answer feeds Coach Chat — they'll suggest plan tweaks based on the trend.</div>
+        <div class="chip-row" data-injury-status>
+          <button class="chip" data-status="improved" onclick="singleChipVal(this)">Better</button>
+          <button class="chip" data-status="same" onclick="singleChipVal(this)">Same</button>
+          <button class="chip" data-status="worse" onclick="singleChipVal(this)">Worse</button>
+        </div>
+      </div>`;
+    wraps.forEach(w => { w.innerHTML = html; w.style.display = 'block'; });
   }
 
   function renderPrimarySourceUI() { renderIntegrations(); }
@@ -5633,7 +5686,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function tool_flagInjury({ area, severity, notes }) {
-    planState.injury = { area, severity, notes: notes || '' };
+    const now = Date.now();
+    // Preserve existing timeline if same injury was previously flagged.
+    const prev = planState.injury;
+    const continuing = prev && prev.area && prev.area.toLowerCase() === String(area || '').toLowerCase();
+    planState.injury = {
+      area,
+      severity,
+      notes: notes || '',
+      flaggedAt: continuing && prev.flaggedAt ? prev.flaggedAt : now,
+      lastReviewedAt: now,
+      dailyStatus: continuing && Array.isArray(prev.dailyStatus) ? prev.dailyStatus.slice() : [],
+    };
     if (severity === 'high') {
       Object.keys(planState.sessions).forEach(d => {
         planState.sessions[d] = { name: 'Rest (injury pause)', meta: 'See a doctor/PT before resuming', duration: 0, type: 'rest' };
@@ -5652,6 +5716,91 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const msg = `Injury flagged: ${area} (${severity}). ${severity === 'high' ? 'Plan paused until cleared.' : 'Plan adjusted.'}`;
     setChange(msg);
     return { success: true, message: msg };
+  }
+
+  // Update an existing injury's severity (typically downgrading as the user
+  // recovers). Called by Coach Chat when the trajectory of dailyStatus
+  // entries shows sustained improvement, OR directly when the user reports
+  // they're better. Severity 'cleared' fully removes the injury and lifts
+  // any session restrictions.
+  function tool_progressInjury({ severity, notes }) {
+    if (!planState.injury) return { success: false, message: 'No active injury to update.' };
+    const prev = planState.injury;
+    const validSev = ['high','moderate','low','cleared'];
+    if (!validSev.includes(severity)) return { success: false, message: 'Severity must be high / moderate / low / cleared.' };
+    if (severity === 'cleared') {
+      planState.injury = null;
+      const msg = `Injury cleared: ${prev.area}. Sessions restored to normal — listen to your body and ease back.`;
+      setChange(msg);
+      renderWeekSessions();
+      renderBanners();
+      return { success: true, message: msg, cleared: true };
+    }
+    // Severity downgrade — relax the session restrictions accordingly.
+    planState.injury = {
+      ...prev,
+      severity,
+      notes: notes || prev.notes,
+      lastReviewedAt: Date.now(),
+    };
+    if (severity === 'low' || severity === 'moderate') {
+      // If currently in 'high' lockdown (all sessions converted to rest),
+      // give the user back their original plan structure. We can't fully
+      // restore the original sessions without snapshot, but at least
+      // un-pause the week so the AI can rebuild on the next coach turn.
+      let unpaused = 0;
+      Object.keys(planState.sessions).forEach(d => {
+        const s = planState.sessions[d];
+        if (s.type === 'rest' && /injury pause/i.test(s.name || '')) {
+          // Mark these as unset — coach should regenerate. For now, leave
+          // them as rest with a clearer label.
+          s.name = 'Rest (recovering)';
+          s.meta = 'Recovery';
+          unpaused++;
+        }
+      });
+      if (unpaused > 0) renderWeekSessions();
+    }
+    const msg = `Injury severity updated: ${prev.area} → ${severity}.`;
+    setChange(msg);
+    renderBanners();
+    return { success: true, message: msg };
+  }
+  // Direct clearance shortcut — same effect as progressInjury({severity:'cleared'}).
+  function tool_clearInjury({ reason }) {
+    return tool_progressInjury({ severity: 'cleared', notes: reason || '' });
+  }
+  // Append today's status to the injury timeline (called from morning check-in).
+  // Status: 'improved' | 'same' | 'worse'.
+  function recordInjuryStatus(status, notes) {
+    if (!planState.injury) return;
+    const valid = ['improved','same','worse'];
+    if (!valid.includes(status)) return;
+    if (!Array.isArray(planState.injury.dailyStatus)) planState.injury.dailyStatus = [];
+    const today = new Date().toISOString().slice(0, 10);
+    // Replace any existing entry for today (multiple check-ins same day = last wins).
+    planState.injury.dailyStatus = planState.injury.dailyStatus.filter(e => e.date !== today);
+    planState.injury.dailyStatus.push({ date: today, status, notes: notes || '' });
+    planState.injury.lastReviewedAt = Date.now();
+    saveUserData();
+  }
+  // Days since the injury was first flagged.
+  function injuryDaysFlagged() {
+    if (!planState.injury || !planState.injury.flaggedAt) return null;
+    const ms = Date.now() - planState.injury.flaggedAt;
+    return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)));
+  }
+  // Trend: count consecutive 'improved' from the end of dailyStatus, halt on
+  // first 'worse' or 'same'. Used to suggest auto-clear.
+  function injuryImprovementStreak() {
+    if (!planState.injury || !Array.isArray(planState.injury.dailyStatus)) return 0;
+    const arr = planState.injury.dailyStatus.slice().reverse();
+    let n = 0;
+    for (const e of arr) {
+      if (e.status === 'improved') n++;
+      else break;
+    }
+    return n;
   }
 
   function tool_addRestWeek({ afterWeekIndex, reason }) {
@@ -5689,6 +5838,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         case 'shortenSession': return tool_shortenSession(input);
         case 'swapDiscipline': return tool_swapDiscipline(input);
         case 'flagInjury': return tool_flagInjury(input);
+        case 'progressInjury': return tool_progressInjury(input);
+        case 'clearInjury': return tool_clearInjury(input);
         case 'addRestWeek': return tool_addRestWeek(input);
         case 'adjustVolume': return tool_adjustVolume(input);
         case 'completeSession': return tool_completeSession(input);
@@ -5999,16 +6150,78 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const changeHtml = planState.lastChange
       ? `<div class="change-banner"><div class="icon">${icon('sync', { size: 16 })}</div><div><strong>Plan updated:</strong> ${escapeHtml(planState.lastChange)}</div></div>`
       : '';
-    const sev = planState.injury && planState.injury.severity;
-    const injuryHtml = planState.injury
-      ? `<div class="injury-banner">
-          <div class="title-row">${sev === 'high' ? '🚫 Plan paused · see a pro' : '⚠ Injury flagged'}</div>
-          <div><strong>${escapeHtml(planState.injury.area)}</strong> · ${escapeHtml(sev)} severity.
-          ${sev === 'high' ? ' Sessions paused until a doctor or PT clears you.' : sev === 'moderate' ? ' Quality sessions reduced 40% across the week.' : ' Monitoring — let me know if it worsens.'}</div>
-        </div>`
-      : '';
     ['planChangeBanner','todayChangeBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = changeHtml; });
-    ['planInjuryBanner','todayInjuryBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = injuryHtml; });
+
+    if (!planState.injury) {
+      ['planInjuryBanner','todayInjuryBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+      return;
+    }
+    const inj = planState.injury;
+    const sev = inj.severity || 'low';
+    const days = (typeof injuryDaysFlagged === 'function') ? injuryDaysFlagged() : null;
+    const daysTxt = days != null ? (days === 0 ? 'flagged today' : days === 1 ? 'day 1' : `day ${days}`) : '';
+    const status = Array.isArray(inj.dailyStatus) ? inj.dailyStatus : [];
+    const streak = (typeof injuryImprovementStreak === 'function') ? injuryImprovementStreak() : 0;
+
+    // Today screen: compact chip — single line, low-visual-weight.
+    const todayChip = `<div class="injury-chip ${sev}">
+      <div class="dot"></div>
+      <div class="body"><strong>${escapeHtml(inj.area)}</strong> · ${escapeHtml(sev)}${daysTxt ? ' · ' + daysTxt : ''}${streak >= 3 ? ' · ↑' + streak + 'd' : ''}</div>
+      <button class="clear-btn" onclick="clearInjuryFromUI()" aria-label="Clear injury">✕</button>
+    </div>`;
+
+    // Plan screen: full banner — the place to read context + act.
+    const trendLine = status.length === 0
+      ? '<span style="color:var(--text-soft); font-size:11px;">No status yet — answer in your morning check-in.</span>'
+      : (streak >= 3
+          ? `<span style="color:var(--good); font-size:11px; font-weight:700;">↑ ${streak} days improved</span>`
+          : status[status.length-1].status === 'worse'
+            ? `<span style="color:var(--alert); font-size:11px; font-weight:700;">↓ getting worse</span>`
+            : `<span style="color:var(--text-soft); font-size:11px;">Last logged: ${status[status.length-1].status}</span>`);
+    const suggestClear = streak >= 7
+      ? `<div style="margin-top:8px; padding:8px 10px; background:var(--good-soft); border-radius:8px; font-size:12px; line-height:1.4;">${streak} days of improvement — likely safe to clear. <button onclick="askCoachAboutInjury()" style="background:none; border:0; color:var(--primary); font-weight:700; cursor:pointer; font-family:inherit; padding:0; margin-left:4px; text-decoration:underline;">Ask coach to clear it →</button></div>`
+      : '';
+    const planBanner = `<div class="injury-banner">
+        <div class="title-row" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>${sev === 'high' ? '🚫 Plan paused · see a pro' : '⚠ Injury flagged'}</span>
+          <button onclick="clearInjuryFromUI()" style="background:none; border:0; color:var(--text-soft); font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer; font-family:inherit;">Clear</button>
+        </div>
+        <div><strong>${escapeHtml(inj.area)}</strong> · ${escapeHtml(sev)} severity${daysTxt ? ' · ' + daysTxt : ''}.
+        ${sev === 'high' ? ' Sessions paused until a doctor or PT clears you.' : sev === 'moderate' ? ' Quality sessions reduced 40% across the week.' : ' Monitoring — let me know if it worsens.'}</div>
+        <div style="margin-top:6px;">${trendLine}</div>
+        ${suggestClear}
+      </div>`;
+
+    const todayEl = document.getElementById('todayInjuryBanner');
+    if (todayEl) todayEl.innerHTML = todayChip;
+    const planEl = document.getElementById('planInjuryBanner');
+    if (planEl) planEl.innerHTML = planBanner;
+  }
+
+  // Direct UI-driven clear: confirm + invoke the same path Coach Chat uses.
+  function clearInjuryFromUI() {
+    if (!planState.injury) return;
+    const area = planState.injury.area;
+    if (!confirm(`Clear the ${area} injury flag? Sessions return to normal — make sure you're actually pain-free.`)) return;
+    if (typeof tool_progressInjury === 'function') tool_progressInjury({ severity: 'cleared', notes: 'manually cleared from UI' });
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof trackEvent === 'function') trackEvent('injury_cleared', { source: 'ui' });
+  }
+
+  // Bridge from injury banner → Coach Chat. Auto-fires the question with
+  // the trend baked in so the AI can immediately reason about whether to
+  // call progressInjury({severity:'cleared'}).
+  function askCoachAboutInjury() {
+    const inj = planState.injury;
+    if (!inj) return;
+    const days = (typeof injuryDaysFlagged === 'function') ? injuryDaysFlagged() : '?';
+    const streak = (typeof injuryImprovementStreak === 'function') ? injuryImprovementStreak() : 0;
+    const prompt = `My ${inj.area} has been flagged for ${days} days at ${inj.severity} severity. My last ${streak} check-ins all said it was improving — can we clear the injury and resume normal training?`;
+    _pendingCoachPrompt = prompt;
+    showScreen('ask');
+    if (typeof updateChatState === 'function') updateChatState();
+    flushPendingCoachPrompt();
+    if (typeof trackEvent === 'function') trackEvent('injury_clear_via_coach', { days, streak });
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -11464,7 +11677,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       postRace: !!planState.postRace,    // race date passed — recovery mode
       sessions: planState.sessions || {},
       weekArc: (planState.weekArc || []).slice(0, 8),
-      injury: planState.injury || null,
+      injury: planState.injury ? {
+        ...planState.injury,
+        daysFlagged: (typeof injuryDaysFlagged === 'function') ? injuryDaysFlagged() : null,
+        improvementStreak: (typeof injuryImprovementStreak === 'function') ? injuryImprovementStreak() : 0,
+        // Trim dailyStatus to last 14 entries to keep context tight.
+        dailyStatus: Array.isArray(planState.injury.dailyStatus) ? planState.injury.dailyStatus.slice(-14) : [],
+      } : null,
       lastChange: planState.lastChange || null,
       lastCheckin: planState.lastCheckin || null,
       recentActivities: acts,
@@ -12900,6 +13119,13 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
         fix: { tool: 'shortenSession', input: { day: 'Wed', newMinutes: 40, newName: 'Easy aerobic (recovery day)', newMeta: '40 min · Zone 2', reason: 'morning check-in signaled low recovery' }}
       });
     }
+    // Capture the conditional injury-status answer if it was rendered.
+    const injuryChip = document.querySelector('#ciInjuryWrap [data-injury-status] .chip.active');
+    if (injuryChip && planState.injury) {
+      const status = injuryChip.dataset.status;
+      if (status) recordInjuryStatus(status, notes);
+    }
+
     renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();

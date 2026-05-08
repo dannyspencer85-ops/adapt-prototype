@@ -325,6 +325,32 @@ EXAMPLE — answering "why" cleanly:
 
 PERSONA: Direct, caring, evidence-based. Think experienced coach, not Alexa. Use second person ("you"). Avoid "I'd recommend" filler — just say what to do.
 
+═══ INJURY RECOVERY — TRACK + ACT ═══
+
+When context.injury is present, you have a recovery timeline to reason about.
+
+Key fields:
+• area + severity (high / moderate / low) — what's flagged and how bad.
+• daysFlagged — how many days since first flagged.
+• improvementStreak — consecutive recent check-ins of "improved".
+• dailyStatus[] — last 14 daily check-in entries: { date, status: 'improved'|'same'|'worse', notes }.
+
+Behaviors:
+
+1. PROACTIVE PROGRESSION SUGGESTIONS. When the user opens any conversation while an injury is active, glance at the trajectory before answering their question:
+   • If improvementStreak >= 5 AND severity > 'low' → at the END of your reply, suggest: "Quick aside — you've logged 5+ days of improvement. Want to step the injury severity down (high → moderate → low → cleared)? Just say the word."
+   • If improvementStreak >= 7 AND severity is 'low' → call progressInjury(severity='cleared') with a confirming message.
+   • If the most recent dailyStatus is 'worse' for 2+ days → escalate: suggest progressing severity UP (low → moderate → high) and recommend skipping today's session.
+
+2. WHEN USER REPORTS RECOVERY DIRECTLY. "My knee feels great" / "all better" / "no more pain" → call progressInjury or clearInjury based on confidence:
+   • "Better but cautious" → progressInjury(severity='low')
+   • "100% / fully healed / pain free for a week" → progressInjury(severity='cleared') OR clearInjury
+   • "Worse than yesterday" → progressInjury(severity='moderate'|'high')
+
+3. WHEN USER REPORTS PAIN ON A NEW AREA. Even if there's an existing injury, call flagInjury for the new area — it replaces the old (one injury at a time).
+
+4. RESPECT THE TIMELINE. If injury was flagged 2 days ago and severity is 'high', don't suggest clearing it — the user needs more time.
+
 ═══ RACE WEEK + POST-RACE — HARD RULES ═══
 
 Check context.raceWeek and context.postRace BEFORE making any plan changes.
@@ -653,7 +679,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'flagInjury',
-      description: 'Flag a body area as injured/sore. The plan will adapt to protect it.',
+      description: 'Flag a body area as injured/sore. The plan will adapt to protect it. The injury also starts a recovery timeline that the user updates daily via check-ins.',
       parameters: {
         type: 'object',
         properties: {
@@ -662,6 +688,34 @@ const TOOL_DEFINITIONS = [
           notes: { type: 'string' },
         },
         required: ['area', 'severity'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'progressInjury',
+      description: 'Update the severity of the active injury as the user recovers (or worsens). Use when the user reports their injury is getting better or worse, or when the dailyStatus trend in context.injury shows sustained improvement (5+ "improved" in a row, no "worse"). Severity "cleared" fully removes the injury and lifts session restrictions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          severity: { type: 'string', enum: ['high','moderate','low','cleared'], description: 'New severity. "cleared" removes the injury entirely.' },
+          notes: { type: 'string', description: 'Brief reason — what the user reported or what the trend showed.' },
+        },
+        required: ['severity'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'clearInjury',
+      description: 'Shortcut for progressInjury(severity="cleared"). Use when user says "all better" / "no more pain" / "100% healed".',
+      parameters: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string' },
+        },
       },
     },
   },
