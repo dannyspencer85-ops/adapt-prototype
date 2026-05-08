@@ -1874,12 +1874,17 @@
           </div>
         </div>
 
-        <div class="field">
+        <!-- Advanced markers (FTP, CSS) — only relevant for triathletes and
+             cyclists/swimmers. Hidden for run-only events (5K/10K/HM/Marathon)
+             since those athletes have no use for these inputs. Shown +
+             collapsed by default for tri events. Visibility set in
+             onbStep(5) → adjustFmAdvancedVisibility(). -->
+        <div class="field" id="fmAdvancedHeader" style="display:none;">
           <label style="display:flex; justify-content:space-between; align-items:center;">
             <span>🚴 🏊 Advanced markers</span>
             <button type="button" onclick="toggleFmAdvanced()" id="fmAdvancedToggle" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Show</button>
           </label>
-          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">FTP and CSS — only if you've tested them. Skip if you haven't.</div>
+          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">FTP (bike) and CSS (swim) — only if you've tested them. Skip if you haven't.</div>
         </div>
         <div id="fmAdvancedFields" style="display:none;">
           <div class="field">
@@ -3310,13 +3315,34 @@
     document.getElementById('onb-' + target).style.display = 'block';
     if (n === 4) populateDisciplineChips();
     if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
-    if (n === 5) prefillFitnessMarkers();
+    if (n === 5) { prefillFitnessMarkers(); adjustFmAdvancedVisibility(); }
     // Pre-fill the first-name field if we already have it stored (returning user
     // re-entering onboarding via "Edit goals" or "Start over").
     if (n === 1) {
       const fnEl = document.getElementById('firstName');
       const saved = getFirstName();
       if (fnEl && saved && !fnEl.value) fnEl.value = saved;
+    }
+  }
+
+  // Hide the bike-FTP / swim-CSS section for run-only events. They make no
+  // sense for someone training for a 5K/10K/HM/Marathon. Triathletes always
+  // see the section (collapsed by default).
+  function adjustFmAdvancedVisibility() {
+    const event = document.getElementById('eventSelect')?.value || '';
+    const isTri = /Ironman|Triathlon/i.test(event);
+    const header = document.getElementById('fmAdvancedHeader');
+    const fields = document.getElementById('fmAdvancedFields');
+    if (header) header.style.display = isTri ? 'block' : 'none';
+    if (fields && !isTri) {
+      // Collapse + clear values for non-tri so they aren't accidentally saved.
+      fields.style.display = 'none';
+      const ftp = document.getElementById('fmFtp');
+      const css = document.getElementById('fmCss');
+      if (ftp) ftp.value = '';
+      if (css) css.value = '';
+      const toggle = document.getElementById('fmAdvancedToggle');
+      if (toggle) toggle.textContent = 'Show';
     }
   }
 
@@ -3442,8 +3468,8 @@
       location: 'Austin, TX',
       profile: { exp: 'new', freq: 'mid', injury: 'none', sleep: '7to8' },
       complexity: 'simple',
-      // No markers — Alex is brand new and hasn't tested anything. Tests
-      // that the plan engine works with zero calibration data.
+      availableDisciplines: ['run','bike','trainer','swim','strength'],
+      // No markers — Alex is brand new and hasn't tested anything.
     },
     {
       id: 'jordan-marathon',
@@ -3455,8 +3481,7 @@
       location: 'Brooklyn, NY',
       profile: { exp: 'some', freq: 'high', injury: 'none', sleep: '7to8' },
       complexity: 'detailed',
-      // Recent half-marathon + measured max HR — engine will derive VDOT
-      // and prescribe specific run paces.
+      availableDisciplines: ['run','strength'],
       fitnessMarkers: { runRace: { distance: 'HM', time: '1:42:18', when: '3-months' }, maxHr: 184, restingHr: 54 },
     },
     {
@@ -3469,6 +3494,7 @@
       location: 'Boulder, CO',
       profile: { exp: 'veteran', freq: 'high', injury: 'none', sleep: '7to8' },
       complexity: 'detailed',
+      availableDisciplines: ['run','bike','trainer','swim','strength'],
       // Veteran with everything dialed in — tests the full calibrated path.
       fitnessMarkers: { runRace: { distance: '10K', time: '46:30', when: '3-months' }, ftp: 245, maxHr: 178, restingHr: 48, css: '1:38' },
     },
@@ -3482,7 +3508,7 @@
       location: 'Coeur d\'Alene, ID',
       profile: { exp: 'some', freq: 'mid', injury: 'none', sleep: '6to7' },
       complexity: 'detailed',
-      // Some markers from his earlier IM cycle, slightly stale.
+      availableDisciplines: ['run','bike','trainer','swim','strength'],
       fitnessMarkers: { runRace: { distance: '10K', time: '52:00', when: '6-months' }, maxHr: 175, restingHr: 60 },
     },
     {
@@ -3495,6 +3521,7 @@
       location: 'Chicago, IL',
       profile: { exp: 'new', freq: 'low', injury: 'none', sleep: '7to8' },
       complexity: 'simple',
+      availableDisciplines: ['run','strength'],
       // No markers — first race ever.
     },
     {
@@ -3507,7 +3534,7 @@
       location: 'Portland, OR',
       profile: { exp: 'veteran', freq: 'mid', injury: 'minor', sleep: '7to8' },
       complexity: 'simple',
-      // Has HR data from past training but no recent race time (was injured).
+      availableDisciplines: ['run','bike','strength'],
       fitnessMarkers: { maxHr: 182, restingHr: 56 },
     },
   ];
@@ -3586,6 +3613,9 @@
     // empty (Alex, Riley) — those exercise the no-calibration code path.
     if (p.fitnessMarkers && typeof writeFitnessMarkers === 'function') {
       writeFitnessMarkers(p.fitnessMarkers);
+    }
+    if (Array.isArray(p.availableDisciplines) && p.availableDisciplines.length > 0) {
+      localStorage.setItem('available-disciplines', JSON.stringify(p.availableDisciplines));
     }
     planState.raceEvent = p.event;
     planState.raceDate = raceDate;
@@ -6477,10 +6507,22 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const weekSessions = days.map(d => ({ day: d, s: sessions[d] })).filter(x => x.s);
     const activeSessions = weekSessions.filter(x => x.s.type !== 'rest');
 
-    // 1. Key session coverage
+    // When the AI generated the plan AND the user hasn't modified it yet, suppress
+    // plan-STRUCTURE critiques (long-run coverage, volume target, intensity ratio,
+    // hard-day spacing, race-readiness, taper depth). The AI considered all of
+    // these when it built the plan — running rule-based critique on an intentional
+    // AI design produces false-positives like "Race week is too heavy" the moment
+    // the plan generates. Once the user starts modifying sessions (lastChange set),
+    // drift can accumulate and these insights become valid again.
+    //
+    // BEHAVIOR insights (check-in signals, injury-specific cross-training,
+    // course-intel prep) ALWAYS run — they're situational, not plan-structure.
+    const aiPlanProtected = planState.planSource === 'ai' && !planState.lastChange;
+
+    // 1. Key session coverage (plan-structure — gated)
     const hasLong = activeSessions.some(x => x.s.duration >= 75);
     const hasQuality = activeSessions.some(x => x.s.type === 'quality' || x.s.type === 'brick');
-    if (!hasLong) {
+    if (!aiPlanProtected && !hasLong) {
       const weekend = sessions.Sat && sessions.Sat.type === 'rest' ? 'Sat' : sessions.Sun && sessions.Sun.type === 'rest' ? 'Sun' : null;
       const longest = weekSessions.filter(x => x.s.type !== 'rest').sort((a, b) => b.s.duration - a.s.duration)[0];
       insights.push({
@@ -6496,7 +6538,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           : null
       });
     }
-    if (!hasQuality && activeSessions.length > 0) {
+    if (!aiPlanProtected && !hasQuality && activeSessions.length > 0) {
       const weekday = ['Tue','Wed','Thu'].find(d => sessions[d] && sessions[d].type !== 'rest' && sessions[d].type !== 'quality' && sessions[d].type !== 'brick');
       insights.push({
         severity: 'warn',
@@ -6508,11 +6550,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       });
     }
 
-    // 2. Weekly volume vs target
+    // 2. Weekly volume vs target (plan-structure — gated)
     const totalMins = activeSessions.reduce((a, x) => a + x.s.duration, 0);
     const currentArc = planState.weekArc.find(w => w.current) || planState.weekArc[0];
     const targetMins = parseWeekHours(currentArc.hours) * 60;
-    if (targetMins > 0) {
+    if (!aiPlanProtected && targetMins > 0) {
       const ratio = totalMins / targetMins;
       if (ratio < 0.7 && totalMins > 0) {
         const easy = weekSessions.filter(x => x.s.type === 'run' || x.s.type === 'bike').sort((a, b) => a.s.duration - b.s.duration)[0];
@@ -6537,8 +6579,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // 3. Intensity ratio (soft 80/20, scales by hours)
-    if (activeSessions.length >= 2) {
+    // 3. Intensity ratio (plan-structure — gated)
+    if (!aiPlanProtected && activeSessions.length >= 2) {
       const qualityMins = activeSessions.filter(x => x.s.type === 'quality' || x.s.type === 'brick').reduce((a, x) => a + x.s.duration, 0);
       const totalActiveMins = activeSessions.reduce((a, x) => a + x.s.duration, 0);
       if (totalActiveMins > 0) {
@@ -6557,8 +6599,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // 4. Hard-day spacing (consecutive quality/brick sessions)
-    for (let i = 0; i < days.length - 1; i++) {
+    // 4. Hard-day spacing (plan-structure — gated)
+    if (!aiPlanProtected) for (let i = 0; i < days.length - 1; i++) {
       const a = sessions[days[i]];
       const b = sessions[days[i + 1]];
       if (!a || !b) continue;
@@ -6593,10 +6635,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // 6. Race readiness trajectory
+    // 6. Race readiness trajectory (plan-structure — gated)
     const totalRemaining = planState.weekArc.reduce((a, w) => a + parseWeekHours(w.hours), 0);
     const baselineForFinish = 28;
-    if (totalRemaining < baselineForFinish * 0.85) {
+    if (!aiPlanProtected && totalRemaining < baselineForFinish * 0.85) {
       insights.push({
         severity: 'alert',
         title: "You're behind for race day",
@@ -6652,9 +6694,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // 7. Taper protection — race week should be low volume
+    // 7. Taper protection (plan-structure — gated)
     const raceWeek = planState.weekArc[planState.weekArc.length - 1];
-    if (raceWeek && parseWeekHours(raceWeek.hours) > 3.5) {
+    if (!aiPlanProtected && raceWeek && parseWeekHours(raceWeek.hours) > 3.5) {
       insights.push({
         severity: 'warn',
         title: 'Race week is too heavy',
@@ -9448,6 +9490,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     if (p.fitnessMarkers && typeof writeFitnessMarkers === 'function') {
       writeFitnessMarkers(p.fitnessMarkers);
+    }
+    if (Array.isArray(p.availableDisciplines) && p.availableDisciplines.length > 0) {
+      localStorage.setItem('available-disciplines', JSON.stringify(p.availableDisciplines));
     }
     planState.raceEvent = p.event;
     planState.raceDate = raceDate;
