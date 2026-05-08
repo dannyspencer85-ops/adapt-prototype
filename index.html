@@ -8850,7 +8850,27 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const hours = parseFloat(localStorage.getItem('hours-per-week') || '5');
     const days = JSON.parse(localStorage.getItem('training-days') || '["Wed","Sat","Sun"]');
     const isTri = /Ironman|Triathlon/.test(event);
-    const isRun = /Marathon|10K|5K/.test(event);
+    const isShortRun = /\b(5K|10K)\b/i.test(event);
+    const isMarathon = /Marathon/i.test(event) && !/Half/i.test(event);
+    const isHalfMar = /Half Marathon/i.test(event);
+    const isRun = isShortRun || isMarathon || isHalfMar;
+    const exp = (() => {
+      try {
+        const fm = JSON.parse(localStorage.getItem('fitness-markers') || 'null');
+        if (fm && fm.runAbility) return fm.runAbility;
+      } catch (e) {}
+      return null;
+    })();
+    // Detect beginner runner: experience='new' OR runAbility says <=15min
+    const expChip = (() => {
+      const m = (planState && planState.profile && planState.profile.exp) || null;
+      return m;
+    })();
+    const isBeginnerRunner = isShortRun && (
+      exp === 'walk-run' || exp === 'under-15' ||
+      // Best-effort fallback: if no markers and weekly hours is <=4, treat as beginner
+      (!exp && hours <= 4)
+    );
 
     const blank = { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' };
     const newSessions = {};
@@ -8860,25 +8880,91 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const qualityDay = days.find(d => d !== longDay && d !== 'Sat' && d !== 'Sun') || days.find(d => d !== longDay) || 'Wed';
     const easyDay = days.find(d => d !== longDay && d !== qualityDay);
 
-    const longMins = isTri ? Math.min(180, Math.max(75, hours * 60 * 0.5)) : isRun ? Math.min(120, Math.max(60, hours * 60 * 0.4)) : 60;
-    const qualityMins = Math.min(75, Math.max(30, hours * 60 * 0.2));
-
-    if (longDay) {
-      newSessions[longDay] = isTri
-        ? { name: 'Long brick', meta: `Bike ${Math.floor(longMins * 0.7 / 60)}:${String(Math.round(longMins * 0.7) % 60).padStart(2,'0')} + Run 0:30`, duration: Math.round(longMins), type: 'brick' }
-        : { name: 'Long run', meta: `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run' };
-    }
-    if (qualityDay) {
-      newSessions[qualityDay] = isTri
-        ? { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' }
-        : { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
-    }
-    if (easyDay) {
-      const easyMins = Math.round(hours * 60 - longMins - qualityMins);
-      if (easyMins > 30) {
-        newSessions[easyDay] = isTri
-          ? { name: 'Long easy run', meta: `${Math.floor(easyMins / 60)}:${String(easyMins % 60).padStart(2,'0')} · Zone 2`, duration: easyMins, type: 'run' }
-          : { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+    if (isBeginnerRunner) {
+      // Couch-to-5K-style fallback. Three short walk/run sessions per week.
+      // No "long run" over 30 min, no intervals/quality work in the first
+      // weeks — match NHS C25K week-1 structure as closely as a static
+      // template can.
+      if (longDay) {
+        newSessions[longDay] = {
+          name: 'Walk + jog intervals',
+          meta: '~28 min · build week-by-week',
+          duration: 28,
+          type: 'run',
+          prescription: '5 min walk warmup + 8×(60s jog / 90s walk) + 5 min walk cooldown ≈ 28 min. NHS C25K week 1.',
+          targets: 'RPE 4-5 during jogs · easy walk between · stay conversational',
+          intensity: 'Z2',
+        };
+      }
+      if (qualityDay) {
+        newSessions[qualityDay] = {
+          name: 'Walk + jog intervals',
+          meta: '~25 min · easy form day',
+          duration: 25,
+          type: 'run',
+          prescription: '5 min walk warmup + 6×(60s jog / 90s walk) + 5 min walk cooldown ≈ 25 min.',
+          targets: 'RPE 4 throughout · focus on relaxed shoulders + smooth turnover',
+          intensity: 'Z2',
+        };
+      }
+      if (easyDay) {
+        newSessions[easyDay] = {
+          name: 'Easy walk',
+          meta: '20-25 min · recovery',
+          duration: 22,
+          type: 'run',
+          prescription: '20-25 min easy walk, no running. Active recovery between run-walk sessions.',
+          targets: 'RPE 2-3 · should feel restorative, not training',
+          intensity: 'Z1',
+        };
+      }
+    } else if (isRun) {
+      // Non-beginner run event — distance-aware caps.
+      const longCap = isShortRun ? 60 : isHalfMar ? 90 : 120;
+      const longFloor = isShortRun ? 35 : 50;
+      const longMins = Math.min(longCap, Math.max(longFloor, hours * 60 * 0.4));
+      const qualityMins = Math.min(60, Math.max(25, hours * 60 * 0.2));
+      if (longDay) {
+        newSessions[longDay] = {
+          name: 'Long run',
+          meta: `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`,
+          duration: Math.round(longMins), type: 'run',
+        };
+      }
+      if (qualityDay) {
+        newSessions[qualityDay] = {
+          name: 'Run intervals',
+          meta: `${Math.round(qualityMins)} min · Quality`,
+          duration: Math.round(qualityMins), type: 'quality',
+        };
+      }
+      if (easyDay) {
+        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
+        if (easyMins > 30) {
+          newSessions[easyDay] = { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+        }
+      }
+    } else {
+      // Triathlon / general — original logic.
+      const longMins = isTri ? Math.min(180, Math.max(75, hours * 60 * 0.5)) : 60;
+      const qualityMins = Math.min(75, Math.max(30, hours * 60 * 0.2));
+      if (longDay) {
+        newSessions[longDay] = isTri
+          ? { name: 'Long brick', meta: `Bike ${Math.floor(longMins * 0.7 / 60)}:${String(Math.round(longMins * 0.7) % 60).padStart(2,'0')} + Run 0:30`, duration: Math.round(longMins), type: 'brick' }
+          : { name: 'Long run', meta: `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run' };
+      }
+      if (qualityDay) {
+        newSessions[qualityDay] = isTri
+          ? { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' }
+          : { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+      }
+      if (easyDay) {
+        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
+        if (easyMins > 30) {
+          newSessions[easyDay] = isTri
+            ? { name: 'Long easy run', meta: `${Math.floor(easyMins / 60)}:${String(easyMins % 60).padStart(2,'0')} · Zone 2`, duration: easyMins, type: 'run' }
+            : { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+        }
       }
     }
 
