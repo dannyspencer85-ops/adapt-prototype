@@ -186,6 +186,16 @@ function buildFitnessMarkersBlock(m) {
     lines.push(`• Swim CSS: ${m.css} per 100m`);
     lines.push('  → Easy: CSS + 8-10s/100m. Threshold sets: at CSS. Fast: CSS - 3s/100m. Use these specific paces in every swim session\'s targets.');
   }
+  if (m.runAbility) {
+    const map = {
+      'walk-run': 'Just walking + short jogs (<5 min continuous). Use Couch-to-5K-style walk/run intervals; do NOT prescribe continuous runs.',
+      'under-15': 'Up to 15 min continuous. Mix of walk-run and short continuous easy runs; cap long sessions at ~25 min.',
+      '15-30': '15-30 min continuous. Easy aerobic 20-30 min; build long runs gradually toward 35-40 min.',
+      '30-60': '30-60 min continuous. Standard easy aerobic + long runs scale normally.',
+      '60-plus': '60+ min continuous. Long-run progressions can reach race-specific durations.',
+    };
+    lines.push(`• Current run ability: ${map[m.runAbility] || m.runAbility}`);
+  }
   if (lines.length === 0) return '';
   return `\n\n═══ CALIBRATED FITNESS MARKERS — USE THESE EXACT NUMBERS ═══\n\n${lines.join('\n')}\n\nWhen prescribing sessions, USE THESE NUMBERS. Don't write "Z2" — write the actual HR range "${m.maxHr ? Math.round(m.maxHr*0.70) + '-' + Math.round(m.maxHr*0.80) + ' bpm' : 'their HR Z2 range'}". Don't write "threshold pace" — derive it from VDOT and write "~7:15/mi" or whatever's correct. The user gave us real data; reflect that in every prescription and target line.`;
 }
@@ -249,7 +259,30 @@ Weekly structure (typical):
 
 Pace anchor: T-pace (threshold) is the most important number for HM athletes.`;
   } else if (isShortRun) {
-    disciplineNote = `Short-distance run event (${event}). Speed and V̇O2max dominate — long aerobic capacity is the FLOOR, not the ceiling.
+    const expLevel = profile && profile.exp;
+    const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
+    const isBeginner = expLevel === 'new' || runAbility === 'walk-run' || runAbility === 'under-15';
+    if (isBeginner) {
+      disciplineNote = `Short-distance run event (${event}) — BEGINNER PATH. The user's experience or current run ability is limited (exp=${expLevel || 'unknown'}, runAbility=${runAbility || 'unknown'}). DO NOT prescribe continuous easy runs longer than they can currently do. Use Couch-to-5K-style walk/run progressions.
+
+Run-ability-anchored prescriptions (use the user's actual capacity):
+• runAbility='walk-run' (just walking + short jogs): start at "5 min walk WU + 8×(60s jog / 90s walk) + 5 min walk CD ≈ 30 min". Add 15 sec jog / drop 15 sec walk per week. By week 6-8 they should be running 20-25 min continuously.
+• runAbility='under-15' (can run up to 15 min): start at "5 min walk + 4×(3 min jog / 90s walk) + 5 min walk ≈ 30 min", building toward 20-30 min continuous runs by week 4-6.
+• runAbility='15-30' (can run 15-30 min): start at 20-25 min continuous easy with one walk break mid-session, build to 30-35 min by week 3-4.
+
+DO NOT prescribe:
+• Threshold or interval work in the first 4 weeks (joints + tendons need adaptation first)
+• Continuous runs longer than the user's current capacity × 1.25
+• Long runs over 45 min for a beginner training for a 5K
+
+DO prescribe:
+• Strides (4-6×20s at fast-feeling pace with full walk recovery) starting week 3
+• Strength sessions if available (huge injury-protection win for new runners)
+• 2-3 run sessions per week max; cross-train (bike/walk) on remaining days
+
+Weekly TOTAL run time should grow ≤10% per week. The plan is "build the runner first, sharpen second."`;
+    } else {
+      disciplineNote = `Short-distance run event (${event}). Speed and V̇O2max dominate — long aerobic capacity is the FLOOR, not the ceiling.
 
 Weekly structure (typical):
 • Long run — capped at 60-75 min progressive Z2-Z3 (this isn't a marathon).
@@ -258,6 +291,7 @@ Weekly structure (typical):
 • Race-pace work in Peak: short reps at goal 5K/10K pace.
 
 Pace anchor: I-pace and R-pace (Daniels), derived from VDOT.`;
+    }
   } else if (isGeneral) {
     disciplineNote = `General fitness — no race target. Goal is consistency + variety + injury-free year-round training.
 
@@ -351,6 +385,9 @@ Your plans MUST reflect these established frameworks:
 ═══ HARD CONSTRAINTS — MUST follow ═══
 
 • Use ONLY the user's selected training days for sessions. Other days = full rest. Do not invent training days.
+• **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — even if the user has 'swim' or 'bike' in their list — DO NOT prescribe swim or bike on a primary quality day. Swim/bike are cross-training only when the event is a triathlon. For run events, every "quality" or "long" day is a RUN day.
+• For run events: allowed types are {'run', 'rest', ${hasStrength ? "'strength'" : "/* no strength access */"}, 'mobility'}. Never 'swim', never 'bike' (unless explicitly cross-training in cases of injury, and even then label it as 'run' replacement, not a primary session).
+• For triathlon events: types follow the discipline allocation rules in the discipline note.
 • Total weekly minutes must be within ±15% of the user's stated weekly hours × 60. (User said ${hours} hrs/week → target ~${Math.round(hours * 60)} min/week.)
 • Each week must have at least one full rest day (duration:0, type:'rest'). Two if hours <= 4.
 • Quality (high-intensity) sessions must be spaced at least 48 hours apart, ideally 72.
@@ -358,6 +395,7 @@ Your plans MUST reflect these established frameworks:
 • Long session is on Sat or Sun if those are training days; otherwise on the last selected day.
 • Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1-2 sentence description of the workout structure), targets (HR/pace/RPE guidance — use ranges and reference the appropriate Daniels/CTL anchor when applicable).
 • prescription MUST reference specific zones, drills, or intervals — not just "easy aerobic." E.g. "8x400m at I pace (~5K race pace) with 400m recoveries; 1mi WU + CD" not "intervals."
+• prescription MUST be populated on every non-rest session — never leave it blank.
 
 ═══ DISCIPLINE NOTES FOR THIS USER ═══
 
@@ -459,6 +497,11 @@ function validatePlan(parsed, { event, hours, days, weeksToRace }) {
   const maxWeeklyMin = Math.round(targetWeeklyMin * 1.30);   // hard ceiling
   const trainingDaySet = new Set(days);
 
+  // For run-only events, the AI sometimes hallucinates swim/bike sessions
+  // (training data leakage from triathlon plans). Coerce them back to run
+  // here so the user gets a coherent run plan even if the AI slipped up.
+  const isRunOnly = /Marathon|10K|5K|Half Marathon/i.test(event) && !/Triathlon|Ironman/i.test(event);
+
   let prevWeekMin = null;
   for (let wi = 0; wi < parsed.weeks.length; wi++) {
     const wk = parsed.weeks[wi];
@@ -475,6 +518,15 @@ function validatePlan(parsed, { event, hours, days, weeksToRace }) {
       if (sess.durationMin < 0) sess.durationMin = 0;
       if (sess.durationMin > 360) return { ok: false, reason: `week ${wi} ${dayName} duration > 6h` };
       if (!VALID_TYPES.includes(sess.type)) sess.type = sess.durationMin === 0 ? 'rest' : 'run';
+      // Run-only events: hard-coerce swim/bike/brick → run (with a note in
+      // prescription so the user knows). The AI shouldn't have prescribed
+      // these in the first place but we defend in depth.
+      if (isRunOnly && (sess.type === 'swim' || sess.type === 'bike' || sess.type === 'brick')) {
+        const original = sess.type;
+        sess.type = 'run';
+        sess.name = sess.name && !/run/i.test(sess.name) ? `Easy run (was ${original})` : (sess.name || 'Easy run');
+        sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from ${original} to run — this is a run-only event.]`;
+      }
       if (!sess.intensity) sess.intensity = sess.type === 'rest' ? 'rest' : 'Z2';
       if (typeof sess.prescription !== 'string') sess.prescription = '';
       if (typeof sess.targets !== 'string') sess.targets = sess.targets ? String(sess.targets) : '';

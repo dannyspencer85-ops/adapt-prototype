@@ -1874,6 +1874,22 @@
           </div>
         </div>
 
+        <!-- Current run ability — drives whether the plan should start with
+             walk/run intervals (Couch-to-5K) or continuous running. Critical
+             for beginners. Defaults to nothing selected — AI uses experience
+             chip from step 2 as a fallback when this is blank. -->
+        <div class="field">
+          <label>🏃 How long can you run continuously today?</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Honest answer beats best-case. The plan starts where you are.</div>
+          <div class="chip-row" id="fmRunAbility">
+            <button class="chip" data-val="walk-run" onclick="singleChipVal(this)">Walk + short jogs</button>
+            <button class="chip" data-val="under-15" onclick="singleChipVal(this)">Up to 15 min</button>
+            <button class="chip" data-val="15-30" onclick="singleChipVal(this)">15-30 min</button>
+            <button class="chip" data-val="30-60" onclick="singleChipVal(this)">30-60 min</button>
+            <button class="chip" data-val="60-plus" onclick="singleChipVal(this)">60 min or more</button>
+          </div>
+        </div>
+
         <!-- Advanced markers (FTP, CSS) — only relevant for triathletes and
              cyclists/swimmers. Hidden for run-only events (5K/10K/HM/Marathon)
              since those athletes have no use for these inputs. Shown +
@@ -3371,6 +3387,10 @@
     setVal('fmHrMax', m.maxHr);
     setVal('fmFtp', m.ftp);
     setVal('fmCss', m.css);
+    if (m.runAbility) {
+      const wrap = document.getElementById('fmRunAbility');
+      if (wrap) [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === m.runAbility));
+    }
     if (m.ftp || m.css) {
       // Auto-expand advanced section if any advanced fields are populated.
       const wrap = document.getElementById('fmAdvancedFields');
@@ -3389,12 +3409,15 @@
     const hrmax = parseInt(document.getElementById('fmHrMax')?.value || '', 10);
     const ftp = parseInt(document.getElementById('fmFtp')?.value || '', 10);
     const css = (document.getElementById('fmCss')?.value || '').trim();
+    const runAbilityChip = document.querySelector('#fmRunAbility .chip.active');
+    const runAbility = runAbilityChip ? (runAbilityChip.dataset.val || '') : '';
     const m = {};
     if (dist && runTime) m.runRace = { distance: dist, time: runTime, when: runWhen || null };
     if (Number.isFinite(rhr) && rhr > 30 && rhr < 100) m.restingHr = rhr;
     if (Number.isFinite(hrmax) && hrmax > 120 && hrmax < 220) m.maxHr = hrmax;
     if (Number.isFinite(ftp) && ftp > 60 && ftp < 600) m.ftp = ftp;
     if (css && /^\d{1,2}:\d{2}$/.test(css)) m.css = css;
+    if (runAbility) m.runAbility = runAbility;
     return Object.keys(m).length > 0 ? m : null;
   }
   function readFitnessMarkers() {
@@ -3522,7 +3545,9 @@
       profile: { exp: 'new', freq: 'low', injury: 'none', sleep: '7to8' },
       complexity: 'simple',
       availableDisciplines: ['run','strength'],
-      // No markers — first race ever.
+      // Beginner-runner marker so the plan engine builds Couch-to-5K-style
+      // walk/run progressions instead of 45-min continuous easy runs.
+      fitnessMarkers: { runAbility: 'walk-run' },
     },
     {
       id: 'morgan-injury',
@@ -8070,13 +8095,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       };
     }
     if (session.type === 'run' && session.duration >= 60) {
+      // Duration-aware cues — no "fuel at 60 min" if session is only 60 min.
+      const cues = [
+        "If you can't hold conversation, slow down — this is the most common mistake.",
+        'Stay compact — no over-striding.',
+      ];
+      if (session.duration >= 90) cues.push('Fuel mid-session (water + 30g carbs) — sessions this long need it.');
       return { ...base,
         warmup: '5 min walk + 5 min easy jog progression.',
         main: `${session.duration - 15} min easy aerobic run, Zone 2 — HR 130-145, conversational pace, compact form.\n\nOptional: last 5 min progression to low Z3 if feeling great.`,
         cooldown: '5 min walk + light stretch.',
         targets: ['HR Z2 (130-145)', 'Pace: conversational', 'RPE 4-5 throughout'],
-        cues: ['If you can\'t hold conversation, slow down — this is the most common mistake.', 'Stay compact — no over-striding.', 'Fuel at 60 min if session exceeds 90 min total.'],
-        alternatives: ['Only 45 min: same zone, just shorter', 'Only 30 min: easy + 4×20s strides at end', 'Treadmill alternative: same duration at 1% incline']
+        cues,
+        alternatives: ['Short on time: same zone, just shorter', 'Treadmill alternative: same duration at 1% incline'],
       };
     }
     if (session.type === 'run') {
