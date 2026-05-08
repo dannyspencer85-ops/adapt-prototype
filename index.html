@@ -6532,17 +6532,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const weekSessions = days.map(d => ({ day: d, s: sessions[d] })).filter(x => x.s);
     const activeSessions = weekSessions.filter(x => x.s.type !== 'rest');
 
-    // When the AI generated the plan AND the user hasn't modified it yet, suppress
-    // plan-STRUCTURE critiques (long-run coverage, volume target, intensity ratio,
-    // hard-day spacing, race-readiness, taper depth). The AI considered all of
-    // these when it built the plan — running rule-based critique on an intentional
-    // AI design produces false-positives like "Race week is too heavy" the moment
-    // the plan generates. Once the user starts modifying sessions (lastChange set),
-    // drift can accumulate and these insights become valid again.
+    // Suppress plan-STRUCTURE critiques (long-run coverage, volume target,
+    // intensity ratio, hard-day spacing, race-readiness, taper depth) when:
+    //   (a) the user just generated their plan and hasn't completed anything yet
+    //       (every plan looks "behind" before any training happens), OR
+    //   (b) the AI generated the plan and the user hasn't modified it — the AI
+    //       already considered all these structural concerns
+    // Once the user has REAL training history (1+ completed session) and has
+    // modified the plan, these insights become valid drift detectors.
     //
     // BEHAVIOR insights (check-in signals, injury-specific cross-training,
     // course-intel prep) ALWAYS run — they're situational, not plan-structure.
-    const aiPlanProtected = planState.planSource === 'ai' && !planState.lastChange;
+    const completedCount = weekSessions.filter(x => x.s.completed).length;
+    // No training history yet → suppress every plan-structure critique. The
+    // user hasn't even started; complaining about "behind for race day" is
+    // pointless until there's real adherence data to compare against.
+    const noHistoryYet = completedCount === 0;
+    // AI plan + no manual edits → trust the AI's structural decisions.
+    const aiPlanIntact = planState.planSource === 'ai' && !planState.lastChange;
+    const aiPlanProtected = noHistoryYet || aiPlanIntact;
 
     // 1. Key session coverage (plan-structure — gated)
     const hasLong = activeSessions.some(x => x.s.duration >= 75);
@@ -9043,13 +9051,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return;
     }
     slot.innerHTML = upcoming.map(({ day, s }) => `
-      <div class="session-row">
+      <div class="session-row" onclick="openSessionModal('${day}')" style="cursor:pointer;">
         <div class="session-icon">${ICON[s.type] || '•'}</div>
         <div class="session-info">
           <div class="session-day">${DAY_FULL[day]} · ${planState.dates[day] || ''}</div>
           <div class="session-name">${escapeHtml(s.name)}</div>
           <div class="session-meta">${escapeHtml(s.meta)}</div>
         </div>
+        <div style="color:var(--text-soft); font-size:18px; align-self:center;">›</div>
       </div>
     `).join('');
   }
