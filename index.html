@@ -2153,6 +2153,11 @@
       <!-- 2. THIS WEEK'S SESSIONS — the substance -->
       <div id="weekSessions"></div>
 
+      <!-- 2b. UPCOMING CALENDAR — color-coded look-ahead. The next 2 weeks
+           are concrete; weeks 3 & 4 are tentative (the plan adapts based on
+           what you actually train). Tap any cell to see session details. -->
+      <div id="upcomingCalendar" style="margin-top: 18px;"></div>
+
       <!-- 3. ACTUAL recent workouts from Strava -->
       <div id="recentStravaSessions"></div>
 
@@ -5361,6 +5366,26 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     dumbbell:    '<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
   };
 
+  // ──────────────────────────────────────────────────────────────────────
+  // SPORT COLORS — single source of truth for color-coding sessions across
+  // the calendar, week strip, dots, and legends. Colors stay consistent
+  // wherever sport-specific markers appear.
+  // ──────────────────────────────────────────────────────────────────────
+  const SPORT_COLORS = {
+    run:       { bg: '#3B8968', fg: '#FFFFFF', label: 'Run' },        // green (primary)
+    bike:      { bg: '#E8941F', fg: '#FFFFFF', label: 'Bike' },        // amber/orange
+    swim:      { bg: '#3D8FD9', fg: '#FFFFFF', label: 'Swim' },        // blue
+    brick:     { bg: '#7E5BB6', fg: '#FFFFFF', label: 'Brick' },       // purple (bike+run combo)
+    quality:   { bg: '#C44545', fg: '#FFFFFF', label: 'Quality' },     // red (hard day)
+    strength:  { bg: '#5A4B8C', fg: '#FFFFFF', label: 'Strength' },    // deep indigo
+    mobility:  { bg: '#B0B7BD', fg: '#FFFFFF', label: 'Mobility' },    // soft grey
+    walk:      { bg: '#84A9B5', fg: '#FFFFFF', label: 'Walk' },        // teal
+    rest:      { bg: '#E6E6E6', fg: '#888888', label: 'Rest' },        // very light grey
+  };
+  function sportColor(type) {
+    return SPORT_COLORS[type] || SPORT_COLORS.rest;
+  }
+
   // Renders an inline SVG icon. Default: 18px, currentColor stroke.
   // Usage: icon('run')  or  icon('run', { size: 20, color: 'var(--primary)' })
   function icon(name, opts) {
@@ -6733,6 +6758,149 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       html += `<div${hi}>${label}</div><div${hi}>${escapeHtml(w.hours)}</div><div${hi}>${escapeHtml(w.focus)}</div>`;
     });
     el.innerHTML = html;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // UPCOMING CALENDAR — 4-week color-coded look-ahead on the Plan tab.
+  // Weeks 1-2: concrete (current + next, populated from planState.fullPlan).
+  // Weeks 3-4: tentative (read from fullPlan if present; rendered with a
+  //   "tentative" visual treatment since the engine adapts week-to-week).
+  // Each cell is tappable for the next 2 weeks (opens session modal).
+  // ──────────────────────────────────────────────────────────────────────
+  function renderUpcomingCalendar() {
+    const el = document.getElementById('upcomingCalendar');
+    if (!el) return;
+    if (!planState.sessions) { el.innerHTML = ''; return; }
+
+    // Build a 4-week × 7-day matrix from the AI plan if available, falling
+    // back to current-week sessions if the rule engine produced only one.
+    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
+    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+    const totalWeeks = fullPlan ? fullPlan.weeks.length : 1;
+    const weekRows = [];
+    for (let off = 0; off < 4; off++) {
+      const target = currentIdx + off;
+      if (fullPlan && fullPlan.weeks[target]) {
+        weekRows.push({
+          offset: off,
+          weekIndex: target,
+          isTentative: off >= 2,
+          isPast: false,
+          isCurrent: off === 0,
+          sessions: fullPlan.weeks[target].sessions || {},
+          phase: (planState.weekArc && planState.weekArc[target] && planState.weekArc[target].focus) || '',
+          hours: (planState.weekArc && planState.weekArc[target] && planState.weekArc[target].hours) || '',
+        });
+      } else if (off === 0) {
+        // Rule-engine fallback only fills the current week.
+        weekRows.push({
+          offset: 0,
+          weekIndex: currentIdx,
+          isTentative: false,
+          isPast: false,
+          isCurrent: true,
+          sessions: planState.sessions,
+          phase: (planState.weekArc && planState.weekArc[currentIdx] && planState.weekArc[currentIdx].focus) || '',
+          hours: (planState.weekArc && planState.weekArc[currentIdx] && planState.weekArc[currentIdx].hours) || '',
+        });
+      }
+    }
+    if (weekRows.length === 0) { el.innerHTML = ''; return; }
+
+    // Compute date range for each week so labels are meaningful.
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayDow = today.getDay(); // 0=Sun, 1=Mon, ...
+    // Treat Mon as week start. Days back to current week's Mon:
+    const daysBackToMon = (todayDow + 6) % 7;
+    const weekMon = new Date(today);
+    weekMon.setDate(today.getDate() - daysBackToMon);
+
+    // Sport types we consider "training" (everything except pure rest).
+    const TRAINING_TYPES = new Set(['run','bike','swim','brick','quality','strength','mobility','walk']);
+    // Build legend from sport types actually present in the visible 4 weeks.
+    const presentTypes = new Set();
+    weekRows.forEach(r => {
+      DAYS.forEach(d => {
+        const s = r.sessions[d];
+        if (s && s.type && TRAINING_TYPES.has(s.type)) presentTypes.add(s.type);
+      });
+    });
+    // Include rest if any non-training day exists.
+    presentTypes.add('rest');
+
+    // Render legend.
+    const legendOrder = ['run','bike','swim','brick','quality','strength','mobility','walk','rest'];
+    const legendHtml = legendOrder
+      .filter(t => presentTypes.has(t))
+      .map(t => {
+        const c = sportColor(t);
+        return `<div style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; background:#fff; border:1px solid var(--border); border-radius:100px; font-size:11px; font-weight:600; color:var(--text);">
+          <span style="width:10px; height:10px; border-radius:50%; background:${c.bg}; ${t === 'rest' ? 'border:1px solid #c0c0c0;' : ''} display:inline-block;"></span>
+          ${escapeHtml(c.label)}
+        </div>`;
+      }).join('');
+
+    // Render each week row as a 7-cell grid.
+    const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const weekHtml = weekRows.map(row => {
+      const rowMon = new Date(weekMon);
+      rowMon.setDate(weekMon.getDate() + row.offset * 7);
+      const rowSun = new Date(rowMon);
+      rowSun.setDate(rowMon.getDate() + 6);
+      const dateRange = `${monthShort[rowMon.getMonth()]} ${rowMon.getDate()}–${rowMon.getMonth() === rowSun.getMonth() ? rowSun.getDate() : monthShort[rowSun.getMonth()] + ' ' + rowSun.getDate()}`;
+      const headerLabel = row.offset === 0 ? 'This week'
+        : row.offset === 1 ? 'Next week'
+        : row.offset === 2 ? 'Week 3 (tentative)'
+        : 'Week 4 (tentative)';
+      const phaseTag = row.phase ? `<span style="font-size:10px; color:var(--text-soft); margin-left:8px; text-transform:uppercase; letter-spacing:0.4px;">${escapeHtml(row.phase)}</span>` : '';
+      const hoursTag = row.hours ? `<span style="font-size:11px; color:var(--text-soft); margin-left:auto; font-weight:500;">${escapeHtml(row.hours)} hr</span>` : '';
+
+      const cells = DAYS.map((d, i) => {
+        const s = row.sessions[d] || {};
+        const type = s.type || 'rest';
+        const c = sportColor(type);
+        const dur = Number(s.duration || s.durationMin || 0);
+        const isRest = type === 'rest' || dur === 0;
+        const cellDate = new Date(rowMon);
+        cellDate.setDate(rowMon.getDate() + i);
+        const isToday = row.isCurrent && cellDate.getTime() === today.getTime();
+        const tappable = row.offset <= 1 && !isRest;
+        const onclick = tappable ? `onclick="openSessionModal('${d}', ${row.offset})"` : '';
+        const cursor = tappable ? 'cursor:pointer;' : 'cursor:default;';
+        const tentative = row.isTentative ? 'opacity: 0.7;' : '';
+        const todayRing = isToday ? `box-shadow: 0 0 0 2px var(--primary);` : '';
+        const dotStyle = isRest
+          ? `background:${c.bg}; border:1px solid #d0d0d0;`
+          : `background:${c.bg};`;
+        const minLabel = !isRest && dur > 0 ? `<div style="font-size:9px; color:var(--text-soft); margin-top:2px; line-height:1;">${dur}m</div>` : '';
+        const dayShort = dayLabels[i].slice(0, 1); // Single letter for compactness
+        return `<div ${onclick} style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 2px; border-radius:8px; ${cursor} ${tentative} ${todayRing}">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:600;">${escapeHtml(dayShort)}</div>
+          <div style="font-size:9px; color:var(--text-soft);">${cellDate.getDate()}</div>
+          <div style="width:18px; height:18px; border-radius:50%; ${dotStyle}" title="${escapeHtml(c.label)}${dur ? ' · ' + dur + ' min' : ''}"></div>
+          ${minLabel}
+        </div>`;
+      }).join('');
+
+      return `<div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 10px; margin-bottom:8px; ${row.isTentative ? 'border-style:dashed;' : ''}">
+        <div style="display:flex; align-items:center; margin-bottom:8px; padding: 0 4px;">
+          <div style="font-size:12px; font-weight:700; color:var(--text);">${escapeHtml(headerLabel)}</div>
+          ${phaseTag}
+          <span style="font-size:10px; color:var(--text-soft); margin-left:8px;">${escapeHtml(dateRange)}</span>
+          ${hoursTag}
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;">${cells}</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="section-label plain" style="margin: 4px 0 8px;">${icon('calendar', { size: 14 })} Upcoming calendar</div>
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Color-coded look-ahead. Tap any session in the next two weeks to see details. Weeks 3 &amp; 4 are tentative — the plan adapts based on what you actually train.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">${legendHtml}</div>
+      ${weekHtml}
+    `;
   }
 
   function renderBanners() {
@@ -9906,6 +10074,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderTodayRationaleSlot();
     renderLogSession();
     renderWeekSessions();
+    renderUpcomingCalendar();
     renderRecentStravaSessions();
     renderProgressTab();
     renderPerformanceTab();
