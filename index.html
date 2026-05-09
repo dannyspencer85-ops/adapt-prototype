@@ -6786,34 +6786,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Map a real Date to the planned session for that day, if any. Used by
   // the month grid to look up plan sessions across the 24-week fullPlan.
   function _sessionForDate(targetDate) {
-    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
-    if (!fullPlan) {
-      // Rule fallback — only the current week is populated.
-      const today = new Date(); today.setHours(0,0,0,0);
-      const dayDelta = Math.round((targetDate - today) / (24*60*60*1000));
-      const todayDow = today.getDay();
-      const daysBackToMon = (todayDow + 6) % 7;
-      const weekMonStart = -daysBackToMon;
-      const weekSunEnd = 6 - daysBackToMon;
-      if (dayDelta < weekMonStart || dayDelta > weekSunEnd) return null;
-      const dayName = DAYS[(targetDate.getDay() + 6) % 7]; // Mon=0..Sun=6
-      return planState.sessions[dayName] || null;
-    }
-    // AI plan path — derive week index from race date / first plan week.
+    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) && planState.fullPlan.weeks.length > 0 ? planState.fullPlan : null;
     const today = new Date(); today.setHours(0,0,0,0);
     const todayDow = today.getDay();
     const daysBackToMon = (todayDow + 6) % 7;
     const currentMonStart = new Date(today);
     currentMonStart.setDate(today.getDate() - daysBackToMon);
-    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
-    // Days from current week's Monday to target date.
     const daysFromCurrentMon = Math.round((targetDate - currentMonStart) / (24*60*60*1000));
-    if (daysFromCurrentMon < 0 || daysFromCurrentMon > 6 * 7 + 6) return null; // out of plan window
+    const dayInWeek = ((daysFromCurrentMon % 7) + 7) % 7; // 0=Mon..6=Sun, safe for negatives
+    const dayName = DAYS[dayInWeek];
+
+    if (!fullPlan) {
+      // No multi-week plan available. Show the current-week shape repeated
+      // forward as tentative, but only for ±1 week. Beyond that, leave blank.
+      if (daysFromCurrentMon < -7 || daysFromCurrentMon > 13) return null;
+      return planState.sessions[dayName] || null;
+    }
+    // Walk the multi-week plan. Each week index maps to current+offset.
+    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
     const targetWeekOffset = Math.floor(daysFromCurrentMon / 7);
     const targetWeekIdx = currentIdx + targetWeekOffset;
-    if (targetWeekIdx < 0 || targetWeekIdx >= fullPlan.weeks.length) return null;
-    const dayInWeek = daysFromCurrentMon - targetWeekOffset * 7;
-    const dayName = DAYS[dayInWeek];
+    if (targetWeekIdx < 0 || targetWeekIdx >= fullPlan.weeks.length) {
+      // Outside the planned window. For days within ±7 of the current week,
+      // fall back to the current-week shape so the visual stays continuous.
+      if (daysFromCurrentMon >= -7 && daysFromCurrentMon < 0) {
+        return planState.sessions[dayName] || null;
+      }
+      return null;
+    }
     return fullPlan.weeks[targetWeekIdx].sessions ? fullPlan.weeks[targetWeekIdx].sessions[dayName] : null;
   }
 
@@ -9864,16 +9864,121 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     planState.sessions = newSessions;
     planState.raceEvent = event;
 
+    // ── Build a multi-week fullPlan + matching weekArc ──
+    // Previously the rule fallback only filled the current week's sessions
+    // and 6 weekArc cells. The calendar then showed blank cells past day 7.
+    // Now we generate N weeks with phase-based volume scaling and a real
+    // taper. Each week reuses the current week's discipline allocation
+    // (same Mon–Sun shape) but durations scale per phase ratio.
     const weeksToRace = Math.max(1, Math.ceil(getDaysToRace() / 7));
-    const weeks = [];
-    const weekLabels = ['Base', 'Build', 'Build', 'Peak', 'Back-off', 'Taper · Race week'];
-    const arcLength = Math.min(6, weeksToRace);
-    for (let i = 0; i < arcLength; i++) {
-      const ratio = i === arcLength - 1 ? 0.5 : i === arcLength - 2 ? 0.85 : 1 + (i * 0.05);
-      const weekHours = Math.max(2, hours * ratio);
-      weeks.push({ dates: `Week ${i + 1}`, hours: `${Math.floor(weekHours)}:${String(Math.round((weekHours - Math.floor(weekHours)) * 60)).padStart(2,'0')}`, focus: weekLabels[i] || 'Build', current: i === 0 });
+    const totalWeeks = Math.min(24, Math.max(4, weeksToRace));
+    const weekArc = [];
+    const fullPlanWeeks = [];
+
+    // Phase ratio for each week index given the total. Mirrors the AI
+    // prompt's periodization (base ramp → peak → taper).
+    function _ratioForWeek(i, total) {
+      // Last week is race week (50%), week before is taper (75%).
+      if (i === total - 1) return 0.5;
+      if (i === total - 2) return 0.75;
+      // Penultimate two weeks are peak (100%), then back-off (85%).
+      if (i === total - 3) return 0.85;
+      if (i === total - 4) return 1.0;
+      // Earlier weeks: base ramp 70% → 95% over the build period.
+      const buildLen = Math.max(1, total - 4);
+      const t = Math.min(1, i / buildLen);
+      // Every 4th week deload (drop 15%).
+      const isDeload = (i + 1) % 4 === 0 && i < total - 4;
+      const base = 0.7 + (0.95 - 0.7) * t;
+      return isDeload ? base * 0.8 : base;
     }
-    planState.weekArc = weeks;
+    function _phaseLabel(i, total) {
+      if (i === total - 1) return 'Race week';
+      if (i === total - 2) return 'Taper';
+      if (i === total - 3) return 'Back-off';
+      if (i === total - 4) return 'Peak';
+      const buildLen = Math.max(1, total - 4);
+      const t = i / buildLen;
+      if (t < 0.33) return 'Base 1';
+      if (t < 0.66) return 'Base 2';
+      return 'Build';
+    }
+    function _scaleSession(template, ratio) {
+      if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
+      const d = Math.round((template.duration || 0) * ratio);
+      // Race week: substitute long efforts with short race-pace primers.
+      const isRace = ratio <= 0.55;
+      const isTaper = ratio <= 0.8 && ratio > 0.55;
+      let name = template.name;
+      let meta = template.meta;
+      let prescription = template.prescription || '';
+      if (isRace && template.type !== 'rest') {
+        name = template.name + ' (race-week primer)';
+        meta = `${d} min · short race-pace primer`;
+        prescription = `Short pre-race shakeout: ${d} min easy with 3-4 short pickups at race pace. Don't tire yourself out.`;
+      } else if (isTaper && (template.type === 'quality' || template.type === 'brick')) {
+        name = template.name + ' (taper)';
+        meta = `${d} min · sharper, shorter`;
+        prescription = `Taper-week version: ${prescription || 'maintain quality'}. Cut total volume; keep sharp efforts at race pace.`;
+      }
+      return {
+        ...template,
+        name,
+        meta: meta || (template.meta ? `${d} min` : 'Recovery'),
+        duration: d,
+        prescription,
+      };
+    }
+
+    // Anchor "current" week to whichever index is at the start of the plan.
+    // For now, always render forward from week 0 = current week.
+    for (let i = 0; i < totalWeeks; i++) {
+      const ratio = _ratioForWeek(i, totalWeeks);
+      const phase = _phaseLabel(i, totalWeeks);
+      const weekHours = Math.max(2, hours * ratio);
+      const isCurrent = i === 0;
+
+      // Scale every Mon-Sun session by this week's ratio. Rest stays rest.
+      const scaledSessions = {};
+      DAYS.forEach(d => {
+        scaledSessions[d] = _scaleSession(newSessions[d], ratio);
+      });
+
+      // Compute the calendar date label for this week's Monday.
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayDow = today.getDay();
+      const daysBackToMon = (todayDow + 6) % 7;
+      const weekMon = new Date(today);
+      weekMon.setDate(today.getDate() - daysBackToMon + i * 7);
+      const weekSun = new Date(weekMon);
+      weekSun.setDate(weekMon.getDate() + 6);
+      const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateRange = `${monthShort[weekMon.getMonth()]} ${weekMon.getDate()}–${weekMon.getMonth() === weekSun.getMonth() ? weekSun.getDate() : monthShort[weekSun.getMonth()] + ' ' + weekSun.getDate()}`;
+
+      weekArc.push({
+        dates: dateRange,
+        hours: `${Math.floor(weekHours)}:${String(Math.round((weekHours - Math.floor(weekHours)) * 60)).padStart(2,'0')}`,
+        focus: phase,
+        current: isCurrent,
+      });
+      fullPlanWeeks.push({
+        weekIndex: i,
+        label: `Week ${i + 1} — ${phase}`,
+        phase,
+        weeklyTotalMin: Math.round(weekHours * 60),
+        focus: phase,
+        deload: ratio < 0.85 && i < totalWeeks - 4,
+        sessions: scaledSessions,
+      });
+    }
+
+    planState.weekArc = weekArc;
+    planState.fullPlan = {
+      summary: `Auto-generated ${event} plan. ${totalWeeks} weeks at ~${hours} hr/week with phase-based progression and a 2-week taper. Rule-engine fallback — re-run with AI when network is available for a fully periodized plan.`,
+      weeks: fullPlanWeeks,
+      notesForUser: ['This plan was generated locally. Re-connect AI in Profile to get a fully periodized version with calibrated paces.'],
+    };
+    planState.activeWeekIdx = 0;
     saveUserData();
   }
 
