@@ -6761,75 +6761,103 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // UPCOMING CALENDAR — 4-week color-coded look-ahead on the Plan tab.
-  // Weeks 1-2: concrete (current + next, populated from planState.fullPlan).
-  // Weeks 3-4: tentative (read from fullPlan if present; rendered with a
-  //   "tentative" visual treatment since the engine adapts week-to-week).
-  // Each cell is tappable for the next 2 weeks (opens session modal).
+  // UPCOMING CALENDAR — true month-grid view on the Plan tab.
+  // Classic Mon-Sun grid (5-6 rows). Each cell carries the day number plus
+  // a sport-color-tinted background for instant scanning. Today gets a
+  // primary ring. Past completed days show a check overlay; past missed
+  // days are muted. Tappable cells open the session modal. The user can
+  // page month-to-month with the prev/next arrows.
+  //
+  // Lightweight state lives on a module-level _calMonthOffset so the
+  // pagination survives renderAll() refreshes (renderAll redraws the grid
+  // for the same offset rather than resetting to the current month).
   // ──────────────────────────────────────────────────────────────────────
+  let _calMonthOffset = 0; // 0 = current month, 1 = next, -1 = previous
+
+  function navUpcomingCalendar(delta) {
+    _calMonthOffset = Math.max(-1, Math.min(6, _calMonthOffset + delta));
+    renderUpcomingCalendar();
+  }
+  function resetUpcomingCalendar() {
+    _calMonthOffset = 0;
+    renderUpcomingCalendar();
+  }
+
+  // Map a real Date to the planned session for that day, if any. Used by
+  // the month grid to look up plan sessions across the 24-week fullPlan.
+  function _sessionForDate(targetDate) {
+    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
+    if (!fullPlan) {
+      // Rule fallback — only the current week is populated.
+      const today = new Date(); today.setHours(0,0,0,0);
+      const dayDelta = Math.round((targetDate - today) / (24*60*60*1000));
+      const todayDow = today.getDay();
+      const daysBackToMon = (todayDow + 6) % 7;
+      const weekMonStart = -daysBackToMon;
+      const weekSunEnd = 6 - daysBackToMon;
+      if (dayDelta < weekMonStart || dayDelta > weekSunEnd) return null;
+      const dayName = DAYS[(targetDate.getDay() + 6) % 7]; // Mon=0..Sun=6
+      return planState.sessions[dayName] || null;
+    }
+    // AI plan path — derive week index from race date / first plan week.
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayDow = today.getDay();
+    const daysBackToMon = (todayDow + 6) % 7;
+    const currentMonStart = new Date(today);
+    currentMonStart.setDate(today.getDate() - daysBackToMon);
+    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+    // Days from current week's Monday to target date.
+    const daysFromCurrentMon = Math.round((targetDate - currentMonStart) / (24*60*60*1000));
+    if (daysFromCurrentMon < 0 || daysFromCurrentMon > 6 * 7 + 6) return null; // out of plan window
+    const targetWeekOffset = Math.floor(daysFromCurrentMon / 7);
+    const targetWeekIdx = currentIdx + targetWeekOffset;
+    if (targetWeekIdx < 0 || targetWeekIdx >= fullPlan.weeks.length) return null;
+    const dayInWeek = daysFromCurrentMon - targetWeekOffset * 7;
+    const dayName = DAYS[dayInWeek];
+    return fullPlan.weeks[targetWeekIdx].sessions ? fullPlan.weeks[targetWeekIdx].sessions[dayName] : null;
+  }
+
   function renderUpcomingCalendar() {
     const el = document.getElementById('upcomingCalendar');
     if (!el) return;
     if (!planState.sessions) { el.innerHTML = ''; return; }
 
-    // Build a 4-week × 7-day matrix from the AI plan if available, falling
-    // back to current-week sessions if the rule engine produced only one.
-    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
-    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
-    const totalWeeks = fullPlan ? fullPlan.weeks.length : 1;
-    const weekRows = [];
-    for (let off = 0; off < 4; off++) {
-      const target = currentIdx + off;
-      if (fullPlan && fullPlan.weeks[target]) {
-        weekRows.push({
-          offset: off,
-          weekIndex: target,
-          isTentative: off >= 2,
-          isPast: false,
-          isCurrent: off === 0,
-          sessions: fullPlan.weeks[target].sessions || {},
-          phase: (planState.weekArc && planState.weekArc[target] && planState.weekArc[target].focus) || '',
-          hours: (planState.weekArc && planState.weekArc[target] && planState.weekArc[target].hours) || '',
-        });
-      } else if (off === 0) {
-        // Rule-engine fallback only fills the current week.
-        weekRows.push({
-          offset: 0,
-          weekIndex: currentIdx,
-          isTentative: false,
-          isPast: false,
-          isCurrent: true,
-          sessions: planState.sessions,
-          phase: (planState.weekArc && planState.weekArc[currentIdx] && planState.weekArc[currentIdx].focus) || '',
-          hours: (planState.weekArc && planState.weekArc[currentIdx] && planState.weekArc[currentIdx].hours) || '',
-        });
-      }
-    }
-    if (weekRows.length === 0) { el.innerHTML = ''; return; }
+    // The visible month — current month + _calMonthOffset.
+    const today = new Date(); today.setHours(0,0,0,0);
+    const monthAnchor = new Date(today.getFullYear(), today.getMonth() + _calMonthOffset, 1);
+    const monthYear = monthAnchor.getFullYear();
+    const monthIdx = monthAnchor.getMonth();
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthLabel = `${monthNames[monthIdx]} ${monthYear}`;
 
-    // Compute date range for each week so labels are meaningful.
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const todayDow = today.getDay(); // 0=Sun, 1=Mon, ...
-    // Treat Mon as week start. Days back to current week's Mon:
-    const daysBackToMon = (todayDow + 6) % 7;
-    const weekMon = new Date(today);
-    weekMon.setDate(today.getDate() - daysBackToMon);
+    // Compute the grid cells: start from the Monday on/before the 1st, end on
+    // the Sunday on/after the last day of the month. Always 6 rows × 7 cols
+    // (max 42 cells) so layout doesn't jump month-to-month.
+    const firstOfMonth = new Date(monthYear, monthIdx, 1);
+    const firstDow = firstOfMonth.getDay(); // 0=Sun..6=Sat
+    const daysFromMon = (firstDow + 6) % 7; // distance back to nearest Monday
+    const gridStart = new Date(firstOfMonth);
+    gridStart.setDate(firstOfMonth.getDate() - daysFromMon);
 
-    // Sport types we consider "training" (everything except pure rest).
+    // Detect the race date so we can mark it on the grid.
+    let raceDate = null;
+    try {
+      const raw = planState.raceDate || localStorage.getItem('race-date') || '';
+      if (raw) { raceDate = new Date(raw + 'T00:00:00'); raceDate.setHours(0,0,0,0); }
+    } catch (e) {}
+
+    // Build legend from sport types that appear anywhere in the visible month.
     const TRAINING_TYPES = new Set(['run','bike','swim','brick','quality','strength','mobility','walk']);
-    // Build legend from sport types actually present in the visible 4 weeks.
     const presentTypes = new Set();
-    weekRows.forEach(r => {
-      DAYS.forEach(d => {
-        const s = r.sessions[d];
-        if (s && s.type && TRAINING_TYPES.has(s.type)) presentTypes.add(s.type);
-      });
-    });
-    // Include rest if any non-training day exists.
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      if (d.getMonth() !== monthIdx) continue;
+      const s = _sessionForDate(d);
+      if (s && s.type && TRAINING_TYPES.has(s.type)) presentTypes.add(s.type);
+    }
     presentTypes.add('rest');
 
-    // Render legend.
     const legendOrder = ['run','bike','swim','brick','quality','strength','mobility','walk','rest'];
     const legendHtml = legendOrder
       .filter(t => presentTypes.has(t))
@@ -6841,66 +6869,122 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         </div>`;
       }).join('');
 
-    // Render each week row as a 7-cell grid.
-    const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const weekHtml = weekRows.map(row => {
-      const rowMon = new Date(weekMon);
-      rowMon.setDate(weekMon.getDate() + row.offset * 7);
-      const rowSun = new Date(rowMon);
-      rowSun.setDate(rowMon.getDate() + 6);
-      const dateRange = `${monthShort[rowMon.getMonth()]} ${rowMon.getDate()}–${rowMon.getMonth() === rowSun.getMonth() ? rowSun.getDate() : monthShort[rowSun.getMonth()] + ' ' + rowSun.getDate()}`;
-      const headerLabel = row.offset === 0 ? 'This week'
-        : row.offset === 1 ? 'Next week'
-        : row.offset === 2 ? 'Week 3 (tentative)'
-        : 'Week 4 (tentative)';
-      const phaseTag = row.phase ? `<span style="font-size:10px; color:var(--text-soft); margin-left:8px; text-transform:uppercase; letter-spacing:0.4px;">${escapeHtml(row.phase)}</span>` : '';
-      const hoursTag = row.hours ? `<span style="font-size:11px; color:var(--text-soft); margin-left:auto; font-weight:500;">${escapeHtml(row.hours)} hr</span>` : '';
+    // Day-of-week header.
+    const dayHeaderHtml = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+      .map(d => `<div style="text-align:center; font-size:10px; font-weight:700; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; padding:6px 0;">${d}</div>`)
+      .join('');
 
-      const cells = DAYS.map((d, i) => {
-        const s = row.sessions[d] || {};
-        const type = s.type || 'rest';
-        const c = sportColor(type);
-        const dur = Number(s.duration || s.durationMin || 0);
-        const isRest = type === 'rest' || dur === 0;
-        const cellDate = new Date(rowMon);
-        cellDate.setDate(rowMon.getDate() + i);
-        const isToday = row.isCurrent && cellDate.getTime() === today.getTime();
-        const tappable = row.offset <= 1 && !isRest;
-        const onclick = tappable ? `onclick="openSessionModal('${d}', ${row.offset})"` : '';
-        const cursor = tappable ? 'cursor:pointer;' : 'cursor:default;';
-        const tentative = row.isTentative ? 'opacity: 0.7;' : '';
-        const todayRing = isToday ? `box-shadow: 0 0 0 2px var(--primary);` : '';
-        const dotStyle = isRest
-          ? `background:${c.bg}; border:1px solid #d0d0d0;`
-          : `background:${c.bg};`;
-        const minLabel = !isRest && dur > 0 ? `<div style="font-size:9px; color:var(--text-soft); margin-top:2px; line-height:1;">${dur}m</div>` : '';
-        const dayShort = dayLabels[i].slice(0, 1); // Single letter for compactness
-        return `<div ${onclick} style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 2px; border-radius:8px; ${cursor} ${tentative} ${todayRing}">
-          <div style="font-size:10px; color:var(--text-soft); font-weight:600;">${escapeHtml(dayShort)}</div>
-          <div style="font-size:9px; color:var(--text-soft);">${cellDate.getDate()}</div>
-          <div style="width:18px; height:18px; border-radius:50%; ${dotStyle}" title="${escapeHtml(c.label)}${dur ? ' · ' + dur + ' min' : ''}"></div>
-          ${minLabel}
-        </div>`;
-      }).join('');
-
-      return `<div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px 10px; margin-bottom:8px; ${row.isTentative ? 'border-style:dashed;' : ''}">
-        <div style="display:flex; align-items:center; margin-bottom:8px; padding: 0 4px;">
-          <div style="font-size:12px; font-weight:700; color:var(--text);">${escapeHtml(headerLabel)}</div>
-          ${phaseTag}
-          <span style="font-size:10px; color:var(--text-soft); margin-left:8px;">${escapeHtml(dateRange)}</span>
-          ${hoursTag}
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;">${cells}</div>
+    // 42 cells (6 rows × 7 days).
+    let cellsHtml = '';
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      const isInMonth = d.getMonth() === monthIdx;
+      const isToday = d.getTime() === today.getTime();
+      const isPast = d.getTime() < today.getTime();
+      const isRaceDay = raceDate && d.getTime() === raceDate.getTime();
+      const s = isInMonth ? _sessionForDate(d) : null;
+      const type = s && s.type ? s.type : 'rest';
+      const c = sportColor(type);
+      const dur = s ? Number(s.duration || s.durationMin || 0) : 0;
+      const isRest = type === 'rest' || dur === 0;
+      const isCompleted = s && s.completed;
+      // Tentative if more than 14 days from today (plan adapts week-to-week).
+      const daysFromToday = Math.round((d - today) / (24*60*60*1000));
+      const isTentative = !isPast && daysFromToday > 14;
+      // Compute look.
+      let bgColor = '#fff';
+      let textColor = isInMonth ? 'var(--text)' : '#cccccc';
+      let opacity = isInMonth ? '1' : '0.35';
+      let borderStyle = '1px solid var(--border)';
+      let borderRadius = '8px';
+      let dotHtml = '';
+      let badgeHtml = '';
+      if (isInMonth && s && !isRest) {
+        // Tinted background using the sport color at low opacity.
+        bgColor = c.bg + '22'; // ~13% alpha hex
+        // Color dot in the corner.
+        dotHtml = `<div style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:${c.bg};"></div>`;
+        if (isTentative) opacity = '0.55';
+      }
+      if (isInMonth && isRest && !isPast) {
+        // Subtle rest marker.
+        bgColor = '#fafafa';
+      }
+      if (isPast && isCompleted) {
+        // Completed past sessions: green check overlay + slightly muted.
+        badgeHtml = `<div style="position:absolute; bottom:3px; right:4px; width:11px; height:11px; border-radius:50%; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:11px; text-align:center;">✓</div>`;
+        opacity = '0.85';
+      } else if (isPast && s && !isRest && !isCompleted) {
+        // Past + planned but not logged: greyscale tint.
+        bgColor = '#f4f4f4';
+        opacity = '0.55';
+      } else if (isPast) {
+        opacity = '0.4';
+      }
+      if (isToday) {
+        borderStyle = '2px solid var(--primary)';
+      }
+      if (isRaceDay) {
+        // Race day stands out — gold border + flag.
+        borderStyle = '2px solid #D9A94A';
+        bgColor = '#FBF0D3';
+        badgeHtml = `<div style="position:absolute; top:3px; left:3px; font-size:10px;">🏁</div>`;
+      }
+      // Tappable when the day has a session AND it's within the plan window.
+      const tappable = isInMonth && s && !isRest;
+      const onclick = tappable ? `onclick="_openCalendarDay(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})"` : '';
+      const cursor = tappable ? 'cursor:pointer;' : 'cursor:default;';
+      // Tooltip for hover/long-press.
+      const tooltip = s && !isRest
+        ? `${escapeAttr(c.label)}${dur ? ' · ' + dur + ' min' : ''}${s.name ? ' — ' + escapeAttr(sanitizeSessionName(s.name)) : ''}`
+        : isRest && isInMonth ? 'Rest day' : '';
+      cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
+        <div style="font-size:12px; font-weight:${isToday ? '700' : '500'}; color:${textColor}; line-height:1;">${d.getDate()}</div>
+        ${dotHtml}
+        ${badgeHtml}
       </div>`;
-    }).join('');
+    }
+
+    // Header with month nav.
+    const headerHtml = `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <button onclick="navUpcomingCalendar(-1)" aria-label="Previous month" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">‹</button>
+      <div style="font-size:14px; font-weight:700; color:var(--text);">${escapeHtml(monthLabel)}${_calMonthOffset !== 0 ? ` <button onclick="resetUpcomingCalendar()" style="background:none; border:0; color:var(--primary); font-size:11px; font-weight:600; cursor:pointer; margin-left:6px; font-family:inherit;">today</button>` : ''}</div>
+      <button onclick="navUpcomingCalendar(1)" aria-label="Next month" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">›</button>
+    </div>`;
 
     el.innerHTML = `
-      <div class="section-label plain" style="margin: 4px 0 8px;">${icon('calendar', { size: 14 })} Upcoming calendar</div>
-      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Color-coded look-ahead. Tap any session in the next two weeks to see details. Weeks 3 &amp; 4 are tentative — the plan adapts based on what you actually train.</div>
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">${legendHtml}</div>
-      ${weekHtml}
+      <div class="section-label plain" style="margin: 4px 0 8px; display:flex; align-items:center; gap:6px;">${icon('calendar', { size: 14 })} Training calendar</div>
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Each day's color shows the planned activity. Tap any day to see details. Faded days are tentative — the plan adapts based on what you actually train.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${legendHtml}</div>
+      <div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px;">
+        ${headerHtml}
+        <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;">${dayHeaderHtml}</div>
+        <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; margin-top:4px;">${cellsHtml}</div>
+      </div>
     `;
+  }
+
+  // Resolve a real Date back into (dayName, weekOffset) so openSessionModal
+  // can show the right session even for future weeks.
+  function _openCalendarDay(year, monthIdx, dateNum) {
+    const target = new Date(year, monthIdx, dateNum);
+    target.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayDow = today.getDay();
+    const daysBackToMon = (todayDow + 6) % 7;
+    const currentMonStart = new Date(today);
+    currentMonStart.setDate(today.getDate() - daysBackToMon);
+    const daysFromCurrentMon = Math.round((target - currentMonStart) / (24*60*60*1000));
+    const weekOffset = Math.floor(daysFromCurrentMon / 7);
+    const dayInWeek = daysFromCurrentMon - weekOffset * 7;
+    const dayName = DAYS[(dayInWeek % 7 + 7) % 7];
+    if (typeof openSessionModal === 'function') openSessionModal(dayName, weekOffset);
+  }
+
+  // Tiny attribute-safe escape for tooltips.
+  function escapeAttr(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
 
   function renderBanners() {
