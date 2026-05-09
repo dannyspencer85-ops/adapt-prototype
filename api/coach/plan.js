@@ -144,7 +144,7 @@ export default async function handler(req) {
 
   // Validate + normalize. If validation fails, return the failure to the
   // caller — the frontend can fall back to its rule engine.
-  const validation = validatePlan(parsed, { event, hours, days, weeksToRace });
+  const validation = validatePlan(parsed, { event, hours, days, weeksToRace, availableDisciplines });
   if (!validation.ok) {
     return new Response(JSON.stringify({
       ok: false,
@@ -433,7 +433,7 @@ Your plans MUST reflect these established frameworks:
 
 • Use ONLY the user's selected training days for sessions. Other days = full rest. Do not invent training days.
 • **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — even if the user has 'swim' or 'bike' in their list — DO NOT prescribe swim or bike on a primary quality day. Swim/bike are cross-training only when the event is a triathlon. For run events, every "quality" or "long" day is a RUN day.
-• For run events: allowed types are {'run', 'rest', ${hasStrength ? "'strength'" : "/* no strength access */"}, 'mobility'}. Never 'swim', never 'bike' (unless explicitly cross-training in cases of injury, and even then label it as 'run' replacement, not a primary session).
+• For run events: allowed types are ${hasStrength ? "{'run', 'rest', 'strength', 'mobility'}" : "{'run', 'rest', 'mobility'}"}. Never 'swim', never 'bike' (unless explicitly cross-training in cases of injury, and even then label it as 'run' replacement, not a primary session).
 • For triathlon events: types follow the discipline allocation rules in the discipline note.
 • Total weekly minutes must be within ±15% of the user's stated weekly hours × 60. (User said ${hours} hrs/week → target ~${Math.round(hours * 60)} min/week.)
 • Each week must have at least one full rest day (duration:0, type:'rest'). Two if hours <= 4.
@@ -509,10 +509,29 @@ If you change durationMin, the prescription text must reflect the new total. If 
 NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
 }
 
+// Server-side mirror of the client's RACE_MIN_HOURS so the AI prompt knows
+// when the user is below the safe minimum for their event. Keep these
+// values in sync with the client list in index.html.
+const RACE_MIN_HOURS_SERVER = {
+  '5K':                { floorMin: 1.5, recMin: 2.5 },
+  '10K':               { floorMin: 2.5, recMin: 3.5 },
+  'Half Marathon':     { floorMin: 3.5, recMin: 5 },
+  'Marathon':          { floorMin: 5,   recMin: 6.5 },
+  'Sprint Triathlon':  { floorMin: 3,   recMin: 5 },
+  'Olympic Triathlon': { floorMin: 5,   recMin: 7 },
+  'Half Ironman':      { floorMin: 7,   recMin: 9 },
+  'Full Ironman':      { floorMin: 10,  recMin: 12 },
+};
+
 function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location }) {
   const limiter = (triFocus && triFocus.limiter) || '';
   const strategy = (triFocus && triFocus.strategy) || '';
   const discList = Array.isArray(availableDisciplines) && availableDisciplines.length > 0 ? availableDisciplines.join(', ') : '';
+  // Under-volume detection — flag if user's available hours is below the
+  // race's safe minimum so the AI tempers its plan accordingly.
+  const minProf = RACE_MIN_HOURS_SERVER[event];
+  const underVolume = minProf && Number(hours) < minProf.floorMin;
+  const tightVolume = minProf && Number(hours) < minProf.recMin && !underVolume;
   return `Generate a complete periodized training plan for me.
 
 Inputs:
@@ -521,6 +540,7 @@ Inputs:
 - Weeks to race: ${weeksToRace}
 - Weekly hours available: ${hours}
 - Training days: ${days.join(', ')}
+${underVolume ? `\n⚠ UNDER-VOLUME ALERT: ${hours} hr/week is BELOW the safe minimum (${minProf.floorMin} hr) for a ${event}. Build the plan as a "base-fitness build" — do NOT promise race-day readiness. Use base aerobic work, conservative progression, no high-volume long sessions. In notesForUser, include a clear note: "Your weekly volume is below the safe minimum for ${event}. This plan builds base fitness — to safely race the distance, increase weekly hours or pick a shorter race."` : ''}${tightVolume ? `\n⚠ TIGHT VOLUME: ${hours} hr/week is on the low end for a ${event} (recommended ${minProf.recMin}+ hr). Build a finish-focused plan — prioritize the long session, drop optional quality where it would crowd recovery. In notesForUser, mention this is a finish-focused build, not a time-goal build.` : ''}
 - Location: ${location || 'unspecified'}
 ${discList ? '- Available disciplines (only prescribe these): ' + discList : ''}
 ${courseIntel && courseIntel.terrain ? '- Course terrain: ' + courseIntel.terrain : ''}
@@ -549,7 +569,14 @@ Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) p
 const VALID_TYPES = ['run','bike','swim','strength','brick','mobility','rest','quality'];
 const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnessMarkers }) {
+function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnessMarkers, availableDisciplines }) {
+  // Server-side discipline enforcement. Mirrors run-only coercion below for
+  // swim/bike/strength suppression when the user has no access. Defense in
+  // depth — the AI sometimes slips a swim into a "no pool" plan; we coerce.
+  const _avail = Array.isArray(availableDisciplines) ? availableDisciplines : [];
+  const _hasSwim = _avail.length === 0 || _avail.includes('swim');
+  const _hasBike = _avail.length === 0 || _avail.includes('bike') || _avail.includes('trainer');
+  const _hasStrength = _avail.length === 0 || _avail.includes('strength');
   if (!parsed || typeof parsed !== 'object') return { ok: false, reason: 'plan is not an object' };
   if (typeof parsed.summary !== 'string') return { ok: false, reason: 'missing summary' };
   if (!Array.isArray(parsed.weeks) || parsed.weeks.length === 0) return { ok: false, reason: 'missing weeks array' };
@@ -607,6 +634,24 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
         sess.name = sess.name && !/run/i.test(sess.name) ? `Easy run (was ${original})` : (sess.name || 'Easy run');
         sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from ${original} to run — this is a run-only event.]`;
       }
+      // Discipline-access enforcement: coerce sessions the user can't do.
+      if (!_hasSwim && sess.type === 'swim') {
+        sess.type = _hasBike ? 'bike' : (_hasStrength ? 'strength' : 'rest');
+        sess.name = sess.type === 'rest' ? 'Rest' : `Cross-train (no swim access)`;
+        sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from swim — user has no pool access.]`;
+        if (sess.type === 'rest') sess.durationMin = 0;
+      }
+      if (!_hasBike && (sess.type === 'bike' || sess.type === 'brick')) {
+        sess.type = _hasStrength ? 'strength' : 'rest';
+        sess.name = sess.type === 'rest' ? 'Rest' : `Cross-train (no bike access)`;
+        sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from bike — user has no bike/trainer access.]`;
+        if (sess.type === 'rest') sess.durationMin = 0;
+      }
+      if (!_hasStrength && sess.type === 'strength') {
+        sess.type = 'mobility';
+        sess.name = 'Mobility (no gym)';
+        sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from strength — user has no gym access. Use bodyweight + mobility instead.]`;
+      }
       // Beginner runner: cap any non-rest session at the week-appropriate max.
       // The AI keeps slipping into "fill the available hours" — defend in depth.
       const cap = beginnerSessionCapMin(wi);
@@ -633,7 +678,12 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
         qualityDays.push(DAYS_ORDER.indexOf(dayName));
       }
     }
-    if (restCount === 0) return { ok: false, reason: `week ${wi} has zero rest days` };
+    // Rest-day check: only enforce when the user has at least one non-training
+    // day. Users who selected all 7 days deserve plans without forced rest
+    // (the easy days serve that role). Triathletes commonly train 6-7 days/wk.
+    if (restCount === 0 && trainingDaySet.size < 7) {
+      return { ok: false, reason: `week ${wi} has zero rest days` };
+    }
     // Quality spacing: any two quality days within 1 day of each other = rejection.
     for (let i = 1; i < qualityDays.length; i++) {
       if (qualityDays[i] - qualityDays[i - 1] === 1) {

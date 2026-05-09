@@ -1764,12 +1764,18 @@
         <div class="field">
           <label>Hours per week you can train</label>
           <div class="chip-row" id="hoursChips">
-            <button class="chip" data-hours="2.5" onclick="singleChip(this)">2-3</button>
-            <button class="chip" data-hours="4" onclick="singleChip(this)">4</button>
-            <button class="chip" data-hours="5" onclick="singleChip(this)">5</button>
-            <button class="chip" data-hours="7" onclick="singleChip(this)">6-8</button>
-            <button class="chip" data-hours="10" onclick="singleChip(this)">9+</button>
+            <button class="chip" data-hours="2.5" onclick="singleChip(this); updateHoursVolumeWarning();">2-3</button>
+            <button class="chip" data-hours="4" onclick="singleChip(this); updateHoursVolumeWarning();">4</button>
+            <button class="chip" data-hours="5" onclick="singleChip(this); updateHoursVolumeWarning();">5</button>
+            <button class="chip" data-hours="7" onclick="singleChip(this); updateHoursVolumeWarning();">6-8</button>
+            <button class="chip" data-hours="10" onclick="singleChip(this); updateHoursVolumeWarning();">9+</button>
           </div>
+          <!-- Minimum volume warning — populated by updateHoursVolumeWarning()
+               whenever the user picks an hours chip. Hidden until a chip is
+               picked AND the selection is below the recommended minimum for
+               their race. -->
+          <div id="hoursVolumeWarn" style="display:none; margin-top:10px; padding:11px 13px; border-radius:12px; font-size:12.5px; line-height:1.5;"></div>
+          <div id="hoursVolumeFloor" style="display:block; margin-top:8px; font-size:11.5px; color:var(--text-soft); line-height:1.5;"></div>
         </div>
         <div class="field">
           <label>Which days work?</label>
@@ -1810,7 +1816,7 @@
           </div>
         </div>
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-full btn-lg" onclick="onbStep(5)">Next</button>
+          <button class="btn btn-primary btn-full btn-lg" onclick="confirmHoursFloorThenNext()">Next</button>
         </div>
       </div>
 
@@ -3331,6 +3337,141 @@
 </div>
 
 <script>
+  // ──────────────────────────────────────────────────────────────────────
+  // RACE MINIMUM WEEKLY HOURS
+  // The amount of training time a typical adult needs to PREPARE SAFELY
+  // for the distance — based on Hal Higdon Novice plans, Daniels' VDOT
+  // tables, USA Triathlon coaching guidelines, NHS/RW C25K progressions,
+  // and the volume floors that show up consistently in injury research
+  // (Nielsen 2014, Damsted 2018) for inexperienced runners.
+  //
+  // floorMin   = absolute minimum below which prep is unsafe / unrealistic
+  //              (high injury risk + likely DNF).
+  // recMin     = comfortable minimum — the volume that gives a reasonable
+  //              chance of a healthy build to race day for an average adult.
+  // recMax     = reasonable upper end for non-elite training — beyond this
+  //              you get diminishing returns and rising injury risk.
+  // ──────────────────────────────────────────────────────────────────────
+  const RACE_MIN_HOURS = {
+    '5K':                { floorMin: 1.5, recMin: 2.5, recMax: 5,  label: '5K' },
+    '10K':               { floorMin: 2.5, recMin: 3.5, recMax: 6,  label: '10K' },
+    'Half Marathon':     { floorMin: 3.5, recMin: 5,   recMax: 8,  label: 'Half Marathon' },
+    'Marathon':          { floorMin: 5,   recMin: 6.5, recMax: 10, label: 'Marathon' },
+    'Sprint Triathlon':  { floorMin: 3,   recMin: 5,   recMax: 8,  label: 'Sprint Triathlon' },
+    'Olympic Triathlon': { floorMin: 5,   recMin: 7,   recMax: 11, label: 'Olympic Triathlon' },
+    'Half Ironman':      { floorMin: 7,   recMin: 9,   recMax: 14, label: 'Half Ironman (70.3)' },
+    'Full Ironman':      { floorMin: 10,  recMin: 12,  recMax: 18, label: 'Full Ironman (140.6)' },
+    'General fitness (no event)': { floorMin: 1.5, recMin: 3, recMax: 8, label: 'General fitness' },
+  };
+
+  // Public — read whatever event the user has currently picked and return
+  // its minimum-hours profile, falling back gracefully.
+  function getRaceMinHours(eventName) {
+    if (!eventName) return null;
+    return RACE_MIN_HOURS[eventName] || null;
+  }
+
+  // Update the warning banner under the hours chip row whenever the user
+  // picks an hours chip OR navigates back into step 4 with a different
+  // event. Three states:
+  //   - below floorMin    → red, hard caution
+  //   - below recMin      → yellow, soft warning
+  //   - in or above recMin → hidden
+  function updateHoursVolumeWarning() {
+    const warn = document.getElementById('hoursVolumeWarn');
+    const floor = document.getElementById('hoursVolumeFloor');
+    if (!warn) return;
+    const event = document.getElementById('eventSelect')?.value || '';
+    const profile = getRaceMinHours(event);
+    // Always show the floor hint so the user sees the recommended range
+    // before they pick a chip.
+    if (floor && profile) {
+      floor.textContent = `For a ${profile.label}, plan on at least ${profile.recMin} hr/week. Below ${profile.floorMin} hr/week, the prep won't safely cover the distance.`;
+    } else if (floor) {
+      floor.textContent = '';
+    }
+    // Live warning only appears once the user picks an hours chip.
+    const activeChip = document.querySelector('#hoursChips .chip.active');
+    if (!activeChip || !profile) {
+      warn.style.display = 'none';
+      return;
+    }
+    const hours = parseFloat(activeChip.dataset.hours || '0');
+    if (hours >= profile.recMin) {
+      warn.style.display = 'none';
+      return;
+    }
+    if (hours < profile.floorMin) {
+      // Red: below the absolute minimum
+      warn.style.background = '#fde8e8';
+      warn.style.border = '1px solid #f5b5b5';
+      warn.style.color = '#7a2828';
+      warn.innerHTML = `<strong>⚠ ${hours} hr/week is too low for a ${profile.label}.</strong><br>Most ${profile.label} plans require <strong>${profile.floorMin}–${profile.recMin} hr/week minimum</strong>. At your current volume, the plan can only build base fitness — not prepare you for race day at this distance. Consider: pick a shorter race, push the date out, or commit to more hours.`;
+    } else {
+      // Yellow: below the comfortable minimum but above the floor
+      warn.style.background = '#fef6e0';
+      warn.style.border = '1px solid #e8c46b';
+      warn.style.color = '#7a5a18';
+      warn.innerHTML = `<strong>⚠ ${hours} hr/week is on the low end for a ${profile.label}.</strong><br>Doable, but the build is tight: expect a finish-focused race rather than a time goal. The recommended range for a healthy ${profile.label} build is <strong>${profile.recMin}–${profile.recMax} hr/week</strong>.`;
+    }
+    warn.style.display = 'block';
+  }
+
+  // Step 4 → 5 transition. If the user's chosen hours/week is below the
+  // absolute safe floor for their race, surface a confirm() before letting
+  // them proceed. Yellow-zone (below recMin but above floorMin) advances
+  // without a blocker — they've already seen the inline warning.
+  function confirmHoursFloorThenNext() {
+    const event = document.getElementById('eventSelect')?.value || '';
+    const profile = getRaceMinHours(event);
+    const activeChip = document.querySelector('#hoursChips .chip.active');
+    if (profile && activeChip) {
+      const hours = parseFloat(activeChip.dataset.hours || '0');
+      if (hours < profile.floorMin) {
+        const ok = confirm(
+          `${hours} hr/week is below the safe minimum (${profile.floorMin} hr) for a ${profile.label}.\n\n` +
+          `At this volume the plan can build base fitness but cannot safely prepare you for the distance. ` +
+          `Injury risk is elevated and finishing the race is uncertain.\n\n` +
+          `Recommended: pick a shorter race or commit to more hours. Continue anyway?`
+        );
+        if (!ok) return;
+      }
+    }
+    onbStep(5);
+  }
+
+  // Run-ability floor per long run-event. A walk-run / under-15 athlete trying
+  // to race a marathon is an injury setup — surface a confirm() at step 5→6
+  // (the "Build my plan" button).
+  const RACE_MIN_RUN_ABILITY = {
+    'Half Marathon': { minLevel: '15-30', label: 'Half Marathon', minDescription: '15-30 min continuous running' },
+    'Marathon':      { minLevel: '30-plus', label: 'Marathon', minDescription: '30+ min continuous running' },
+    'Half Ironman':  { minLevel: '30-plus', label: 'Half Ironman (70.3)', minDescription: '30+ min continuous running' },
+    'Full Ironman':  { minLevel: '30-plus', label: 'Full Ironman (140.6)', minDescription: '30+ min continuous running' },
+  };
+  // Ordered by capability (lowest → highest) for comparison.
+  const _RUN_ABILITY_RANK = { 'walk-run': 0, 'under-15': 1, '15-30': 2, '30-plus': 3, '30-60': 3, '60-plus': 4 };
+  // Returns true if the user has confirmed they accept building a long-event
+  // plan despite low running ability.
+  function checkRunAbilityFloor() {
+    const event = document.getElementById('eventSelect')?.value || '';
+    const gate = RACE_MIN_RUN_ABILITY[event];
+    if (!gate) return true;
+    const ability = getActiveChipVal('fmRunAbility');
+    if (!ability) return true; // not specified, skip the gate
+    const rank = _RUN_ABILITY_RANK[ability] != null ? _RUN_ABILITY_RANK[ability] : 99;
+    const minRank = _RUN_ABILITY_RANK[gate.minLevel] != null ? _RUN_ABILITY_RANK[gate.minLevel] : 0;
+    if (rank < minRank) {
+      return confirm(
+        `Heads up — you said you can currently do ${ability}, but a ${gate.label} typically requires ${gate.minDescription} as a starting point.\n\n` +
+        `The plan can build base fitness, but you may not be ready to safely race the distance on the planned date. ` +
+        `Strongly consider: pick a shorter event (5K or 10K), or push the race date out by 4-6 months to build the run base first.\n\n` +
+        `Continue with the ${gate.label} plan anyway?`
+      );
+    }
+    return true;
+  }
+
   function onbStep(n) {
     ['welcome','1','2','3','4','5','building'].forEach(s => {
       const el = document.getElementById('onb-' + s);
@@ -3338,7 +3479,7 @@
     });
     const target = n === 0 ? 'welcome' : n === 6 ? 'building' : String(n);
     document.getElementById('onb-' + target).style.display = 'block';
-    if (n === 4) populateDisciplineChips();
+    if (n === 4) { populateDisciplineChips(); updateHoursVolumeWarning(); }
     if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
     if (n === 5) { prefillFitnessMarkers(); adjustFmAdvancedVisibility(); }
     // Pre-fill the first-name field if we already have it stored (returning user
@@ -3902,6 +4043,9 @@
     if (document.querySelectorAll('#daysChips .chip.active').length === 0) missing.push('which days you can train (step 4)');
     const eventDateProbe = document.getElementById('eventDate');
     if (!eventDateProbe || !eventDateProbe.value) missing.push('event date (step 3)');
+    // Run-ability floor — block if user with low ability is targeting a long
+    // run event. Lets them confirm-and-continue if they really want to.
+    if (typeof checkRunAbilityFloor === 'function' && !checkRunAbilityFloor()) return;
     if (missing.length > 0) {
       alert('Before I can build your plan, please fill in: ' + missing.join(', ') + '.');
       // Send them to the earliest missing step.
@@ -9138,22 +9282,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const isMarathon = /Marathon/i.test(event) && !/Half/i.test(event);
     const isHalfMar = /Half Marathon/i.test(event);
     const isRun = isShortRun || isMarathon || isHalfMar;
-    const exp = (() => {
-      try {
-        const fm = JSON.parse(localStorage.getItem('fitness-markers') || 'null');
-        if (fm && fm.runAbility) return fm.runAbility;
-      } catch (e) {}
-      return null;
+    const isGeneral = /General fitness/i.test(event) || (!isTri && !isRun);
+    // Discipline awareness: read what the user actually has access to so we
+    // never prescribe a swim for someone with no pool, or a brick for a
+    // run-event athlete who unchecked Bike. Default = all four if unset.
+    let avail = [];
+    try { avail = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) { avail = []; }
+    if (!Array.isArray(avail) || avail.length === 0) avail = ['run','bike','trainer','swim','strength'];
+    const hasRun = avail.includes('run');
+    const hasBike = avail.includes('bike') || avail.includes('trainer');
+    const hasSwim = avail.includes('swim');
+    const hasStrength = avail.includes('strength');
+    // Run-only events HARD-coerce to run regardless of what was selected
+    // (matches plan.js validatePlan run-only coercion). Defense in depth.
+    const runOnlyEvent = isRun;
+    const fm = (() => {
+      try { return JSON.parse(localStorage.getItem('fitness-markers') || 'null'); } catch (e) { return null; }
     })();
-    // Detect beginner runner: experience='new' OR runAbility says <=15min
-    const expChip = (() => {
-      const m = (planState && planState.profile && planState.profile.exp) || null;
-      return m;
-    })();
-    const isBeginnerRunner = isShortRun && (
-      exp === 'walk-run' || exp === 'under-15' ||
-      // Best-effort fallback: if no markers and weekly hours is <=4, treat as beginner
-      (!exp && hours <= 4)
+    const runAbility = fm && fm.runAbility ? fm.runAbility : null;
+    const profileExp = (planState && planState.profile && planState.profile.exp) || null;
+    // Beginner runner detection — fires for ANY run event when ability is
+    // walk-run / under-15 OR experience is 'new'. Drops the lossy
+    // (!exp && hours<=4) heuristic that caught experienced low-volume athletes.
+    const isBeginnerRunner = isRun && (
+      runAbility === 'walk-run' ||
+      runAbility === 'under-15' ||
+      profileExp === 'new'
     );
 
     const blank = { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' };
@@ -9228,26 +9382,102 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           newSessions[easyDay] = { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
         }
       }
-    } else {
-      // Triathlon / general — original logic.
-      const longMins = isTri ? Math.min(180, Math.max(75, hours * 60 * 0.5)) : 60;
+    } else if (isTri) {
+      // Triathlon — discipline-aware. Brick only if user has BOTH bike AND
+      // run. Otherwise long day becomes the longest available discipline.
+      const longMins = Math.min(180, Math.max(75, hours * 60 * 0.5));
       const qualityMins = Math.min(75, Math.max(30, hours * 60 * 0.2));
       if (longDay) {
-        newSessions[longDay] = isTri
-          ? { name: 'Long brick', meta: `Bike ${Math.floor(longMins * 0.7 / 60)}:${String(Math.round(longMins * 0.7) % 60).padStart(2,'0')} + Run 0:30`, duration: Math.round(longMins), type: 'brick' }
-          : { name: 'Long run', meta: `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run' };
+        if (hasBike && hasRun) {
+          // Standard tri long brick
+          const bikeMins = Math.round(longMins * 0.7);
+          const runMins = Math.min(30, Math.round(longMins * 0.3));
+          newSessions[longDay] = {
+            name: 'Long brick',
+            meta: `Bike ${Math.floor(bikeMins/60)}:${String(bikeMins%60).padStart(2,'0')} + Run ${Math.floor(runMins/60)}:${String(runMins%60).padStart(2,'0')}`,
+            duration: Math.round(longMins), type: 'brick'
+          };
+        } else if (hasBike) {
+          newSessions[longDay] = { name: 'Long bike', meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · Zone 2 steady`, duration: Math.round(longMins), type: 'bike' };
+        } else if (hasRun) {
+          newSessions[longDay] = { name: 'Long run', meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run' };
+        } else if (hasSwim) {
+          newSessions[longDay] = { name: 'Long swim', meta: `${Math.round(longMins)} min · technique + endurance`, duration: Math.round(longMins), type: 'swim' };
+        }
       }
       if (qualityDay) {
-        newSessions[qualityDay] = isTri
-          ? { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' }
-          : { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+        // Quality session prefers the user's actual disciplines.
+        if (hasSwim && hasBike) {
+          newSessions[qualityDay] = { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasBike) {
+          newSessions[qualityDay] = { name: 'Bike intervals', meta: `${Math.round(qualityMins)} min · Quality (5×3 min @ threshold)`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasRun) {
+          newSessions[qualityDay] = { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasSwim) {
+          newSessions[qualityDay] = { name: 'Swim CSS set', meta: `${Math.round(qualityMins)} min · 8×100m at CSS pace`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasStrength) {
+          newSessions[qualityDay] = { name: 'Strength + mobility', meta: `${Math.round(qualityMins)} min · full-body, controlled tempo`, duration: Math.round(qualityMins), type: 'strength' };
+        }
       }
       if (easyDay) {
         const easyMins = Math.round(hours * 60 - longMins - qualityMins);
         if (easyMins > 30) {
-          newSessions[easyDay] = isTri
-            ? { name: 'Long easy run', meta: `${Math.floor(easyMins / 60)}:${String(easyMins % 60).padStart(2,'0')} · Zone 2`, duration: easyMins, type: 'run' }
-            : { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+          // Pick the easiest-to-recover discipline they have.
+          if (hasRun) {
+            newSessions[easyDay] = { name: 'Easy aerobic run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+          } else if (hasBike) {
+            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike' };
+          } else if (hasSwim) {
+            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · drills + smooth aerobic`, duration: easyMins, type: 'swim' };
+          }
+        }
+      }
+    } else {
+      // General fitness (no event) — discipline-aware variety week.
+      // Build a mixed week from whatever the user has access to. Avoids the
+      // old fallback which produced a generic running plan even for users
+      // with no run access.
+      const longMins = Math.min(75, Math.max(40, hours * 60 * 0.4));
+      const qualityMins = Math.min(60, Math.max(25, hours * 60 * 0.25));
+      // Long day — prefer a discipline that builds aerobic base.
+      if (longDay) {
+        if (hasRun) {
+          newSessions[longDay] = { name: 'Long aerobic run', meta: `${Math.round(longMins)} min · Zone 2`, duration: Math.round(longMins), type: 'run' };
+        } else if (hasBike) {
+          newSessions[longDay] = { name: 'Long bike', meta: `${Math.round(longMins)} min · Zone 2 steady`, duration: Math.round(longMins), type: 'bike' };
+        } else if (hasSwim) {
+          newSessions[longDay] = { name: 'Long swim', meta: `${Math.round(longMins)} min · technique-focused`, duration: Math.round(longMins), type: 'swim' };
+        } else if (hasStrength) {
+          newSessions[longDay] = { name: 'Full-body strength', meta: `${Math.round(longMins)} min · 4 rounds, compound lifts`, duration: Math.round(longMins), type: 'strength' };
+        }
+      }
+      // Quality day — variety: pick a discipline different from longDay's.
+      if (qualityDay) {
+        const longType = newSessions[longDay] && newSessions[longDay].type;
+        if (hasStrength && longType !== 'strength') {
+          newSessions[qualityDay] = { name: 'Strength', meta: `${Math.round(qualityMins)} min · 3 rounds, full-body`, duration: Math.round(qualityMins), type: 'strength' };
+        } else if (hasBike && longType !== 'bike') {
+          newSessions[qualityDay] = { name: 'Bike intervals', meta: `${Math.round(qualityMins)} min · 5×3 min hard`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasRun && longType !== 'run') {
+          newSessions[qualityDay] = { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · 6×400m at 5K pace`, duration: Math.round(qualityMins), type: 'quality' };
+        } else if (hasSwim) {
+          newSessions[qualityDay] = { name: 'Swim CSS set', meta: `${Math.round(qualityMins)} min · technique + intervals`, duration: Math.round(qualityMins), type: 'quality' };
+        }
+      }
+      // Easy day — pick the discipline NOT yet used.
+      if (easyDay) {
+        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
+        if (easyMins > 30) {
+          const used = new Set([newSessions[longDay] && newSessions[longDay].type, newSessions[qualityDay] && newSessions[qualityDay].type]);
+          if (hasBike && !used.has('bike') && !used.has('quality')) {
+            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike' };
+          } else if (hasRun && !used.has('run')) {
+            newSessions[easyDay] = { name: 'Easy run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+          } else if (hasSwim && !used.has('swim')) {
+            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · technique`, duration: easyMins, type: 'swim' };
+          } else if (hasRun) {
+            newSessions[easyDay] = { name: 'Easy run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+          }
         }
       }
     }
