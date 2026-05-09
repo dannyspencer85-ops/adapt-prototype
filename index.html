@@ -1590,7 +1590,7 @@
             <span>What are you training for?</span>
             <button type="button" onclick="openRaceHelper()" style="background:var(--primary-soft); border:0; color:var(--primary-dark); font-weight:700; font-size:12px; padding:4px 10px; border-radius:100px; cursor:pointer; font-family:inherit;">Not sure? Ask the race helper</button>
           </label>
-          <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker();">
+          <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent();">
             <option>Half Ironman</option>
             <option>Full Ironman</option>
             <option>Marathon</option>
@@ -1607,31 +1607,26 @@
           <input type="date" id="eventDate">
         </div>
 
+        <!-- Curated race picker — auto-fills the course chips below if the user picks a known race. -->
         <div class="field">
-          <label>Race location <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
-          <input type="text" id="eventLocation" placeholder="City, state">
-        </div>
-
-        <!-- Phase 1: Curated race picker -->
-        <div class="field">
-          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;" id="racePickerLabel">(optional — for course-specific training)</span></label>
+          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;" id="racePickerLabel">(optional — auto-fills course details)</span></label>
           <select id="racePickerSelect" onchange="onPickCuratedRace()">
-            <option value="">— I'll add details manually —</option>
+            <option value="">— I'll describe the course manually —</option>
           </select>
           <div id="racePickerSummary" style="display:none; margin-top:10px; padding:12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5;"></div>
         </div>
 
-        <!-- Phase 2: Manual course detail entry (collapsible) -->
+        <!-- Course details — always visible, event-aware. The fields the user
+             sees adapt to the race they picked above (run-only courses don't
+             ask about swim, runs don't ask about bike profile, etc.). -->
         <div class="field">
-          <label style="display:flex; justify-content:space-between; align-items:center;">
-            <span>Course details <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></span>
-            <button type="button" onclick="toggleCourseDetails()" id="courseDetailsToggle" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Show</button>
-          </label>
-          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">Tell us what makes your course tough and the engine will adjust your plan.</div>
+          <label id="courseDetailsHeader">Tell us about the course</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-top:4px;" id="courseDetailsHint">The plan adapts: hilly courses get hill work, hot races get heat acclimatization, open-water swims get sighting drills.</div>
         </div>
-        <div id="courseDetailsFields" style="display:none;">
-          <div class="field">
-            <label>Terrain</label>
+        <div id="courseDetailsFields">
+          <!-- RUN-leg profile (run events) / RUN-leg profile (tri events) -->
+          <div class="field" id="courseTerrainField">
+            <label id="courseTerrainLabel">Run course profile</label>
             <div class="chip-row" id="courseTerrainChips">
               <button type="button" class="chip active" data-val="flat" onclick="singleChipVal(this)">Flat</button>
               <button type="button" class="chip" data-val="rolling" onclick="singleChipVal(this)">Rolling</button>
@@ -1639,8 +1634,19 @@
               <button type="button" class="chip" data-val="mountainous" onclick="singleChipVal(this)">Mountainous</button>
             </div>
           </div>
-          <div class="field">
-            <label>Surface</label>
+          <!-- BIKE-leg profile (tri events only — bike is the dominant leg). -->
+          <div class="field" id="courseBikeField" style="display:none;">
+            <label>Bike leg profile</label>
+            <div class="chip-row" id="courseBikeChips">
+              <button type="button" class="chip active" data-val="flat" onclick="singleChipVal(this)">Flat / fast</button>
+              <button type="button" class="chip" data-val="rolling" onclick="singleChipVal(this)">Rolling</button>
+              <button type="button" class="chip" data-val="climbing" onclick="singleChipVal(this)">Climbing</button>
+              <button type="button" class="chip" data-val="mountainous" onclick="singleChipVal(this)">Mountainous</button>
+            </div>
+          </div>
+          <!-- Surface (run events only — tri run is almost always road). -->
+          <div class="field" id="courseSurfaceField">
+            <label id="courseSurfaceLabel">Surface</label>
             <div class="chip-row" id="courseSurfaceChips">
               <button type="button" class="chip active" data-val="road" onclick="singleChipVal(this)">Road</button>
               <button type="button" class="chip" data-val="trail" onclick="singleChipVal(this)">Trail</button>
@@ -1648,12 +1654,12 @@
               <button type="button" class="chip" data-val="mixed" onclick="singleChipVal(this)">Mixed</button>
             </div>
           </div>
-          <div class="field" id="courseSwimField">
+          <!-- SWIM type (tri events only). -->
+          <div class="field" id="courseSwimField" style="display:none;">
             <label>Swim type</label>
             <div class="chip-row" id="courseSwimChips">
-              <button type="button" class="chip active" data-val="none" onclick="singleChipVal(this)">None</button>
               <button type="button" class="chip" data-val="pool" onclick="singleChipVal(this)">Pool</button>
-              <button type="button" class="chip" data-val="lake" onclick="singleChipVal(this)">Lake</button>
+              <button type="button" class="chip active" data-val="lake" onclick="singleChipVal(this)">Lake</button>
               <button type="button" class="chip" data-val="river" onclick="singleChipVal(this)">River</button>
               <button type="button" class="chip" data-val="ocean" onclick="singleChipVal(this)">Ocean</button>
             </div>
@@ -1677,15 +1683,8 @@
             </div>
           </div>
           <div class="field">
-            <label>Notable challenges <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
-            <input type="text" id="courseNotes" placeholder="e.g. river current, technical descents, prairie wind">
-          </div>
-
-          <!-- Strava auto-detect (only shows if connected) -->
-          <div style="margin-top:10px; padding:12px; background:var(--bg-soft); border-radius:10px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-soft); line-height:1.5;">
-              💡 <strong>Tip:</strong> After onboarding, connect Strava in Profile to auto-detect course data from any Strava URL.
-            </div>
+            <label>Anything else worth flagging? <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
+            <input type="text" id="courseNotes" placeholder="e.g. river current, technical descents, exposed wind">
           </div>
         </div>
 
@@ -3480,7 +3479,7 @@
     const target = n === 0 ? 'welcome' : n === 6 ? 'building' : String(n);
     document.getElementById('onb-' + target).style.display = 'block';
     if (n === 4) { populateDisciplineChips(); updateHoursVolumeWarning(); }
-    if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); }
+    if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent(); }
     if (n === 5) { prefillFitnessMarkers(); adjustFmAdvancedVisibility(); }
     // Pre-fill the first-name field if we already have it stored (returning user
     // re-entering onboarding via "Edit goals" or "Start over").
@@ -4059,9 +4058,9 @@
     const event = document.getElementById('eventSelect')?.value || 'Half Ironman';
     const eventDateEl = document.getElementById('eventDate');
     const eventDate = eventDateEl && eventDateEl.value ? eventDateEl.value : '';
-    const eventLocation = document.getElementById('eventLocation')?.value.trim() || '';
-    localStorage.setItem('race-location', eventLocation);
-    planState.raceLocation = eventLocation;
+    // Race location is no longer a free-text input. The curated race picker
+    // still sets it via onPickCuratedRace; manual flow leaves it blank.
+    const eventLocation = (planState.raceLocation || localStorage.getItem('race-location') || '');
     const activeHours = document.querySelector('#hoursChips .chip.active');
     const hours = activeHours ? parseFloat(activeHours.dataset.hours) : 5;
     const activeDays = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent);
@@ -4945,12 +4944,59 @@
     card.style.display = (card.style.display === 'none' || !card.style.display) ? 'block' : 'none';
     if (card.style.display === 'block') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
-  function toggleCourseDetails() {
-    const f = document.getElementById('courseDetailsFields');
-    const t = document.getElementById('courseDetailsToggle');
-    if (!f || !t) return;
-    if (f.style.display === 'none') { f.style.display = 'block'; t.textContent = 'Hide'; }
-    else { f.style.display = 'none'; t.textContent = 'Show'; }
+  // Show/hide course-detail fields based on event type. Run-only events
+  // hide the swim and bike-profile fields. Triathlons add the bike profile
+  // and swim type. The header copy adapts so users see what's relevant.
+  function adjustCourseDetailsForEvent() {
+    const event = document.getElementById('eventSelect')?.value || '';
+    const isTri = /Ironman|Triathlon/i.test(event);
+    const isRun = /Marathon|10K|5K|Half Marathon/i.test(event) && !isTri;
+    const isGeneral = /General fitness/i.test(event);
+    const swimField = document.getElementById('courseSwimField');
+    const bikeField = document.getElementById('courseBikeField');
+    const surfaceField = document.getElementById('courseSurfaceField');
+    const terrainField = document.getElementById('courseTerrainField');
+    const terrainLabel = document.getElementById('courseTerrainLabel');
+    const surfaceLabel = document.getElementById('courseSurfaceLabel');
+    const header = document.getElementById('courseDetailsHeader');
+    const hint = document.getElementById('courseDetailsHint');
+    if (!swimField || !bikeField || !terrainField) return;
+    if (isTri) {
+      // Triathlons — show bike profile + swim type. Run leg labeled clearly.
+      bikeField.style.display = 'block';
+      swimField.style.display = 'block';
+      surfaceField.style.display = 'none'; // tri run is almost always road
+      terrainField.style.display = 'block';
+      if (terrainLabel) terrainLabel.textContent = 'Run leg profile';
+      if (header) header.textContent = 'Tell us about the course';
+      if (hint) hint.textContent = 'The plan adapts: hilly bikes get climbing intervals, open-water swims get sighting drills, hot races get heat acclimatization.';
+    } else if (isRun) {
+      // Run-only — hide bike + swim; show terrain (renamed) + surface.
+      bikeField.style.display = 'none';
+      swimField.style.display = 'none';
+      surfaceField.style.display = 'block';
+      terrainField.style.display = 'block';
+      if (terrainLabel) terrainLabel.textContent = 'Course profile';
+      if (surfaceLabel) surfaceLabel.textContent = 'Surface';
+      if (header) header.textContent = 'Tell us about the course';
+      if (hint) hint.textContent = 'The plan adapts: hilly courses get hill repeats, trail courses get strength + ankle work, hot races get heat acclimatization.';
+    } else if (isGeneral) {
+      // General fitness — minimal: terrain + climate, no surface/swim/bike.
+      bikeField.style.display = 'none';
+      swimField.style.display = 'none';
+      surfaceField.style.display = 'block';
+      terrainField.style.display = 'block';
+      if (terrainLabel) terrainLabel.textContent = 'Where you usually train';
+      if (surfaceLabel) surfaceLabel.textContent = 'Mostly';
+      if (header) header.textContent = 'Tell us about your environment';
+      if (hint) hint.textContent = 'Helps the plan match the terrain and surface you actually use.';
+    } else {
+      // Default — show everything.
+      bikeField.style.display = 'block';
+      swimField.style.display = 'block';
+      surfaceField.style.display = 'block';
+      terrainField.style.display = 'block';
+    }
   }
   // Populate the curated race dropdown based on the currently selected event type
   function refreshRacePicker() {
@@ -4988,17 +5034,17 @@
       summary.innerHTML = '';
       return;
     }
-    // Populate manual chips so the user can see/edit what we'll apply
+    // Populate manual chips so the user can see/edit what we'll apply.
+    // bikeProfile defaults to terrain (curated races don't yet carry a
+    // separate bike-leg profile — terrain is a reasonable proxy).
     setActiveChipVal('courseTerrainChips', race.terrain);
     setActiveChipVal('courseSurfaceChips', race.surface);
     setActiveChipVal('courseSwimChips', race.swim);
+    setActiveChipVal('courseBikeChips', race.bikeProfile || race.terrain);
     setActiveChipVal('courseClimateChips', race.climate);
     setActiveChipVal('courseAltitudeChips', race.altitude);
     const notesEl = document.getElementById('courseNotes');
     if (notesEl) notesEl.value = race.notes || '';
-    // Auto-fill location if blank
-    const locEl = document.getElementById('eventLocation');
-    if (locEl && !locEl.value.trim()) locEl.value = race.location;
     summary.style.display = 'block';
     summary.innerHTML = `
       <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(race.name)}</div>
@@ -5006,14 +5052,20 @@
       <div>${escapeHtml(race.notes || '')}</div>
     `;
   }
-  // Read the current onboarding course-detail inputs into a courseIntel object
+  // Read the current onboarding course-detail inputs into a courseIntel object.
+  // bikeProfile is only meaningful for tri events; swim only for tri events.
+  // Both are emitted unconditionally so the AI prompt can use them or skip
+  // them based on event type. 'none' means the field doesn't apply.
   function readCourseIntelFromInputs() {
     const raceId = document.getElementById('racePickerSelect')?.value || '';
+    const event = document.getElementById('eventSelect')?.value || '';
+    const isTri = /Ironman|Triathlon/i.test(event);
     return {
       raceId: raceId || null,
       terrain: getActiveChipVal('courseTerrainChips') || 'rolling',
       surface: getActiveChipVal('courseSurfaceChips') || 'road',
-      swim: getActiveChipVal('courseSwimChips') || 'none',
+      bikeProfile: isTri ? (getActiveChipVal('courseBikeChips') || 'rolling') : 'none',
+      swim: isTri ? (getActiveChipVal('courseSwimChips') || 'lake') : 'none',
       climate: getActiveChipVal('courseClimateChips') || 'temperate',
       altitude: getActiveChipVal('courseAltitudeChips') || 'sea',
       notes: document.getElementById('courseNotes')?.value.trim() || '',
@@ -9283,6 +9335,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const isHalfMar = /Half Marathon/i.test(event);
     const isRun = isShortRun || isMarathon || isHalfMar;
     const isGeneral = /General fitness/i.test(event) || (!isTri && !isRun);
+    // Read course intel so the fallback can shape sessions to terrain.
+    let intel = null;
+    try { intel = JSON.parse(localStorage.getItem('course-intel') || 'null'); } catch (e) {}
+    if (!intel && planState && planState.courseIntel) intel = planState.courseIntel;
+    const terrain = (intel && intel.terrain) || 'rolling';
+    const bikeProfile = (intel && intel.bikeProfile) || terrain;
+    const surface = (intel && intel.surface) || 'road';
+    const swim = (intel && intel.swim) || 'none';
+    const climate = (intel && intel.climate) || 'temperate';
+    const isHilly = terrain === 'hilly' || terrain === 'mountainous';
+    const isClimbingBike = bikeProfile === 'climbing' || bikeProfile === 'mountainous';
+    const isOpenWater = swim === 'lake' || swim === 'river' || swim === 'ocean';
+    const isHot = climate === 'hot' || climate === 'hot-humid';
     // Discipline awareness: read what the user actually has access to so we
     // never prescribe a swim for someone with no pool, or a brick for a
     // run-event athlete who unchecked Bike. Default = all four if unset.
@@ -9357,7 +9422,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         };
       }
     } else if (isRun) {
-      // Non-beginner run event — distance-aware caps.
+      // Non-beginner run event — distance-aware caps. Shape adapts to terrain.
       const longCap = isShortRun ? 60 : isHalfMar ? 90 : 120;
       const longFloor = isShortRun ? 35 : 50;
       const longMins = Math.min(longCap, Math.max(longFloor, hours * 60 * 0.4));
@@ -9365,56 +9430,119 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (longDay) {
         newSessions[longDay] = {
           name: 'Long run',
-          meta: `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`,
-          duration: Math.round(longMins), type: 'run',
+          meta: isHilly
+            ? `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2 with rolling/hilly terrain — rehearse the elevation profile`
+            : `${Math.floor(longMins / 60)}:${String(Math.round(longMins) % 60).padStart(2,'0')} · Zone 2`,
+          duration: Math.round(longMins),
+          type: 'run',
+          prescription: isHilly
+            ? `Easy aerobic long run on rolling terrain. Don't hammer the climbs — keep effort steady (Z2 HR), let pace fluctuate. Practice relaxed downhill running. ~${Math.round(longMins)} min total.`
+            : `Easy aerobic long run, mostly flat. Keep HR in Z2 throughout, conversational pace. ~${Math.round(longMins)} min total.`,
+          targets: 'HR Z2 throughout · RPE 4-5 · conversational',
+          intensity: 'Z2',
         };
       }
       if (qualityDay) {
+        // Hilly courses → swap intervals for hill repeats. Flat courses get
+        // standard track-style intervals.
+        const qualityName = isHilly ? 'Hill repeats' : 'Run intervals';
+        const qualityPrescription = isHilly
+          ? `Hill repeats: 10 min WU + 6-8×60-90s uphill (RPE 8, ~5K effort) with full recovery jog/walk down + 5 min CD. Hilly course requires hill-specific power.`
+          : `Track/road intervals: 10 min WU + 6×400m at 5K race pace (or 4×800m for HM/Marathon prep) with 90s easy jog recovery + 10 min CD.`;
         newSessions[qualityDay] = {
-          name: 'Run intervals',
-          meta: `${Math.round(qualityMins)} min · Quality`,
-          duration: Math.round(qualityMins), type: 'quality',
+          name: qualityName,
+          meta: `${Math.round(qualityMins)} min · ${isHilly ? 'Hill power' : 'Quality'}`,
+          duration: Math.round(qualityMins),
+          type: 'quality',
+          prescription: qualityPrescription,
+          targets: isHilly ? 'Uphill: RPE 8 · downhill: easy recovery · drive arms' : 'Interval pace: 5K effort · recovery: easy jog',
+          intensity: 'Z4',
         };
       }
       if (easyDay) {
         const easyMins = Math.round(hours * 60 - longMins - qualityMins);
         if (easyMins > 30) {
-          newSessions[easyDay] = { name: 'Easy aerobic', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+          newSessions[easyDay] = {
+            name: 'Easy aerobic',
+            meta: `${easyMins} min · Zone 2${surface === 'trail' ? ' · trail' : ''}`,
+            duration: easyMins,
+            type: 'run',
+            prescription: surface === 'trail'
+              ? `Easy aerobic run on trail or soft surface. Fits the ankle/glute strength your race surface demands. Keep HR in Z2.`
+              : `Easy aerobic run, Z2 HR throughout. Should feel relaxed.`,
+            intensity: 'Z2',
+          };
         }
       }
     } else if (isTri) {
-      // Triathlon — discipline-aware. Brick only if user has BOTH bike AND
-      // run. Otherwise long day becomes the longest available discipline.
+      // Triathlon — discipline-aware AND course-aware. Brick adapts to bike
+      // profile (climbing course → climbing brick), quality adapts to bike
+      // demand, swim quality picks up open-water drills if applicable.
       const longMins = Math.min(180, Math.max(75, hours * 60 * 0.5));
       const qualityMins = Math.min(75, Math.max(30, hours * 60 * 0.2));
       if (longDay) {
         if (hasBike && hasRun) {
-          // Standard tri long brick
           const bikeMins = Math.round(longMins * 0.7);
           const runMins = Math.min(30, Math.round(longMins * 0.3));
           newSessions[longDay] = {
-            name: 'Long brick',
+            name: isClimbingBike ? 'Long brick (climbing)' : 'Long brick',
             meta: `Bike ${Math.floor(bikeMins/60)}:${String(bikeMins%60).padStart(2,'0')} + Run ${Math.floor(runMins/60)}:${String(runMins%60).padStart(2,'0')}`,
-            duration: Math.round(longMins), type: 'brick'
+            duration: Math.round(longMins),
+            type: 'brick',
+            prescription: isClimbingBike
+              ? `Climbing brick: bike ${bikeMins} min on hilly terrain (or trainer with ramped resistance) — sustained Z2 with 2-3 longer efforts on real climbs. T2 fast. Run ${runMins} min off bike — first 8 min slow (legs adapting), then steady Z2.`
+              : `Steady brick: bike ${bikeMins} min flat/rolling Z2 (HR 130-145, cadence 85-95). T2 fast. Run ${runMins} min off bike — first 8 min slow, settle into Z2.`,
+            targets: isClimbingBike ? 'Climbs: HR Z3 OK · descents: recover · run: HR <Z2 first 8 min' : 'Bike Z2 · run Z2 throughout',
+            intensity: 'Z2',
           };
         } else if (hasBike) {
-          newSessions[longDay] = { name: 'Long bike', meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · Zone 2 steady`, duration: Math.round(longMins), type: 'bike' };
+          newSessions[longDay] = {
+            name: isClimbingBike ? 'Long bike (hilly)' : 'Long bike',
+            meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · ${isClimbingBike ? 'Climbing Z2' : 'Zone 2 steady'}`,
+            duration: Math.round(longMins), type: 'bike',
+            prescription: isClimbingBike
+              ? `Long climbing ride. Steady Z2 base on flats, controlled effort on climbs (don't redline). Practice gear selection and pacing for sustained climbs.`
+              : `Long aerobic ride. Hold HR Z2 throughout, smooth pedal stroke, cadence 85-95 rpm.`,
+            intensity: 'Z2',
+          };
         } else if (hasRun) {
-          newSessions[longDay] = { name: 'Long run', meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run' };
+          newSessions[longDay] = { name: 'Long run', meta: `${Math.floor(longMins/60)}:${String(Math.round(longMins)%60).padStart(2,'0')} · Zone 2`, duration: Math.round(longMins), type: 'run', intensity: 'Z2' };
         } else if (hasSwim) {
-          newSessions[longDay] = { name: 'Long swim', meta: `${Math.round(longMins)} min · technique + endurance`, duration: Math.round(longMins), type: 'swim' };
+          newSessions[longDay] = { name: 'Long swim', meta: `${Math.round(longMins)} min · technique + endurance`, duration: Math.round(longMins), type: 'swim', intensity: 'Z2' };
         }
       }
       if (qualityDay) {
-        // Quality session prefers the user's actual disciplines.
-        if (hasSwim && hasBike) {
-          newSessions[qualityDay] = { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+        // Quality picks the discipline that needs the most race-specific work.
+        if (isOpenWater && hasSwim) {
+          // Open-water race → prioritize swim sighting/drafting drills weekly.
+          newSessions[qualityDay] = {
+            name: 'Open-water swim drills',
+            meta: `${Math.round(qualityMins)} min · sighting + drafting`,
+            duration: Math.round(qualityMins),
+            type: 'quality',
+            prescription: `Pool or OW: 400m WU + 6×100m at race pace sighting every 4th stroke + 4×50m drafting/passing drills + 200m CD. Practice the open-water skills your race demands.`,
+            targets: 'Sight every 4 strokes · smooth stroke · simulate race chop',
+            intensity: 'Z3',
+          };
+        } else if (isClimbingBike && hasBike) {
+          // Climbing course → bike-climb intervals are the priority.
+          newSessions[qualityDay] = {
+            name: 'Bike climbing intervals',
+            meta: `${Math.round(qualityMins)} min · 4-6×3-5 min on climbs`,
+            duration: Math.round(qualityMins),
+            type: 'quality',
+            prescription: `WU 10 min easy + 4-6×3-5 min sustained climbs at threshold (RPE 8, ~95% FTP) with easy descent recovery + 10 min CD. Out of saddle on the steepest 30s of each rep.`,
+            targets: 'Climb: HR Z4 / FTP 90-100% · seated 70%, standing 30% · cadence 70-80 on climbs',
+            intensity: 'Z4',
+          };
+        } else if (hasSwim && hasBike) {
+          newSessions[qualityDay] = { name: 'Swim + Bike intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality', intensity: 'Z4' };
         } else if (hasBike) {
-          newSessions[qualityDay] = { name: 'Bike intervals', meta: `${Math.round(qualityMins)} min · Quality (5×3 min @ threshold)`, duration: Math.round(qualityMins), type: 'quality' };
+          newSessions[qualityDay] = { name: 'Bike intervals', meta: `${Math.round(qualityMins)} min · 5×3 min @ threshold`, duration: Math.round(qualityMins), type: 'quality', intensity: 'Z4' };
         } else if (hasRun) {
-          newSessions[qualityDay] = { name: 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality' };
+          newSessions[qualityDay] = { name: isHilly ? 'Hill repeats' : 'Run intervals', meta: `${Math.round(qualityMins)} min · Quality`, duration: Math.round(qualityMins), type: 'quality', intensity: 'Z4' };
         } else if (hasSwim) {
-          newSessions[qualityDay] = { name: 'Swim CSS set', meta: `${Math.round(qualityMins)} min · 8×100m at CSS pace`, duration: Math.round(qualityMins), type: 'quality' };
+          newSessions[qualityDay] = { name: 'Swim CSS set', meta: `${Math.round(qualityMins)} min · 8×100m at CSS pace`, duration: Math.round(qualityMins), type: 'quality', intensity: 'Z4' };
         } else if (hasStrength) {
           newSessions[qualityDay] = { name: 'Strength + mobility', meta: `${Math.round(qualityMins)} min · full-body, controlled tempo`, duration: Math.round(qualityMins), type: 'strength' };
         }
@@ -9422,13 +9550,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (easyDay) {
         const easyMins = Math.round(hours * 60 - longMins - qualityMins);
         if (easyMins > 30) {
-          // Pick the easiest-to-recover discipline they have.
           if (hasRun) {
-            newSessions[easyDay] = { name: 'Easy aerobic run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
+            newSessions[easyDay] = { name: 'Easy aerobic run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run', intensity: 'Z2' };
           } else if (hasBike) {
-            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike' };
+            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike', intensity: 'Z2' };
           } else if (hasSwim) {
-            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · drills + smooth aerobic`, duration: easyMins, type: 'swim' };
+            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · drills + smooth aerobic`, duration: easyMins, type: 'swim', intensity: 'Z2' };
           }
         }
       }
@@ -12676,8 +12803,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       picker.value = race.id;
       if (typeof onPickCuratedRace === 'function') onPickCuratedRace();
     }
-    const locEl = document.getElementById('eventLocation');
-    if (locEl) locEl.value = race.location || '';
+    // The curated race carries its own location; persist directly to storage.
+    if (race.location) {
+      localStorage.setItem('race-location', race.location);
+      planState.raceLocation = race.location;
+    }
     const dateEl = document.getElementById('eventDate');
     if (dateEl) dateEl.value = _computeTargetDateForRace(race);
 
