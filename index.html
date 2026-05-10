@@ -1613,7 +1613,11 @@
             <option>Sprint Triathlon</option>
             <option>10K</option>
             <option>5K</option>
-            <option>General fitness (no event)</option>
+            <!-- "General fitness (no event)" was here. Removed — that flow
+                 didn't fit the prototype's race-targeted shape (race date,
+                 race countdown, taper, etc. all assumed an event). The
+                 plan-engine general-fitness branches stay in place as dead
+                 code in case we revisit it later. -->
           </select>
         </div>
         <div class="field">
@@ -5396,8 +5400,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return `${DAY_FULL[getTodayDay()]}, ${months[t.getMonth()]} ${t.getDate()}`;
   }
   function getDaysToRace() {
-    const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '2026-06-07';
+    // Returns null when there's no real race date (e.g. "General fitness")
+    // OR the user picked a default placeholder. Callers must check for null
+    // before doing race-day math. The earlier hardcoded fallback ('2026-06-07')
+    // produced fake countdowns + fake race-week cards for general-fitness users.
+    const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+    if (!raceStr) return null;
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    if (/General fitness/i.test(event)) return null;
     const race = new Date(raceStr + 'T00:00:00');
+    if (isNaN(race.getTime())) return null;
     const today = new Date();
     today.setHours(0,0,0,0);
     return Math.ceil((race - today) / (1000 * 60 * 60 * 24));
@@ -6971,15 +6983,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function _projectSessionForDate(targetDate, daysFromCurrentMon, dayName) {
     const template = planState.sessions ? planState.sessions[dayName] : null;
     if (!template) return null;
-    // Compute weeks from today's week to race week.
+    // Don't project past race day. If the user is post-race (negative
+    // days-to-race), don't fabricate ghost workouts forever — the calendar
+    // should go quiet beyond the race.
     let weeksFromTodayToRace = null;
     try {
       const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+      if (days != null && days < 0) return null; // post-race: no projection
       if (days != null && days >= 0) weeksFromTodayToRace = Math.ceil(days / 7);
     } catch (e) {}
     const offsetFromCurrent = Math.floor(daysFromCurrentMon / 7);
-    if (weeksFromTodayToRace != null && offsetFromCurrent >= weeksFromTodayToRace + 1) {
-      // Past race day — no projection.
+    // Project up to and INCLUDING race week, not past it.
+    if (weeksFromTodayToRace != null && offsetFromCurrent >= weeksFromTodayToRace) {
       return null;
     }
     const ratio = _phaseRatioForWeekOffset(offsetFromCurrent, weeksFromTodayToRace);
@@ -9304,12 +9319,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const issues = [];
     const wins = [];
 
+    // Empty weekArc guard — happens during onboarding, between plans, and
+    // post-race. Returns a neutral "pending" state instead of throwing.
+    if (!planState.weekArc || planState.weekArc.length === 0 || !planState.sessions) {
+      return { score: 75, status: 'pending', label: 'PLAN PENDING', color: '#D9A94A', issues: [], wins: [] };
+    }
     const activeSessions = Object.values(planState.sessions).filter(s => s.type !== 'rest');
     const hasLong = activeSessions.some(s => s.duration >= 75);
     const hasQuality = activeSessions.some(s => s.type === 'quality' || s.type === 'brick');
     const total = activeSessions.reduce((a, s) => a + s.duration, 0);
     const currentArc = planState.weekArc.find(w => w.current) || planState.weekArc[0];
-    const targetMins = parseWeekHours(currentArc.hours) * 60;
+    const targetMins = currentArc ? parseWeekHours(currentArc.hours) * 60 : 0;
     const ratio = targetMins > 0 ? total / targetMins : 1;
 
     if (!hasLong) { score -= 25; issues.push('No long session (75+ min) this week — biggest fitness driver is missing'); }
@@ -9320,9 +9340,22 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     else if (ratio > 1.15) { score -= 10; issues.push(`Volume ${Math.round((ratio - 1) * 100)}% over target — raises injury risk`); }
     else { wins.push(`Weekly volume on target (${formatMins(total)})`); }
 
+    // Event-aware block-volume baseline. Hardcoded 28h was Half IM specific
+    // and made every other event grade against the wrong yardstick.
     const totalArcHrs = planState.weekArc.reduce((a, w) => a + parseWeekHours(w.hours), 0);
-    const baseline = 28;
-    if (totalArcHrs < baseline * 0.85) { score -= 20; issues.push(`Block total ${totalArcHrs.toFixed(1)}h below ${baseline}h baseline for Half IM finish`); }
+    const event = (planState.raceEvent || localStorage.getItem('race-event') || '').trim();
+    const BASELINE_BY_EVENT = {
+      '5K': 6, '10K': 8, 'Half Marathon': 14, 'Marathon': 22,
+      'Sprint Triathlon': 12, 'Olympic Triathlon': 22,
+      'Half Ironman': 28, 'Full Ironman': 50,
+      'General fitness (no event)': 0, // no baseline — consistency matters, not block volume
+    };
+    const baseline = BASELINE_BY_EVENT[event] != null ? BASELINE_BY_EVENT[event] : 14;
+    if (baseline > 0 && totalArcHrs < baseline * 0.85) {
+      score -= 20;
+      const eventShort = event === 'Half Ironman' ? 'Half IM' : event === 'Full Ironman' ? 'Full IM' : event || 'this race';
+      issues.push(`Block total ${totalArcHrs.toFixed(1)}h below ${baseline}h baseline for ${eventShort}`);
+    }
 
     if (planState.injury && planState.injury.severity === 'high') { score -= 30; issues.push(`Injury paused training: ${planState.injury.area}`); }
     else if (planState.injury && planState.injury.severity === 'moderate') { score -= 10; issues.push(`Moderate injury flagged: ${planState.injury.area}`); }
@@ -9381,12 +9414,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     card.style.color = palette.text;
     card.style.display = 'block';
 
-    // Per-score color block helper.
-    const scoreBlock = (s, label, sublabel) => `
+    // Per-score color block helper. When the score is a placeholder (no
+    // check-in for body, or no plan for race), render "—" instead of a
+    // misleading number.
+    const scoreBlock = (s, label, sublabel, isPending) => `
       <div style="flex:1; min-width:0; background:rgba(255,255,255,0.55); padding:10px 12px; border-radius:10px;">
         <div style="display:flex; align-items:baseline; gap:6px;">
-          <div style="font-size:22px; font-weight:800; color:${s.color}; line-height:1;">${s.score}</div>
-          <div style="font-size:9px; font-weight:700; color:var(--text-soft); letter-spacing:0.3px;">/ 100</div>
+          <div style="font-size:22px; font-weight:800; color:${s.color}; line-height:1;">${isPending ? '—' : s.score}</div>
+          <div style="font-size:9px; font-weight:700; color:var(--text-soft); letter-spacing:0.3px;">${isPending ? '' : '/ 100'}</div>
         </div>
         <div style="font-size:11px; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; margin-top:5px; color:${s.color};">${escapeHtml(label)}</div>
         <div style="font-size:11.5px; line-height:1.35; margin-top:2px; color:var(--text-soft);">${escapeHtml(sublabel)}</div>
@@ -9396,13 +9431,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const raceColor = race.status === 'on-track' ? '#3B8968' : race.status === 'slightly-behind' ? '#D9A94A' : '#C44545';
     const raceObj = { score: race.score, color: raceColor };
 
+    // Pending flags — body has no check-in, race has no plan. Show "—" so
+    // the card doesn't lie about the data we have.
+    const bodyPending = !planState.lastCheckin && !planState.injury;
+    const racePending = race.status === 'pending';
     card.innerHTML = `
       <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85; margin-bottom:8px;">TODAY · TAP FOR DETAILS</div>
       <div style="display:flex; gap:8px;">
-        ${scoreBlock(body, 'Body today', body.label)}
-        ${scoreBlock(raceObj, 'Race ready', race.label)}
+        ${scoreBlock(body, 'Body today', body.label, bodyPending)}
+        ${scoreBlock(raceObj, 'Race ready', race.label, racePending)}
       </div>
-      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan needs small fixes' : 'Plan is behind — adjust this week')}</div>
+      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(racePending ? 'Plan is still building' : race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan needs small fixes' : 'Plan is behind — adjust this week')}</div>
     `;
   }
 
@@ -9606,20 +9645,37 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const records = detectPRs();
     let dismissed = {};
     try { dismissed = JSON.parse(localStorage.getItem('pr-dismissed') || '{}'); } catch (e) {}
-    // Save the most recent PR as a "new" surface — the most recent
-    // previously-unseen record wins the banner slot.
+    // First-load welcome: if the user has never seen ANY PR celebration
+    // before, surface their best record as a welcome moment. Tracked via
+    // 'pr-welcome-shown'. Without this, a user with a year of Strava
+    // history would silently mark every record as "seen" on first render
+    // and never see a celebration.
     const seen = (() => { try { return JSON.parse(localStorage.getItem('pr-seen') || '{}'); } catch (e) { return {}; } })();
-    const fresh = records.filter(r => !seen[r.id] && !dismissed[r.id]);
-    // Record ALL detected as seen so we only celebrate brand-new PRs once.
-    records.forEach(r => { seen[r.id] = Date.now(); });
-    localStorage.setItem('pr-seen', JSON.stringify(seen));
-    if (fresh.length === 0) { slot.style.display = 'none'; return; }
+    const welcomeShown = localStorage.getItem('pr-welcome-shown') === '1';
+    let fresh = records.filter(r => !seen[r.id] && !dismissed[r.id]);
+    // Welcome path: no previously-seen records but we DO have records — show
+    // the first one as a welcome PR.
+    if (!welcomeShown && fresh.length === 0 && records.length > 0) {
+      const undismissed = records.filter(r => !dismissed[r.id]);
+      if (undismissed.length > 0) fresh = [undismissed[0]];
+    }
+    if (fresh.length === 0) {
+      // Nothing new this render. Still mark all as seen so future renders
+      // only show NEW records.
+      records.forEach(r => { seen[r.id] = Date.now(); });
+      localStorage.setItem('pr-seen', JSON.stringify(seen));
+      slot.style.display = 'none';
+      return;
+    }
+    // We have something fresh. DO NOT mark as seen yet — only mark when the
+    // user dismisses (via dismissPR). This prevents the "all seen on first
+    // render" bug where the celebration is silently consumed.
     const r = fresh[0];
     slot.style.display = 'block';
     slot.innerHTML = `<div style="background:linear-gradient(135deg, #5DA985, #3B8968); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
       <div style="font-size:34px; line-height:1;">🏆</div>
       <div style="flex:1; min-width:0;">
-        <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.9;">NEW PERSONAL BEST</div>
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.9;">${welcomeShown ? 'NEW PERSONAL BEST' : 'YOUR BEST RECORD'}</div>
         <div style="font-size:16px; font-weight:800; margin-top:2px;">${escapeHtml(r.label)} — ${escapeHtml(r.value)}</div>
         <div style="font-size:11.5px; opacity:0.9; margin-top:1px;">Tap to dismiss</div>
       </div>
@@ -9628,9 +9684,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function dismissPR(id) {
     let dismissed = {};
+    let seen = {};
     try { dismissed = JSON.parse(localStorage.getItem('pr-dismissed') || '{}'); } catch (e) {}
+    try { seen = JSON.parse(localStorage.getItem('pr-seen') || '{}'); } catch (e) {}
     dismissed[id] = Date.now();
     localStorage.setItem('pr-dismissed', JSON.stringify(dismissed));
+    // Mark ALL current records as seen now that user has interacted with the
+    // banner — subsequent runs will only celebrate brand-new records.
+    const records = detectPRs();
+    records.forEach(r => { seen[r.id] = Date.now(); });
+    localStorage.setItem('pr-seen', JSON.stringify(seen));
+    localStorage.setItem('pr-welcome-shown', '1');
     renderPRBanner();
   }
 
@@ -9729,6 +9793,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // ──────────────────────────────────────────────────────────────────────
   function maybeShowFirstSessionMoment() {
     if (localStorage.getItem('first-session-shown') === '1') return;
+    // Guard against firing before plan generation actually completed. If we
+    // fire too early (network race or fast-path), the seed defaults at line
+    // ~5444 ("Swim + Bike intervals") get treated as the user's first
+    // session, the modal opens with that fake content, and 'first-session-
+    // shown' gets set — locking the real first-session moment from ever
+    // showing. Require an actual plan source to be set.
+    if (!planState.planSource) return;
     const sessions = planState.sessions || {};
     // Find the first non-rest session in the next 7 days.
     const today = new Date();
@@ -9796,7 +9867,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       alert('No sessions to export this week.');
       return;
     }
-    const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    // Floating local time (no Z suffix, no TZID) — calendars treat this as
+    // "the user's local clock time" which is what we want for "7am workout."
+    // toISOString() with Z would produce UTC-shifted events in non-UTC zones.
+    const fmt = (d) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    };
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -9863,7 +9940,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       alert('No upcoming sessions to export.');
       return;
     }
-    const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    // Floating local time (no Z suffix, no TZID) — calendars treat this as
+    // "the user's local clock time" which is what we want for "7am workout."
+    // toISOString() with Z would produce UTC-shifted events in non-UTC zones.
+    const fmt = (d) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    };
     const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Adapt//Training Plan//EN','CALSCALE:GREGORIAN'];
     events.forEach((e, i) => {
       lines.push('BEGIN:VEVENT');
@@ -10316,6 +10399,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bottom = document.getElementById('raceLabelBottom');
     if (!banner) return;
 
+    // No race date (general fitness, or unset) — hide the countdown
+    // banner entirely. The hero workout becomes primary.
+    if (days == null) {
+      banner.style.display = 'none';
+      return;
+    }
+    banner.style.display = 'flex';
+
     if (days < 0) {
       // POST-RACE — racefinished. Lock the banner into a celebratory + new-goal
       // CTA. Other parts of the app should also reach this state via
@@ -10643,6 +10734,46 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
+    // ── STRENGTH INJECTION ──
+    // When the user has gym access, every plan should include 1-2 strength
+    // sessions per week. Endurance research is consistent: 1-2x/wk strength
+    // reduces injury risk 30-50% and improves running economy 4-8% (Lauersen
+    // 2014, Yamamoto 2008, Beattie 2014). The branch above only added
+    // strength as a fallback when no other discipline fit; here we ALWAYS
+    // inject strength on a rest day if one is available.
+    //
+    // Logic: pick up to 2 days that are currently rest, prefer Mon and Fri
+    // (book-ends of the week, maximally spaced from long sessions). Beginner
+    // runners get 1 short mobility-heavy session; everyone else gets 1-2
+    // moderate strength sessions.
+    if (hasStrength) {
+      const numStrengthSessions = isBeginnerRunner ? 1 : 2;
+      // Preferred days for strength — book-end placement, spaced from long day.
+      const preferredOrder = ['Mon', 'Fri', 'Tue', 'Thu', 'Wed'];
+      let placedCount = 0;
+      for (const d of preferredOrder) {
+        if (placedCount >= numStrengthSessions) break;
+        // Only inject on actual training days that are currently rest.
+        if (!days.includes(d)) continue;
+        if (!newSessions[d] || newSessions[d].type !== 'rest') continue;
+        // Skip the day right before a long session (recovery).
+        const dayBeforeLong = DAYS[(DAYS.indexOf(longDay) + 6) % 7];
+        if (d === dayBeforeLong) continue;
+        const strengthMins = isBeginnerRunner ? 20 : 35;
+        newSessions[d] = isBeginnerRunner
+          ? { name: 'Mobility + light strength', meta: `${strengthMins} min · hips, glutes, core`, duration: strengthMins, type: 'strength', prescription: '5 min dynamic warm-up + 3 rounds: 8 squats, 8 glute bridges, 6 single-leg deadlifts/side, 30s plank, 8 push-ups (knees OK). Quality over quantity.', targets: 'Form first · RPE 5-6 · stop 1-2 reps before failure', intensity: 'Z2' }
+          : { name: 'Strength', meta: `${strengthMins} min · full-body, posterior chain focus`, duration: strengthMins, type: 'strength', prescription: '5 min dynamic warm-up + 3-4 rounds: 8 squats or deadlifts, 6 single-leg work/side, 8 push or pull, 8 hip hinge, 45s plank or anti-rotation. Compound > isolation.', targets: 'RPE 7 · don\'t fail · explosive concentric, controlled eccentric', intensity: 'Z2' };
+        placedCount++;
+      }
+      // Fallback: if we couldn't find rest days (user picked few training
+      // days, all are filled), append a brief strength addendum to a quality
+      // day's prescription. Better to call it out than silently drop strength.
+      if (placedCount === 0 && qualityDay && newSessions[qualityDay]) {
+        const q = newSessions[qualityDay];
+        q.prescription = (q.prescription ? q.prescription + ' ' : '') + '[Add 15 min post-session strength: 3 rounds of 8 single-leg deadlifts, 8 squats, 30s plank.]';
+      }
+    }
+
     planState.sessions = newSessions;
     planState.raceEvent = event;
 
@@ -10660,6 +10791,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Phase ratio for each week index given the total. Mirrors the AI
     // prompt's periodization (base ramp → peak → taper).
     function _ratioForWeek(i, total) {
+      // Short plans (≤ 4 weeks) — late-onboarding case. We can't include
+      // a Base/Build/Peak/Taper sequence in 4 weeks; treat all weeks as
+      // sharpening with descending volume.
+      if (total <= 4) {
+        if (i === total - 1) return 0.5;        // race week
+        if (i === total - 2) return 0.75;       // sharpen taper
+        return 0.85;                              // sharpen
+      }
       // Last week is race week (50%), week before is taper (75%).
       if (i === total - 1) return 0.5;
       if (i === total - 2) return 0.75;
@@ -10675,6 +10814,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return isDeload ? base * 0.8 : base;
     }
     function _phaseLabel(i, total) {
+      // Short plans get a flatter label scheme — calling week 1 "Peak" was
+      // misleading for a late-onboarding user.
+      if (total <= 4) {
+        if (i === total - 1) return 'Race week';
+        if (i === total - 2) return 'Taper';
+        return 'Sharpen';
+      }
       if (i === total - 1) return 'Race week';
       if (i === total - 2) return 'Taper';
       if (i === total - 3) return 'Back-off';
@@ -10776,6 +10922,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const doneBadge = document.getElementById('heroDoneBadge');
     const sectionLabel = document.getElementById('heroSectionLabel');
     const heroCard = document.getElementById('heroCard');
+    // When the race-day card owns the screen (T-7 through T+14), the
+    // standard "Today's workout" hero would be a second competing primary.
+    // Hide hero in that window so the race-day card has visual primacy.
+    const _daysToRace = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    const _raceCardActive = _daysToRace != null && _daysToRace >= -14 && _daysToRace <= 7;
+    if (_raceCardActive) {
+      if (heroCard) heroCard.style.display = 'none';
+      if (sectionLabel) sectionLabel.style.display = 'none';
+      return;
+    } else {
+      if (heroCard) heroCard.style.display = '';
+      if (sectionLabel) sectionLabel.style.display = '';
+    }
     const actionsPending = document.getElementById('heroActionsPending');
     const actionsDone = document.getElementById('heroActionsDone');
     const actionsRest = document.getElementById('heroActionsRest');
@@ -11587,6 +11746,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function setStravaConfig(cfg) {
     if (cfg) localStorage.setItem('strava-config', JSON.stringify(cfg));
     else localStorage.removeItem('strava-config');
+    // Any successful credential save (OAuth callback, manual token entry,
+    // refresh) clears the stale auth-error banner. Without this, the red
+    // banner can stick on Plan/Pulse tabs even after the user reconnects.
+    if (cfg && cfg.accessToken) {
+      planState.stravaAuthError = null;
+      try { localStorage.removeItem('strava-auth-error'); } catch (e) {}
+      if (typeof renderStravaAuthBanner === 'function') renderStravaAuthBanner();
+    }
     renderStravaUI();
   }
   function renderStravaUI() {
