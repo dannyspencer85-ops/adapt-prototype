@@ -2277,6 +2277,14 @@
       </div>
     </div>
     <div class="screen-inner">
+      <!-- Connect-Strava banner — surfaces only when Strava isn't connected,
+           so users land on the Pulse tab and see the one action that
+           unlocks every chart below it. Hidden once Strava is connected. -->
+      <div id="pulseConnectBanner" style="display:none; background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; padding:14px 16px; border-radius:14px; margin-bottom:14px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Connect Strava to fill these charts</div>
+        <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px;">All Pulse charts pull from your Strava history. Without it, you're seeing empty placeholders.</div>
+        <button onclick="showScreen('profile')" style="background:#D9A94A; color:#fff; border:0; padding:8px 14px; border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">Open Profile to connect</button>
+      </div>
       <!-- Time range selector -->
       <div style="display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto;">
         <button class="chip" data-perf-range="7" onclick="setPerfRange(7)">Last 7 days</button>
@@ -2888,9 +2896,9 @@
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 scale. 85+ is on track. 65-84 means small things to tighten up. Below 65 means real risks. Tap the pill anywhere to see the full breakdown.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What if I'm injured?</strong><br>Say "my [area] hurts" in chat, or log it at morning check-in. Engine auto-adjusts. See a doctor or PT for actual medical advice — the app flags, it doesn't diagnose.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>Can't run today — what do I do?</strong><br>Tap "Adjust today" on the workout card. Deselect the disciplines you can't do. Workout adapts automatically.</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>My watch data isn't showing up</strong><br>This prototype doesn't actually connect to watches yet — data is simulated. In production, you'd link Apple Health or Garmin Connect in Profile → Data sources.</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>My watch data isn't showing up</strong><br>Connect Strava in Profile → tap "Connect Strava" → authorize Adapt. Activities sync from your Strava account (recorded by any connected watch — Garmin, Apple Watch, etc.). Apple HealthKit and Garmin Connect direct integration are coming later.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do notifications work?</strong><br>When your logged workout data suggests an adjustment, a notification appears on the bell. Tap Accept to apply, Reject to dismiss.</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What's Quick Actions vs Coach Chat?</strong><br>Quick Actions is free and handles plan changes + common training questions with scripted answers. Coach Chat uses Claude AI for open-ended coaching conversations — requires your own Anthropic API key.</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How does the chat work?</strong><br>Coach Chat uses an AI model to answer your training questions and adjust your plan via tools (move sessions, shorten, flag injury, etc.). Structural changes show an Apply / Cancel card — you confirm before they take effect. Free during the prototype, capped at 50 messages/day.</div>
         <div style="padding: 10px 0;"><strong>I want to start over</strong><br>Profile tab → "Start over with a new plan." Your current plan resets, you go through onboarding again.</div>
       </div>
       <button class="btn btn-ghost btn-full" onclick="closeHelp()" style="margin-top: 14px;">Close</button>
@@ -8533,281 +8541,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     fixesCopy.forEach(fix => _runToolDirect(fix.tool, fix.input));
   }
 
-  // ── Past session data (simulated — in prod this comes from Apple Health / Garmin / Strava) ──
-  const PAST_SESSIONS = {
-    'sat_apr26': {
-      name: 'Long brick',
-      date: 'Saturday, April 26',
-      planned: { duration: 150, desc: 'Bike 2:00 + Run 0:30 (prescribed)' },
-      actual: {
-        duration: 148,
-        distance: '38.3 mi',
-        avgHR: 142,
-        maxHR: 168,
-        rpe: 7,
-        calories: 1840,
-        weather: '68°F, light wind NE',
-        source: 'Garmin Forerunner 945',
-        zones: { z1: 7, z2: 78, z3: 45, z4: 15, z5: 3 }
-      },
-      segments: [
-        { icon: '🚴', name: 'Bike', duration: '2h 00m', distance: '35.2 mi', pace: '17.6 mph', avgHR: 138, maxHR: 156, cadence: 87 },
-        { icon: '🔄', name: 'T2', duration: '3m 12s', note: 'Transition' },
-        { icon: '🏃', name: 'Run', duration: '28m', distance: '3.0 mi', pace: '9:30 /mi', avgHR: 152, maxHR: 168, cadence: 174 }
-      ],
-      notes: 'Felt strong, settled into Z2 bike easily, ran off bike easy. Legs tired at mile 2 but under control.',
-      prescribed: 'Bike 2:00 at Z2 with 3×5-min race-pace + Run 0:30 easy Z2',
-      adherence: 'Very close to prescription — ran 2 min under planned, executed intent well'
-    },
-    'mon_apr28': {
-      name: 'Rest day',
-      date: 'Monday, April 28',
-      planned: { duration: 0, desc: 'Full rest' },
-      actual: {
-        duration: 0,
-        morningHR: 45,
-        sleep: '7h 48m',
-        weight: '175 lb',
-        hrv: '62ms (baseline: 58)',
-        steps: 4820,
-        source: 'Apple Health + Garmin'
-      },
-      notes: 'Legs felt light Monday morning — good sign Saturday was well-paced.',
-      prescribed: 'Full rest',
-      adherence: 'Full rest taken ✓'
-    },
-    'sun_apr27': {
-      name: 'Long easy run',
-      date: 'Sunday, April 27',
-      planned: { duration: 75, desc: '1:15 Zone 2' },
-      actual: {
-        duration: 78,
-        distance: '8.1 mi',
-        avgHR: 136,
-        maxHR: 148,
-        avgPace: '9:38 /mi',
-        rpe: 5,
-        calories: 820,
-        weather: '64°F, clear',
-        cadence: 176,
-        source: 'Garmin Forerunner 945',
-        zones: { z1: 12, z2: 62, z3: 4, z4: 0, z5: 0 }
-      },
-      segments: [
-        { icon: '🏃', name: 'Mile 1', duration: '9:52', pace: '9:52', avgHR: 128 },
-        { icon: '🏃', name: 'Mile 2', duration: '9:44', pace: '9:44', avgHR: 134 },
-        { icon: '🏃', name: 'Mile 3', duration: '9:36', pace: '9:36', avgHR: 138 },
-        { icon: '🏃', name: 'Miles 4-8', duration: '49:18', pace: '9:29', avgHR: 140 }
-      ],
-      notes: 'Good controlled Z2. Stayed conversational throughout — textbook easy run.',
-      prescribed: '1:15 easy Z2 run',
-      adherence: 'Right on target — slightly longer duration, perfect HR zone'
-    }
-  };
-
-  function openSessionReport(id) {
-    const s = PAST_SESSIONS[id];
-    if (!s) return;
-    document.getElementById('srTitle').textContent = s.name;
-    document.getElementById('srWhen').textContent = s.date;
-
-    let html = '';
-
-    // Stat tiles
-    html += '<div class="stat-grid" style="margin-top: 10px;">';
-    if (s.actual.duration) {
-      html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">${formatMins(s.actual.duration)}</div>${s.actual.distance ? `<div class="stat-sub">${s.actual.distance}</div>` : ''}</div>`;
-    } else {
-      html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">Rest</div><div class="stat-sub">Full day off</div></div>`;
-    }
-    if (s.actual.avgHR) {
-      html += `<div class="stat-tile"><div class="stat-label">Avg HR</div><div class="stat-value">${s.actual.avgHR}</div>${s.actual.maxHR ? `<div class="stat-sub">Max ${s.actual.maxHR}</div>` : ''}</div>`;
-    } else if (s.actual.morningHR) {
-      html += `<div class="stat-tile"><div class="stat-label">Morning HR</div><div class="stat-value">${s.actual.morningHR}</div><div class="stat-sub">Baseline 46</div></div>`;
-    } else {
-      html += `<div class="stat-tile"><div class="stat-label">—</div><div class="stat-value">—</div></div>`;
-    }
-    if (s.actual.rpe) {
-      html += `<div class="stat-tile"><div class="stat-label">RPE</div><div class="stat-value">${s.actual.rpe}/10</div><div class="stat-sub">Self-reported</div></div>`;
-    } else if (s.actual.sleep) {
-      html += `<div class="stat-tile"><div class="stat-label">Sleep</div><div class="stat-value">${s.actual.sleep.split(' ')[0]}</div><div class="stat-sub">Last night</div></div>`;
-    } else {
-      html += `<div class="stat-tile"><div class="stat-label">—</div><div class="stat-value">—</div></div>`;
-    }
-    html += '</div>';
-
-    // Route with HR overlay (for sessions with GPS data)
-    if (s.actual.avgHR && s.actual.distance && s.name !== 'Rest day') {
-      html += `<div class="detail-section" style="margin-top: 18px;">
-        <div class="detail-label">Route · heart rate</div>
-        ${generateRouteWithHR(s)}
-        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px; padding: 0 4px;">
-          <div><strong style="color:var(--text);">Start</strong> · HR 128</div>
-          <div><strong style="color:var(--text);">Finish</strong> · HR ${s.actual.maxHR || 140}</div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:10px; font-size:10px;">
-          <div style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#B3CDBD;border-radius:2px;"></span>Z1</div>
-          <div style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#5DA985;border-radius:2px;"></span>Z2</div>
-          <div style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#D9A94A;border-radius:2px;"></span>Z3</div>
-          <div style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#E89C3E;border-radius:2px;"></span>Z4</div>
-          <div style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#C87A3B;border-radius:2px;"></span>Z5</div>
-        </div>
-      </div>`;
-    }
-
-    // Zone breakdown
-    if (s.actual.zones) {
-      const z = s.actual.zones;
-      const total = z.z1 + z.z2 + z.z3 + z.z4 + z.z5;
-      const pct = k => Math.round((z[k] / total) * 100);
-      const colors = { z1: '#B3CDBD', z2: '#5DA985', z3: '#D9A94A', z4: '#E89C3E', z5: '#C87A3B' };
-      html += `<div class="detail-section" style="margin-top: 18px;">
-        <div class="detail-label">Time in heart-rate zones</div>
-        <div class="zone-bar">
-          ${['z1','z2','z3','z4','z5'].map(k => z[k] > 0 ? `<div class="zone-seg" style="background:${colors[k]}; flex:${z[k]}">${pct(k) >= 8 ? pct(k) + '%' : ''}</div>` : '').join('')}
-        </div>
-        <div class="zone-legend">
-          <div>Z1 · ${z.z1}m</div>
-          <div>Z2 · ${z.z2}m</div>
-          <div>Z3 · ${z.z3}m</div>
-          <div>Z4 · ${z.z4}m</div>
-          <div>Z5 · ${z.z5}m</div>
-        </div>
-      </div>`;
-    }
-
-    // Segments
-    if (s.segments && s.segments.length > 0) {
-      html += `<div class="detail-section" style="margin-top: 14px;">
-        <div class="detail-label">Segments</div>
-        ${s.segments.map(seg => `
-          <div class="segment-row">
-            <div class="seg-icon">${seg.icon || '•'}</div>
-            <div style="flex:1;">
-              <div style="font-weight: 700;">${escapeHtml(seg.name)}</div>
-              <div style="color: var(--text-soft); font-size: 12px;">${[seg.duration, seg.distance, seg.pace].filter(Boolean).join(' · ')}</div>
-            </div>
-            ${seg.avgHR ? `<div style="text-align: right; font-size: 12px; color: var(--text-soft);"><div>HR ${seg.avgHR}${seg.maxHR ? '/'+seg.maxHR : ''}</div>${seg.cadence ? `<div>${seg.cadence} rpm</div>` : ''}</div>` : ''}
-          </div>
-        `).join('')}
-      </div>`;
-    }
-
-    // Additional metrics (rest days)
-    if (s.actual.hrv || s.actual.weight || s.actual.steps) {
-      html += `<div class="detail-section" style="margin-top: 14px;">
-        <div class="detail-label">Body metrics</div>
-        <div style="font-size: 13px; line-height: 1.7;">
-          ${s.actual.sleep ? `<div><strong>Sleep:</strong> ${s.actual.sleep}</div>` : ''}
-          ${s.actual.hrv ? `<div><strong>HRV:</strong> ${s.actual.hrv}</div>` : ''}
-          ${s.actual.weight ? `<div><strong>Weight:</strong> ${s.actual.weight}</div>` : ''}
-          ${s.actual.steps ? `<div><strong>Steps:</strong> ${s.actual.steps.toLocaleString()}</div>` : ''}
-        </div>
-      </div>`;
-    }
-
-    // Plan vs actual
-    html += `<div class="detail-section" style="margin-top: 14px;">
-      <div class="detail-label">Prescribed vs. actual</div>
-      <div style="font-size: 13px; line-height: 1.55; background: var(--bg); padding: 10px 12px; border-radius: 10px;">
-        <div style="color: var(--text-soft); margin-bottom: 4px;"><strong>Prescribed:</strong> ${escapeHtml(s.prescribed)}</div>
-        <div style="color: var(--primary-dark);"><strong>Engine notes:</strong> ${escapeHtml(s.adherence)}</div>
-      </div>
-    </div>`;
-
-    if (s.notes) {
-      html += `<div class="detail-section" style="margin-top: 14px;">
-        <div class="detail-label">Your reflection</div>
-        <div style="font-size: 13px; line-height: 1.55; padding: 10px 12px; background: var(--secondary-soft); border-left: 3px solid var(--secondary); border-radius: 8px; font-style: italic;">"${escapeHtml(s.notes)}"</div>
-      </div>`;
-    }
-
-    // Context
-    if (s.actual.weather || s.actual.source) {
-      html += `<div class="detail-section" style="margin-top: 14px; font-size: 12px; color: var(--text-soft);">
-        ${s.actual.weather ? `<div>Weather: ${escapeHtml(s.actual.weather)}</div>` : ''}
-        ${s.actual.source ? `<div>Data source: ${escapeHtml(s.actual.source)}</div>` : ''}
-      </div>`;
-    }
-
-    document.getElementById('srBody').innerHTML = html;
-    document.getElementById('sessionReportModal').classList.add('show');
-  }
-
+  // PAST_SESSIONS demo constant + openSessionReport function were deleted —
+  // they were prototype-era stubs no longer wired into any UI surface. Real
+  // past sessions now flow through the Strava integration:
+  //   getVisibleStravaActivities() → renderRecentStravaSessions on Plan tab
+  //   → openStravaActivityDetails opens the same sessionReportModal shell
+  //     populated with REAL Strava data.
+  // closeSessionReport (below) is preserved because the real Strava modal
+  // reuses the same close handler.
   function closeSessionReport() {
-    document.getElementById('sessionReportModal').classList.remove('show');
-  }
-
-  function generateRouteWithHR(session) {
-    const isBrick = session.name.toLowerCase().includes('brick');
-    const routes = {
-      'Long brick': [
-        { x: 20, y: 70, hr: 128, label: 'bike start' }, { x: 50, y: 55, hr: 134 },
-        { x: 90, y: 45, hr: 138 }, { x: 140, y: 50, hr: 140 },
-        { x: 180, y: 60, hr: 142 }, { x: 200, y: 80, hr: 145 },
-        { x: 220, y: 100, hr: 148 }, { x: 250, y: 105, hr: 152, label: 'bike surge' },
-        { x: 280, y: 95, hr: 150 }, { x: 310, y: 85, hr: 142 },
-        { x: 340, y: 75, hr: 138, label: 'T2' },
-        { x: 355, y: 85, hr: 148, label: 'run start' }, { x: 370, y: 100, hr: 155 },
-        { x: 380, y: 120, hr: 162 }, { x: 370, y: 140, hr: 168 }
-      ],
-      'Long easy run': [
-        { x: 20, y: 100, hr: 128, label: 'start' }, { x: 50, y: 80, hr: 132 },
-        { x: 90, y: 70, hr: 134 }, { x: 130, y: 75, hr: 136 },
-        { x: 170, y: 85, hr: 138 }, { x: 210, y: 95, hr: 140 },
-        { x: 240, y: 105, hr: 140 }, { x: 270, y: 110, hr: 142 },
-        { x: 300, y: 105, hr: 144 }, { x: 330, y: 100, hr: 146 },
-        { x: 360, y: 90, hr: 148, label: 'finish kick' }, { x: 380, y: 80, hr: 150 }
-      ]
-    };
-    const pts = routes[session.name] || routes['Long easy run'];
-    const hrToColor = (hr) => {
-      if (hr < 125) return '#B3CDBD';
-      if (hr < 142) return '#5DA985';
-      if (hr < 155) return '#D9A94A';
-      if (hr < 168) return '#E89C3E';
-      return '#C87A3B';
-    };
-    let svg = `<svg viewBox="0 0 400 180" style="width:100%; height:150px; background: #F6F4EC; border-radius: 10px; margin-top: 6px;">`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1];
-      svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${hrToColor(a.hr)}" stroke-width="5" stroke-linecap="round"/>`;
-    }
-    pts.forEach(p => {
-      if (p.label) {
-        svg += `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#fff" stroke="${hrToColor(p.hr)}" stroke-width="2"/>`;
-      }
-    });
-    const first = pts[0], last = pts[pts.length - 1];
-    svg += `<circle cx="${first.x}" cy="${first.y}" r="6" fill="#fff" stroke="var(--primary)" stroke-width="2.5"/>`;
-    svg += `<circle cx="${last.x}" cy="${last.y}" r="6" fill="var(--primary)" stroke="#fff" stroke-width="2"/>`;
-    svg += `</svg>`;
-    return svg;
-  }
-
-  // ── Notifications (watch-data auto-adjustments) ──
-  planState.notifications = planState.notifications || [];
-
-  function seedDemoNotification() {
-    if (planState.notifications.length > 0) return;
-    planState.notifications.push({
-      id: 'notif_demo_' + Date.now(),
-      timestamp: Date.now() - 1000 * 60 * 15,
-      severity: 'warn',
-      icon: '⚡',
-      title: 'Saturday brick may need a lighter touch',
-      summary: 'Your watch shows Saturday\'s long brick came in hotter than prescribed — avg HR 152 vs. target 135-145.',
-      breakdown: [
-        'Prescribed target: Zone 2, avg HR 130-145',
-        'Actual avg HR: 152 (Zone 3 drift)',
-        'Perceived effort logged: 8/10 (prescribed: 6-7)',
-        'Pattern: your aerobic pace is drifting into tempo — usually means fatigue building or aerobic base needs time',
-        'Saturday\'s next brick is 3 days away — small reduction now protects you'
-      ],
-      changeText: 'Drop Saturday\'s bike portion from 2:00 → 1:45 (−15 min), keep run portion at 30 min. Same total stimulus, less total load.',
-      fix: { tool: 'shortenSession', input: { day: 'Sat', newMinutes: 135, newName: 'Brick (adjusted)', newMeta: 'Bike 1:45 + Run 0:30', reason: 'watch data showed HR drift; reducing load' }}
-    });
-    saveUserData();
+    const m = document.getElementById('sessionReportModal');
+    if (m) m.classList.remove('show');
   }
 
   function renderNotifBadge() {
@@ -11690,18 +11434,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${days[d.getDay()]} · ${months[d.getMonth()]} ${d.getDate()}`;
   }
-  // Render real recent activities on the Plan tab
+  // Render real recent activities on the Plan tab.
   function renderRecentStravaSessions() {
     const slot = document.getElementById('recentStravaSessions');
-    const demoSlot = document.getElementById('recentDemoSessions');
     if (!slot) return;
     const acts = getVisibleStravaActivities().slice().sort((a,b) => new Date(b.start_date) - new Date(a.start_date));
     if (acts.length === 0) {
       slot.innerHTML = '';
-      if (demoSlot) demoSlot.style.display = 'block';
       return;
     }
-    if (demoSlot) demoSlot.style.display = 'none'; // hide hardcoded demo when real data is available
 
     // Show last 5 completed sessions
     const recent = acts.slice(0, 5);
@@ -12427,6 +12168,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { buckets, bucketSize, bucketLabel };
   }
   function renderPerformanceTab() {
+    // Toggle the top-of-tab connect-Strava banner.
+    const connectBanner = document.getElementById('pulseConnectBanner');
+    if (connectBanner) {
+      connectBanner.style.display = (typeof getStravaConfig === 'function' && getStravaConfig()) ? 'none' : 'block';
+    }
     // Sync the range chips with the saved selection
     const savedRange = getPerfRange();
     document.querySelectorAll('[data-perf-range]').forEach(b => {
