@@ -1990,6 +1990,24 @@
         <div style="font-size: 16px; opacity: 0.7;">›</div>
       </div>
 
+      <!-- RACE-DAY FLOW — three different cards swap into this slot based on
+           where the user is in their race timeline:
+             T-7 to T-1: race-week countdown + checklist
+             T-0:        race-morning brief
+             T+0..T+14:  post-race retro form (until completed)
+           Each replaces the standard hero workout when active.
+           Hidden by default; renderRaceDayCard() decides when to show it. -->
+      <div id="raceDayCard" style="display:none; margin-bottom:14px;"></div>
+
+      <!-- PR / MILESTONE BANNER — auto-appears when the user hits a new
+           personal best (5K time, longest run, biggest week, etc.).
+           Dismissible. -->
+      <div id="prCelebrationBanner" style="display:none; margin-bottom:14px;"></div>
+
+      <!-- WEEKLY RECAP — appears Sunday + Monday with a summary of the
+           prior week's training. Dismissible per-week. -->
+      <div id="weeklyRecapCard" style="display:none; margin-bottom:14px;"></div>
+
       <!-- DAILY READINESS — the "today's number" most successful fitness apps
            lead with (Whoop recovery, Garmin training readiness, intervals.icu
            form). One look-at-it card, big number, color-coded verdict. Taps
@@ -2811,6 +2829,26 @@
       <h2 id="celebrateTitle">Nice work!</h2>
       <p id="celebrateText">You just hit a milestone.</p>
       <button onclick="closeCelebrate()">Keep going</button>
+    </div>
+  </div>
+
+  <!-- FIRST-SESSION SUCCESS MOMENT — shown once after onboarding when the
+       plan is freshly built. Tells the user exactly what's next + lets
+       them export the workout to their calendar so the plan reaches them
+       even when they don't open the app. -->
+  <div class="modal-bg center" id="firstSessionModal">
+    <div class="modal" style="max-width: 380px;">
+      <div style="text-align:center; margin-bottom:14px;">
+        <div style="font-size:42px; margin-bottom:6px;">🎯</div>
+        <h2 style="font-size:22px; margin:0 0 4px 0;">Your plan is ready</h2>
+        <div style="color:var(--text-soft); font-size:13px;">Here's what comes next.</div>
+      </div>
+      <div id="firstSessionDetail" style="background:var(--bg-soft); padding:14px 16px; border-radius:14px; margin-bottom:14px;"></div>
+      <button onclick="exportFirstSessionToICS()" id="firstSessionICSBtn" style="background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; padding:11px 14px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; width:100%; margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+        Add this week to my calendar
+      </button>
+      <button onclick="closeFirstSessionModal()" class="btn btn-primary btn-full">I'll check the app — got it</button>
     </div>
   </div>
 
@@ -4137,6 +4175,10 @@
         // If we're already past the "building" screen (user navigated away),
         // re-show the home screen.
         if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
+        // First-session success moment — modal once after onboarding.
+        if (typeof maybeShowFirstSessionMoment === 'function') {
+          setTimeout(maybeShowFirstSessionMoment, 600);
+        }
       })
       .catch(err => {
         console.warn('AI plan generation failed; falling back to rule engine:', err);
@@ -4147,6 +4189,9 @@
         computeReadinessFlags();
         renderAll();
         if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
+        if (typeof maybeShowFirstSessionMoment === 'function') {
+          setTimeout(maybeShowFirstSessionMoment, 600);
+        }
       });
   }
 
@@ -9209,6 +9254,426 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       </div>`;
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // RACE-DAY FLOW
+  // Single dynamic card on Home that adapts based on the user's position
+  // in the race timeline. T-7 to T-1: race-week checklist. T-0: race
+  // morning brief. T+0..+14: post-race retro form.
+  // ──────────────────────────────────────────────────────────────────────
+  function renderRaceDayCard() {
+    const slot = document.getElementById('raceDayCard');
+    if (!slot) return;
+    const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    if (days == null) { slot.style.display = 'none'; return; }
+    const event = (planState.raceEvent || localStorage.getItem('race-event') || 'your race');
+
+    if (days >= 1 && days <= 7) {
+      // ── T-7 to T-1: Race-week checklist + countdown ──
+      const checked = (() => {
+        try { return JSON.parse(localStorage.getItem('race-week-checklist') || '{}'); } catch (e) { return {}; }
+      })();
+      const items = [
+        { id: 'gear', label: 'Race kit packed (shoes, watch, charger, race-day clothes)' },
+        { id: 'bib', label: 'Race bib + timing chip picked up (or registered)' },
+        { id: 'fuel', label: 'Fueling dialed — eaten the same breakfast on a long session' },
+        { id: 'route', label: 'Course familiar — looked at elevation, key turns, aid stations' },
+        { id: 'weather', label: 'Weather forecast checked — gear adjusted for conditions' },
+        { id: 'sleep', label: 'Sleep prioritized — bed earlier T-2 and T-3 (race night sleep is bonus)' },
+        { id: 'travel', label: 'Travel logistics confirmed — wake-up time, transport, parking' },
+      ];
+      const completedCount = items.filter(i => checked[i.id]).length;
+      slot.style.display = 'block';
+      slot.innerHTML = `<div style="background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; border-radius:14px; padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85;">RACE WEEK · T-${days}</div>
+            <div style="font-size:18px; font-weight:800; margin-top:2px;">${escapeHtml(event)} · ${days} day${days === 1 ? '' : 's'} out</div>
+          </div>
+          <div style="font-size:11px; font-weight:700; opacity:0.8;">${completedCount}/${items.length}</div>
+        </div>
+        <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px; opacity:0.95;">Tick these off as you go. Race-day prep beats race-day improv.</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${items.map(it => `<label style="display:flex; gap:9px; align-items:flex-start; cursor:pointer; padding:5px 0; font-size:13px; line-height:1.4;">
+            <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer;">
+            <span style="${checked[it.id] ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.label)}</span>
+          </label>`).join('')}
+        </div>
+      </div>`;
+      return;
+    }
+
+    if (days === 0) {
+      // ── T-0: Race-morning brief ──
+      slot.style.display = 'block';
+      slot.innerHTML = `<div style="background:linear-gradient(135deg, #D9A94A, #E8B961); color:#fff; border-radius:14px; padding:18px 18px;">
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.6px; text-transform:uppercase; opacity:0.9;">🏁 RACE DAY</div>
+        <div style="font-size:24px; font-weight:800; margin-top:4px;">${escapeHtml(event)}</div>
+        <div style="font-size:13px; opacity:0.95; line-height:1.5; margin:10px 0 14px;">All the work is done. Today is execution.</div>
+        <div style="background:rgba(255,255,255,0.18); border-radius:10px; padding:11px 13px; font-size:12.5px; line-height:1.6;">
+          <div style="font-weight:700; margin-bottom:4px;">Reminders:</div>
+          <div>• Eat your tested breakfast 2-3 hr before start</div>
+          <div>• Hydrate steadily, don't chug at the line</div>
+          <div>• Warm up easy — let HR rise gradually</div>
+          <div>• Start at goal pace, not 10 sec faster</div>
+          <div>• First quarter conservative, second quarter steady, finish strong</div>
+        </div>
+        <button onclick="markRaceComplete()" style="background:#fff; color:#7a5a18; border:0; padding:10px 14px; border-radius:100px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; width:100%; margin-top:12px;">I finished the race →</button>
+      </div>`;
+      return;
+    }
+
+    if (days < 0 && days >= -14) {
+      // ── T+0 to T+14: Post-race retro (until user fills it in) ──
+      const retroDone = localStorage.getItem('post-race-retro-done') === '1';
+      if (retroDone) { slot.style.display = 'none'; return; }
+      slot.style.display = 'block';
+      slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; border-radius:14px; padding:16px 18px;">
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85;">POST-RACE RETRO</div>
+        <div style="font-size:18px; font-weight:800; margin-top:3px;">How did it go?</div>
+        <div style="font-size:12.5px; line-height:1.5; margin:8px 0 12px; opacity:0.95;">A few minutes now will help shape your next race. Honest reflection beats rationalized memory.</div>
+        <button onclick="openPostRaceRetro()" style="background:var(--primary); color:#fff; border:0; padding:10px 14px; border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; width:100%;">Start retro</button>
+        <button onclick="dismissPostRaceRetro()" style="background:none; border:0; color:var(--text-soft); padding:8px; font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; width:100%; margin-top:4px;">Skip for now</button>
+      </div>`;
+      return;
+    }
+
+    slot.style.display = 'none';
+  }
+
+  function toggleRaceWeekItem(id, checked) {
+    let state = {};
+    try { state = JSON.parse(localStorage.getItem('race-week-checklist') || '{}'); } catch (e) {}
+    state[id] = !!checked;
+    localStorage.setItem('race-week-checklist', JSON.stringify(state));
+    renderRaceDayCard();
+  }
+  function markRaceComplete() {
+    planState.postRace = true;
+    if (typeof saveUserData === 'function') saveUserData();
+    renderAll();
+  }
+  function dismissPostRaceRetro() {
+    localStorage.setItem('post-race-retro-done', '1');
+    renderRaceDayCard();
+  }
+  function openPostRaceRetro() {
+    // Simple prompt-based capture for the prototype. Logs to localStorage
+    // so the user can revisit. In production this would be a full modal
+    // with structured fields (time, splits, RPE, lessons).
+    const event = planState.raceEvent || 'your race';
+    const time = prompt(`Finish time for ${event}? (e.g. 4:12:35, or skip)`);
+    if (time === null) return;
+    const rpe = prompt('How hard did it feel, 1-10?');
+    if (rpe === null) return;
+    const wentWell = prompt('What went well? (one sentence)');
+    if (wentWell === null) return;
+    const toRemember = prompt('What would you do differently? (one sentence)');
+    if (toRemember === null) return;
+    const retro = { event, time: time || '', rpe: rpe || '', wentWell: wentWell || '', toRemember: toRemember || '', savedAt: Date.now() };
+    localStorage.setItem('post-race-retro', JSON.stringify(retro));
+    localStorage.setItem('post-race-retro-done', '1');
+    alert('Saved. Your retro is in localStorage and Coach Chat can reference it for your next plan.');
+    renderRaceDayCard();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PR / MILESTONE DETECTION
+  // Scans planState.stravaActivities for personal bests across run/bike/swim
+  // distances and weekly volume. New PRs get cached in localStorage with a
+  // dismissed flag; the home banner surfaces undismissed ones.
+  // ──────────────────────────────────────────────────────────────────────
+  function detectPRs() {
+    const acts = (planState.stravaActivities || []).filter(a => a && a.start_date && a.moving_min > 0);
+    if (acts.length < 2) return [];
+    const sorted = acts.slice().sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
+    const records = [];
+    // PR distances by sport (in km, for activities at least this long).
+    const distancePRs = [
+      { dist: 5,  sport: 'Run', name: '5K' },
+      { dist: 10, sport: 'Run', name: '10K' },
+      { dist: 21.1, sport: 'Run', name: 'Half Marathon' },
+      { dist: 42.2, sport: 'Run', name: 'Marathon' },
+      { dist: 40, sport: 'Ride', name: '40K bike' },
+      { dist: 100, sport: 'Ride', name: 'Century (100K)' },
+    ];
+    distancePRs.forEach(target => {
+      const eligible = sorted.filter(a => {
+        const sport = (a.type || a.sport_type || '').toLowerCase();
+        const km = (a.distance_m || 0) / 1000;
+        return sport.includes(target.sport.toLowerCase()) && km >= target.dist - 0.2;
+      });
+      if (eligible.length === 0) return;
+      // Pace-prorated time over the target distance.
+      let bestSecs = Infinity;
+      let bestActivity = null;
+      eligible.forEach(a => {
+        const km = (a.distance_m || 0) / 1000;
+        if (km <= 0) return;
+        const totalSecs = (a.moving_min || 0) * 60;
+        const proratedSecs = totalSecs * (target.dist / km);
+        if (proratedSecs > 0 && proratedSecs < bestSecs) {
+          bestSecs = proratedSecs;
+          bestActivity = a;
+        }
+      });
+      if (bestActivity) {
+        records.push({ id: `${target.name}_${bestActivity.id}`, label: `${target.name} best`, value: _fmtSecondsAsTime(bestSecs), activityId: bestActivity.id, date: bestActivity.start_date });
+      }
+    });
+    // Biggest training week (rolling 7-day max minutes).
+    let bestWeekStart = null;
+    let bestWeekMins = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const start = new Date(sorted[i].start_date);
+      const end = new Date(start); end.setDate(end.getDate() + 7);
+      const mins = sorted.filter(a => {
+        const ad = new Date(a.start_date);
+        return ad >= start && ad < end;
+      }).reduce((s, a) => s + (a.moving_min || 0), 0);
+      if (mins > bestWeekMins) {
+        bestWeekMins = mins;
+        bestWeekStart = start;
+      }
+    }
+    if (bestWeekMins > 0 && bestWeekStart) {
+      records.push({ id: `BigWeek_${bestWeekStart.toISOString().slice(0,10)}`, label: 'Biggest week', value: `${formatMins(Math.round(bestWeekMins))}`, date: bestWeekStart.toISOString() });
+    }
+    return records;
+  }
+  function _fmtSecondsAsTime(secs) {
+    secs = Math.round(secs);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+  function renderPRBanner() {
+    const slot = document.getElementById('prCelebrationBanner');
+    if (!slot) { return; }
+    const records = detectPRs();
+    let dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('pr-dismissed') || '{}'); } catch (e) {}
+    // Save the most recent PR as a "new" surface — the most recent
+    // previously-unseen record wins the banner slot.
+    const seen = (() => { try { return JSON.parse(localStorage.getItem('pr-seen') || '{}'); } catch (e) { return {}; } })();
+    const fresh = records.filter(r => !seen[r.id] && !dismissed[r.id]);
+    // Record ALL detected as seen so we only celebrate brand-new PRs once.
+    records.forEach(r => { seen[r.id] = Date.now(); });
+    localStorage.setItem('pr-seen', JSON.stringify(seen));
+    if (fresh.length === 0) { slot.style.display = 'none'; return; }
+    const r = fresh[0];
+    slot.style.display = 'block';
+    slot.innerHTML = `<div style="background:linear-gradient(135deg, #5DA985, #3B8968); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+      <div style="font-size:34px; line-height:1;">🏆</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.9;">NEW PERSONAL BEST</div>
+        <div style="font-size:16px; font-weight:800; margin-top:2px;">${escapeHtml(r.label)} — ${escapeHtml(r.value)}</div>
+        <div style="font-size:11.5px; opacity:0.9; margin-top:1px;">Tap to dismiss</div>
+      </div>
+      <button onclick="dismissPR('${r.id}')" style="background:rgba(255,255,255,0.25); color:#fff; border:0; padding:6px 9px; border-radius:100px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;">Got it</button>
+    </div>`;
+  }
+  function dismissPR(id) {
+    let dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('pr-dismissed') || '{}'); } catch (e) {}
+    dismissed[id] = Date.now();
+    localStorage.setItem('pr-dismissed', JSON.stringify(dismissed));
+    renderPRBanner();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // WEEKLY RECAP
+  // Sunday + Monday surface a "last week" summary card on Home. Pulled
+  // from Strava + planned sessions. Dismissable per-week.
+  // ──────────────────────────────────────────────────────────────────────
+  function renderWeeklyRecap() {
+    const slot = document.getElementById('weeklyRecapCard');
+    if (!slot) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dow = today.getDay(); // 0=Sun, 1=Mon, ...
+    // Show on Sunday or Monday only.
+    if (dow !== 0 && dow !== 1) { slot.style.display = 'none'; return; }
+    // Compute last week's date range (Mon of last week through Sun of last week).
+    const daysBackToThisMon = (dow + 6) % 7;
+    const lastWeekMon = new Date(today);
+    lastWeekMon.setDate(today.getDate() - daysBackToThisMon - 7);
+    const lastWeekSun = new Date(lastWeekMon);
+    lastWeekSun.setDate(lastWeekMon.getDate() + 6);
+    lastWeekSun.setHours(23, 59, 59, 999);
+    const weekKey = lastWeekMon.toISOString().slice(0, 10);
+    // Per-week dismissal.
+    let dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('weekly-recap-dismissed') || '{}'); } catch (e) {}
+    if (dismissed[weekKey]) { slot.style.display = 'none'; return; }
+    // Aggregate Strava activities in the window.
+    const acts = (planState.stravaActivities || []).filter(a => {
+      if (!a || !a.start_date) return false;
+      const d = new Date(a.start_date);
+      return d >= lastWeekMon && d <= lastWeekSun;
+    });
+    // Skip the recap if the user had no training last week — empty card adds noise.
+    if (acts.length === 0) { slot.style.display = 'none'; return; }
+    const totalMins = acts.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const totalKm = acts.reduce((s, a) => s + ((a.distance_m || 0) / 1000), 0);
+    const avgHr = (() => {
+      const withHr = acts.filter(a => a.avg_hr);
+      if (withHr.length === 0) return null;
+      return Math.round(withHr.reduce((s, a) => s + a.avg_hr, 0) / withHr.length);
+    })();
+    // Compare to the week before for a delta line.
+    const prevMon = new Date(lastWeekMon); prevMon.setDate(lastWeekMon.getDate() - 7);
+    const prevSun = new Date(lastWeekMon); prevSun.setDate(lastWeekMon.getDate() - 1); prevSun.setHours(23,59,59,999);
+    const prevActs = (planState.stravaActivities || []).filter(a => {
+      if (!a || !a.start_date) return false;
+      const d = new Date(a.start_date);
+      return d >= prevMon && d <= prevSun;
+    });
+    const prevMins = prevActs.reduce((s, a) => s + (a.moving_min || 0), 0);
+    const deltaPct = prevMins > 0 ? Math.round(((totalMins - prevMins) / prevMins) * 100) : null;
+    const deltaLine = deltaPct == null ? ''
+      : deltaPct === 0 ? 'Same volume as the week before.'
+      : `${deltaPct > 0 ? '↑' : '↓'} ${Math.abs(deltaPct)}% vs the week before.`;
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateRange = `${monthShort[lastWeekMon.getMonth()]} ${lastWeekMon.getDate()}–${lastWeekMon.getMonth() === lastWeekSun.getMonth() ? lastWeekSun.getDate() : monthShort[lastWeekSun.getMonth()] + ' ' + lastWeekSun.getDate()}`;
+    slot.style.display = 'block';
+    slot.innerHTML = `<div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <div>
+          <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-soft);">WEEKLY RECAP</div>
+          <div style="font-size:15px; font-weight:800; color:var(--text); margin-top:2px;">${escapeHtml(dateRange)}</div>
+        </div>
+        <button onclick="dismissWeeklyRecap('${weekKey}')" style="background:none; border:0; color:var(--text-soft); font-size:18px; cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:10px;">
+        <div style="background:var(--bg-soft); padding:10px; border-radius:10px;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase;">Total time</div>
+          <div style="font-size:18px; font-weight:800; margin-top:3px;">${formatMins(Math.round(totalMins))}</div>
+        </div>
+        <div style="background:var(--bg-soft); padding:10px; border-radius:10px;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase;">Sessions</div>
+          <div style="font-size:18px; font-weight:800; margin-top:3px;">${acts.length}</div>
+        </div>
+        <div style="background:var(--bg-soft); padding:10px; border-radius:10px;">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:700; text-transform:uppercase;">${avgHr ? 'Avg HR' : 'Distance'}</div>
+          <div style="font-size:18px; font-weight:800; margin-top:3px;">${avgHr ? avgHr : (totalKm > 0 ? totalKm.toFixed(1) + ' km' : '—')}</div>
+        </div>
+      </div>
+      ${deltaLine ? `<div style="font-size:12.5px; color:var(--text-soft); line-height:1.5;">${escapeHtml(deltaLine)}</div>` : ''}
+    </div>`;
+  }
+  function dismissWeeklyRecap(weekKey) {
+    let dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('weekly-recap-dismissed') || '{}'); } catch (e) {}
+    dismissed[weekKey] = Date.now();
+    localStorage.setItem('weekly-recap-dismissed', JSON.stringify(dismissed));
+    renderWeeklyRecap();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // FIRST-SESSION SUCCESS MOMENT
+  // Modal shown once after onboarding — tells user exactly what's next +
+  // offers calendar export so the plan reaches them when the app isn't open.
+  // ──────────────────────────────────────────────────────────────────────
+  function maybeShowFirstSessionMoment() {
+    if (localStorage.getItem('first-session-shown') === '1') return;
+    const sessions = planState.sessions || {};
+    // Find the first non-rest session in the next 7 days.
+    const today = new Date();
+    let firstDay = null, firstSession = null, firstDate = null;
+    for (let off = 0; off < 7; off++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + off);
+      const dow = (d.getDay() + 6) % 7; // Mon=0..Sun=6
+      const dayName = DAYS[dow];
+      const s = sessions[dayName];
+      if (s && s.type !== 'rest' && (s.duration || s.durationMin || 0) > 0) {
+        firstDay = dayName;
+        firstSession = s;
+        firstDate = d;
+        break;
+      }
+    }
+    if (!firstSession || !firstDate) return;
+    const dur = Number(firstSession.duration || firstSession.durationMin || 0);
+    const sanitizedName = (typeof sanitizeSessionName === 'function') ? sanitizeSessionName(firstSession.name || 'Easy session') : firstSession.name;
+    const dayLabels = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const friendlyDate = `${dayLabels[firstDay] || firstDay} · ${monthShort[firstDate.getMonth()]} ${firstDate.getDate()}`;
+    const detail = document.getElementById('firstSessionDetail');
+    if (detail) {
+      detail.innerHTML = `
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-soft); margin-bottom:4px;">FIRST SESSION</div>
+        <div style="font-size:16px; font-weight:800; color:var(--text); margin-bottom:2px;">${escapeHtml(sanitizedName)}</div>
+        <div style="font-size:13px; color:var(--text-soft); line-height:1.4;">${escapeHtml(friendlyDate)} · ${dur} min</div>
+        ${firstSession.prescription ? `<div style="font-size:12.5px; color:var(--text); margin-top:8px; line-height:1.5; padding-top:8px; border-top:1px solid var(--border);">${escapeHtml(String(firstSession.prescription))}</div>` : ''}
+      `;
+    }
+    // Stash the date + session so the ICS export can read it.
+    window._firstSessionForICS = { day: firstDay, date: firstDate, session: firstSession };
+    document.getElementById('firstSessionModal').classList.add('show');
+    localStorage.setItem('first-session-shown', '1');
+  }
+  function closeFirstSessionModal() {
+    const m = document.getElementById('firstSessionModal');
+    if (m) m.classList.remove('show');
+  }
+
+  // Export the full upcoming week's sessions to an .ics file the user can
+  // double-click into Apple/Google/Outlook calendar. Workout name + duration
+  // become the event title; session prescription goes in the body.
+  function exportFirstSessionToICS() {
+    const sessions = planState.sessions || {};
+    const today = new Date(); today.setHours(7, 0, 0, 0); // 7am default start
+    const events = [];
+    for (let off = 0; off < 7; off++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + off);
+      const dow = (d.getDay() + 6) % 7;
+      const dayName = DAYS[dow];
+      const s = sessions[dayName];
+      if (!s || s.type === 'rest' || (s.duration || s.durationMin || 0) === 0) continue;
+      const dur = Number(s.duration || s.durationMin || 0);
+      const start = new Date(d);
+      const end = new Date(start.getTime() + dur * 60 * 1000);
+      const title = (typeof sanitizeSessionName === 'function') ? sanitizeSessionName(s.name || 'Training') : (s.name || 'Training');
+      const desc = String(s.prescription || s.meta || '').replace(/\n/g, '\\n');
+      events.push({ start, end, title: 'Adapt: ' + title, description: desc });
+    }
+    if (events.length === 0) {
+      alert('No sessions to export this week.');
+      return;
+    }
+    const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Adapt//Training Plan//EN',
+      'CALSCALE:GREGORIAN',
+    ];
+    events.forEach((e, i) => {
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:adapt-${Date.now()}-${i}@adapt.app`);
+      lines.push(`DTSTAMP:${fmt(new Date())}`);
+      lines.push(`DTSTART:${fmt(e.start)}`);
+      lines.push(`DTEND:${fmt(e.end)}`);
+      lines.push(`SUMMARY:${e.title}`);
+      lines.push(`DESCRIPTION:${e.description}`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'adapt-this-week.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (typeof trackEvent === 'function') trackEvent('first_session_ics_exported', { count: events.length });
+  }
+
   function openReadinessModal() {
     trackEvent('readiness_viewed');
     renderReadinessCard('readinessModalBody');
@@ -10256,6 +10721,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderInsights();
     renderCourseIntel();
     renderReadinessPills();
+    if (typeof renderRaceDayCard === 'function') renderRaceDayCard();
+    if (typeof renderPRBanner === 'function') renderPRBanner();
+    if (typeof renderWeeklyRecap === 'function') renderWeeklyRecap();
   }
 
   // ── Streak tracking ──
