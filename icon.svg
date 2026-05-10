@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Adapt app icon — single character "A" set in a deep-green rounded square.
+       Designed to read at any size from 16px (tab favicon) to 512px (Android
+       splash). The negative space is the brand: clean, minimal, opinionated.
+       SVG works across iOS Safari, Chrome, Edge, Firefox PWAs. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5DA985"/>
+      <stop offset="100%" stop-color="#2E6B51"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+  <path d="M 256 96
+           L 144 416
+           L 200 416
+           L 222 352
+           L 290 352
+           L 312 416
+           L 368 416
+           Z
+           M 240 304
+           L 256 256
+           L 272 304
+           Z"
+        fill="#FFFFFF"
+        stroke="#FFFFFF"
+        stroke-width="2"
+        stroke-linejoin="round"/>
+</svg>

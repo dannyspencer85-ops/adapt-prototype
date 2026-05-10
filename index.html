@@ -3,7 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Adapt — Prototype</title>
+<title>Adapt — Adaptive Endurance Coach</title>
+<!-- PWA manifest + theme. Lets the user "Add to Home Screen" on iOS/Android,
+     applies the brand color to the OS chrome (URL bar / task switcher), and
+     sets the background that shows during PWA splash on Android. -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#3B8968">
+<meta name="background-color" content="#F6F4EC">
+<!-- iOS Safari PWA tags. iOS uses these instead of the manifest for the
+     home-screen install. apple-mobile-web-app-capable triggers standalone
+     mode (no Safari chrome). status-bar-style controls the top bar. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Adapt">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
   :root {
     --bg: #F6F4EC;
@@ -2159,6 +2173,9 @@
       </div>
     </div>
     <div class="screen-inner">
+      <!-- Strava auth-failure banner — only renders when the last sync hit
+           a terminal auth error. Cleared on successful sync. -->
+      <div id="planStravaAuthBanner" style="display:none;"></div>
       <!-- Single priority-ranked banner. Was previously 5 stacked strips
            (source/summary/injury/change/peak) all competing for attention.
            renderPlanPriorityBanner() now picks the most relevant of the
@@ -2200,6 +2217,13 @@
       <!-- 5. EXPANDERS at the bottom for less-frequent info -->
       <div style="margin-top: 18px;">
         <button onclick="openScheduleModal()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Edit schedule preferences</button>
+        <!-- Export the full plan to a .ics calendar file. Drops every
+             non-rest session in fullPlan into Apple/Google/Outlook with
+             title, duration, and prescription so the plan reaches the
+             user even when they don't open the app. -->
+        <button onclick="exportFullPlanToICS()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>Export full plan to calendar (.ics)</button>
+        <!-- Reminders — open-time nudges the user can opt into. -->
+        <button onclick="enableLocalReminders()" id="enableRemindersBtn" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Turn on workout reminders</button>
       </div>
 
       <details style="margin-top: 4px;">
@@ -2295,6 +2319,8 @@
       </div>
     </div>
     <div class="screen-inner">
+      <!-- Strava auth-failure banner — terminal auth error from sync. -->
+      <div id="pulseStravaAuthBanner" style="display:none;"></div>
       <!-- Connect-Strava banner — surfaces only when Strava isn't connected,
            so users land on the Pulse tab and see the one action that
            unlocks every chart below it. Hidden once Strava is connected. -->
@@ -3405,6 +3431,53 @@
 </div>
 
 <script>
+  // ──────────────────────────────────────────────────────────────────────
+  // PWA — register the service worker on first load. Cached app shell lets
+  // the user open Adapt offline (the workout they already loaded stays
+  // readable on a long run with no signal). On iOS we also surface a
+  // one-time "Add to Home Screen" hint, since iOS Safari has no built-in
+  // install prompt the way Android Chrome does.
+  // ──────────────────────────────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // iOS install hint — shown once per device. Only fires on iOS Safari (not
+  // Chrome iOS, which is iOS Safari under the hood but has no Add to Home
+  // Screen). Hidden when the user has already installed (in standalone mode
+  // window.navigator.standalone === true).
+  function maybeShowIOSInstallHint() {
+    if (localStorage.getItem('ios-install-hint-dismissed') === '1') return;
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isInStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (!isIOS || isInStandalone) return;
+    // Build the hint UI. Floats above the bottom nav, dismissable.
+    const hint = document.createElement('div');
+    hint.id = 'iosInstallHint';
+    hint.style.cssText = 'position:fixed; left:14px; right:14px; bottom:84px; background:#fff; border:1px solid var(--primary); color:var(--text); padding:14px 16px; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.12); z-index:1000; font-size:13px; line-height:1.45;';
+    hint.innerHTML = `
+      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">📲 Install Adapt</div>
+      <div style="margin-bottom:10px; color:var(--text-soft);">Tap the share icon (square + arrow) at the bottom of Safari, then "Add to Home Screen" so the app opens like a native app and works offline.</div>
+      <button onclick="dismissIOSInstallHint()" style="background:var(--primary); color:#fff; border:0; padding:7px 14px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;">Got it</button>
+    `;
+    document.body.appendChild(hint);
+  }
+  function dismissIOSInstallHint() {
+    localStorage.setItem('ios-install-hint-dismissed', '1');
+    const hint = document.getElementById('iosInstallHint');
+    if (hint) hint.remove();
+  }
+  // Show the hint after the user has been in the app for a few seconds —
+  // not on initial load (don't disturb first impression).
+  window.addEventListener('load', () => {
+    setTimeout(maybeShowIOSInstallHint, 8000);
+  });
+
   // ──────────────────────────────────────────────────────────────────────
   // RACE MINIMUM WEEKLY HOURS
   // The amount of training time a typical adult needs to PREPARE SAFELY
@@ -9147,6 +9220,85 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.getElementById('editImpact').innerHTML = html;
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // BODY READINESS — distinct from race readiness.
+  //   - Race readiness = "are you on track to peak for race day?" — drawn
+  //     from the plan structure (long session present, intensity ratio,
+  //     volume vs target, weeks-to-race).
+  //   - Body readiness = "should you train hard TODAY?" — drawn from the
+  //     morning check-in (body, sleep, stress) plus any active injury.
+  //
+  // The two answer different questions and shouldn't share one number.
+  // The home card now shows BOTH side-by-side so a fresh body on a
+  // behind-schedule plan reads honestly: "Your body is ready, your plan
+  // is behind."
+  // ──────────────────────────────────────────────────────────────────────
+  function computeBodyReadiness() {
+    const checkin = planState.lastCheckin || null;
+    const inj = planState.injury || null;
+
+    // No data → conservative neutral signal that prompts a check-in.
+    if (!checkin && !inj) {
+      return {
+        score: 75,
+        label: 'No check-in yet',
+        verdict: 'Tap morning check-in for a real number',
+        color: '#D9A94A',
+        bgSoft: '#FBF0D3',
+        borderSoft: '#e8c46b',
+        textColor: '#7a5a18',
+        notes: ['Body readiness needs your morning check-in to compute.'],
+      };
+    }
+
+    let score = 100;
+    const notes = [];
+    const body = checkin && checkin.body ? checkin.body : null;
+    const sleep = checkin && checkin.sleep ? checkin.sleep : null;
+    const stress = checkin && checkin.stress ? checkin.stress : null;
+
+    // Body field — biggest single signal.
+    if (body === 'Exhausted') { score -= 35; notes.push('Body: exhausted'); }
+    else if (body === 'Drained') { score -= 20; notes.push('Body: drained'); }
+    else if (body === 'OK') { score -= 5; notes.push('Body: OK'); }
+    else if (body === 'Fresh') { notes.push('Body: fresh'); }
+
+    // Sleep — under 6 hours is a hard penalty.
+    if (sleep === 'Under 5h') { score -= 25; notes.push('Sleep: <5h'); }
+    else if (sleep === '5-6h') { score -= 12; notes.push('Sleep: 5-6h'); }
+    else if (sleep === '6-7h') { score -= 5; notes.push('Sleep: 6-7h'); }
+    else if (sleep === '7-8h') { notes.push('Sleep: 7-8h'); }
+    else if (sleep === '8h+') { score += 2; notes.push('Sleep: 8h+'); }
+
+    // Stress.
+    if (stress === 'High') { score -= 12; notes.push('Stress: high'); }
+    else if (stress === 'Moderate') { score -= 4; notes.push('Stress: moderate'); }
+
+    // Active injury.
+    if (inj && inj.severity === 'high') { score -= 40; notes.push(`Injury: ${inj.area} (severe)`); }
+    else if (inj && inj.severity === 'moderate') { score -= 20; notes.push(`Injury: ${inj.area} (moderate)`); }
+    else if (inj && inj.severity === 'low') { score -= 8; notes.push(`Injury: ${inj.area} (mild)`); }
+
+    score = Math.max(0, Math.min(100, score));
+
+    // Verdict text + color.
+    let label, verdict, color, bgSoft, borderSoft, textColor;
+    if (score >= 80) {
+      label = 'Ready to push';
+      verdict = "You're ready for hard work today";
+      color = '#3B8968'; bgSoft = '#DCEADF'; borderSoft = '#3B8968'; textColor = '#2E6B51';
+    } else if (score >= 55) {
+      label = 'Stay steady';
+      verdict = 'Honor the plan, but skip the heroics';
+      color = '#D9A94A'; bgSoft = '#FBF0D3'; borderSoft = '#e8c46b'; textColor = '#7a5a18';
+    } else {
+      label = 'Take it easy';
+      verdict = 'Recovery beats stubbornness today';
+      color = '#C44545'; bgSoft = '#fde8e8'; borderSoft = '#f5b5b5'; textColor = '#7a2828';
+    }
+    return { score, label, verdict, color, bgSoft, borderSoft, textColor, notes };
+  }
+
   function computeRaceReadiness() {
     let score = 100;
     const issues = [];
@@ -9198,60 +9350,60 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (el) el.style.display = 'none';
     });
 
-    // Daily readiness card on Home — the "today's number" surface.
+    // Daily readiness card on Home — TWO scores side-by-side:
+    //   Body (today): "should I train hard today?" — from check-in + injury
+    //   Race (overall): "am I on track to peak for race day?" — from plan
+    // Splitting them prevents the misleading single-number that conflated
+    // "I slept badly" with "my plan is behind."
     const card = document.getElementById('todayReadinessCard');
     if (!card) return;
-    let r = null;
-    try {
-      r = (typeof computeRaceReadiness === 'function') ? computeRaceReadiness() : null;
-    } catch (e) { r = null; }
-    // Hide if no plan or race is over.
+    let race = null, body = null;
+    try { race = (typeof computeRaceReadiness === 'function') ? computeRaceReadiness() : null; } catch (e) {}
+    try { body = (typeof computeBodyReadiness === 'function') ? computeBodyReadiness() : null; } catch (e) {}
     const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
-    if (!r || days == null || days < 0) {
+    if (!race || days == null || days < 0) {
       card.style.display = 'none';
       return;
     }
-    // Pull a body-readiness signal from the morning check-in if present.
-    const checkin = planState.lastCheckin || null;
-    const bodyMap = { 'Fresh': 'Fresh', 'OK': 'OK', 'Drained': 'Drained', 'Exhausted': 'Drained' };
-    const bodyLabel = checkin && checkin.body ? (bodyMap[checkin.body] || checkin.body) : null;
-    const sleepLabel = checkin && checkin.sleep ? checkin.sleep : null;
+    if (!body) body = computeBodyReadiness();
 
-    // Color shape: green = on-track / good, gold = slightly behind / OK,
-    // red = behind / drained.
-    const isGood = r.status === 'on-track' && (!bodyLabel || bodyLabel === 'Fresh' || bodyLabel === 'OK');
-    const isAlert = r.status === 'behind' || bodyLabel === 'Drained';
-    const palette = isAlert
-      ? { bg: '#fde8e8', border: '#f5b5b5', text: '#7a2828', accent: '#C44545' }
-      : !isGood
-      ? { bg: '#fef6e0', border: '#e8c46b', text: '#7a5a18', accent: '#D9A94A' }
-      : { bg: '#DCEADF', border: '#3B8968', text: '#2E6B51', accent: '#3B8968' };
-
-    const verdict = isAlert ? 'Take it easy today'
-      : !isGood ? 'Stay steady'
-      : 'You\'re ready to push';
-
-    const subline = checkin
-      ? `Body: ${bodyLabel || '—'}${sleepLabel ? ' · Sleep: ' + sleepLabel : ''}`
-      : 'Tap the morning check-in below to refine this number.';
+    // The card's overall background follows the WORSE of the two — if either
+    // signal is in the alert range, the card looks alert.
+    const minScore = Math.min(body.score, race.score);
+    const palette = minScore < 55
+      ? { bg: '#fde8e8', border: '#f5b5b5', text: '#7a2828' }
+      : minScore < 80
+      ? { bg: '#fef6e0', border: '#e8c46b', text: '#7a5a18' }
+      : { bg: '#DCEADF', border: '#3B8968', text: '#2E6B51' };
 
     card.style.background = palette.bg;
     card.style.border = `1px solid ${palette.border}`;
     card.style.color = palette.text;
     card.style.display = 'block';
-    card.innerHTML = `
-      <div style="display:flex; align-items:center; gap:14px;">
-        <div style="background:${palette.accent}; color:#fff; width:54px; height:54px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0;">
-          <div style="font-size:22px; font-weight:800; line-height:1;">${r.score}</div>
-          <div style="font-size:9px; font-weight:700; opacity:0.8; letter-spacing:0.3px; margin-top:2px;">/ 100</div>
+
+    // Per-score color block helper.
+    const scoreBlock = (s, label, sublabel) => `
+      <div style="flex:1; min-width:0; background:rgba(255,255,255,0.55); padding:10px 12px; border-radius:10px;">
+        <div style="display:flex; align-items:baseline; gap:6px;">
+          <div style="font-size:22px; font-weight:800; color:${s.color}; line-height:1;">${s.score}</div>
+          <div style="font-size:9px; font-weight:700; color:var(--text-soft); letter-spacing:0.3px;">/ 100</div>
         </div>
-        <div style="flex:1; min-width:0;">
-          <div style="font-size:11px; font-weight:700; letter-spacing:0.5px; opacity:0.75; text-transform:uppercase;">Today's readiness</div>
-          <div style="font-size:16px; font-weight:700; margin-top:1px;">${escapeHtml(verdict)}</div>
-          <div style="font-size:12px; opacity:0.85; margin-top:2px; line-height:1.4;">${escapeHtml(subline)}</div>
-        </div>
-        <div style="font-size:18px; opacity:0.5;">›</div>
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; margin-top:5px; color:${s.color};">${escapeHtml(label)}</div>
+        <div style="font-size:11.5px; line-height:1.35; margin-top:2px; color:var(--text-soft);">${escapeHtml(sublabel)}</div>
       </div>`;
+
+    // Race readiness uses race.status mapped to a color.
+    const raceColor = race.status === 'on-track' ? '#3B8968' : race.status === 'slightly-behind' ? '#D9A94A' : '#C44545';
+    const raceObj = { score: race.score, color: raceColor };
+
+    card.innerHTML = `
+      <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85; margin-bottom:8px;">TODAY · TAP FOR DETAILS</div>
+      <div style="display:flex; gap:8px;">
+        ${scoreBlock(body, 'Body today', body.label)}
+        ${scoreBlock(raceObj, 'Race ready', race.label)}
+      </div>
+      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan needs small fixes' : 'Plan is behind — adjust this week')}</div>
+    `;
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -9673,6 +9825,188 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     URL.revokeObjectURL(url);
     if (typeof trackEvent === 'function') trackEvent('first_session_ics_exported', { count: events.length });
   }
+
+  // Export the FULL plan — every non-rest session across every week in
+  // fullPlan.weeks — to a single .ics file. Lets the user drop the entire
+  // build into Apple/Google/Outlook in one go. Each event uses the real
+  // session date (computed from the current week's Monday + week offset).
+  function exportFullPlanToICS() {
+    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
+    if (!fullPlan) {
+      alert('No multi-week plan available yet. Try again after the plan finishes building.');
+      return;
+    }
+    const today = new Date(); today.setHours(7, 0, 0, 0);
+    const todayDow = today.getDay();
+    const daysBackToMon = (todayDow + 6) % 7;
+    const currentMon = new Date(today);
+    currentMon.setDate(today.getDate() - daysBackToMon);
+    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+    const events = [];
+    fullPlan.weeks.forEach((wk, wIdx) => {
+      const weekOffset = wIdx - currentIdx;
+      if (weekOffset < 0) return; // skip past weeks
+      const sessions = wk.sessions || {};
+      DAYS.forEach((dayName, di) => {
+        const s = sessions[dayName];
+        if (!s || s.type === 'rest' || (s.duration || s.durationMin || 0) === 0) return;
+        const dur = Number(s.duration || s.durationMin || 0);
+        const start = new Date(currentMon);
+        start.setDate(currentMon.getDate() + weekOffset * 7 + di);
+        const end = new Date(start.getTime() + dur * 60 * 1000);
+        const title = (typeof sanitizeSessionName === 'function') ? sanitizeSessionName(s.name || 'Training') : (s.name || 'Training');
+        const desc = String(s.prescription || s.meta || '').replace(/\n/g, '\\n');
+        events.push({ start, end, title: 'Adapt: ' + title, description: desc });
+      });
+    });
+    if (events.length === 0) {
+      alert('No upcoming sessions to export.');
+      return;
+    }
+    const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Adapt//Training Plan//EN','CALSCALE:GREGORIAN'];
+    events.forEach((e, i) => {
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:adapt-full-${Date.now()}-${i}@adapt.app`);
+      lines.push(`DTSTAMP:${fmt(new Date())}`);
+      lines.push(`DTSTART:${fmt(e.start)}`);
+      lines.push(`DTEND:${fmt(e.end)}`);
+      lines.push(`SUMMARY:${e.title}`);
+      lines.push(`DESCRIPTION:${e.description}`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `adapt-full-plan-${(planState.raceEvent || 'plan').replace(/\s+/g, '-').toLowerCase()}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (typeof trackEvent === 'function') trackEvent('full_plan_ics_exported', { count: events.length });
+    alert(`Exported ${events.length} sessions across ${fullPlan.weeks.length} weeks. Open the .ics in your calendar app.`);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // LOCAL NOTIFICATIONS — workout-day reminders.
+  // The honest MVP: web Notifications work while the page is open, and via
+  // service worker push when supplied with a server-side push subscription.
+  // We don't have a push backend yet, so this layer:
+  //   1. Asks for notification permission (one-time)
+  //   2. Schedules an in-page setTimeout reminder for the user's next
+  //      training-day session if they keep the tab open overnight
+  //   3. On every app focus, checks if today is a training day with an
+  //      unlogged session — if so, fires a system Notification immediately
+  //      (so a user opening the app at 6am sees a clear "today's session"
+  //      ping even before they navigate)
+  //   4. Gracefully no-ops on browsers without Notification support
+  // For real backgrounded reminders we'd need a push backend — flagged in
+  // the deferred-work list.
+  // ──────────────────────────────────────────────────────────────────────
+  function _hasNotificationApi() {
+    return typeof window !== 'undefined' && 'Notification' in window;
+  }
+  function enableLocalReminders() {
+    if (!_hasNotificationApi()) {
+      alert("Your browser doesn't support notifications. Try Chrome, Safari, or Firefox.");
+      return;
+    }
+    Notification.requestPermission().then((perm) => {
+      if (perm === 'granted') {
+        localStorage.setItem('local-reminders-enabled', '1');
+        // Test ping so the user sees it actually works.
+        try {
+          new Notification('Adapt reminders are on', {
+            body: "We'll remind you about today's session when you open the app.",
+            icon: '/icon.svg',
+            tag: 'adapt-reminder-enabled',
+          });
+        } catch (e) {}
+        // Update the button label.
+        const btn = document.getElementById('enableRemindersBtn');
+        if (btn) {
+          btn.innerHTML = btn.innerHTML.replace('Turn on workout reminders', '✓ Workout reminders on');
+        }
+        // Schedule next-workout reminder while the page is open.
+        scheduleNextWorkoutReminder();
+        if (typeof trackEvent === 'function') trackEvent('reminders_enabled');
+      } else {
+        alert('You can enable notifications later in your browser settings.');
+      }
+    });
+  }
+  function scheduleNextWorkoutReminder() {
+    if (!_hasNotificationApi() || Notification.permission !== 'granted') return;
+    // Find the next training session in the next 7 days.
+    const sessions = planState.sessions || {};
+    const now = new Date();
+    let bestDelay = null, bestSession = null;
+    for (let off = 0; off < 7; off++) {
+      const target = new Date(now);
+      target.setDate(now.getDate() + off);
+      target.setHours(6, 30, 0, 0); // notify at 6:30am the morning of
+      if (target < now) continue;
+      const dayName = DAYS[(target.getDay() + 6) % 7];
+      const s = sessions[dayName];
+      if (!s || s.type === 'rest' || (s.duration || 0) === 0) continue;
+      const delay = target - now;
+      if (bestDelay == null || delay < bestDelay) {
+        bestDelay = delay;
+        bestSession = { dayName, session: s };
+      }
+    }
+    if (!bestSession || bestDelay == null) return;
+    // setTimeout cap is 24.8 days; we schedule for at most the next 7 days.
+    setTimeout(() => {
+      try {
+        new Notification("Today's session is on", {
+          body: `${bestSession.session.name || 'Training'} · ${bestSession.session.duration} min. Open Adapt for details.`,
+          icon: '/icon.svg',
+          tag: 'adapt-workout-day',
+        });
+      } catch (e) {}
+      // Re-arm for the next session after this one fires.
+      scheduleNextWorkoutReminder();
+    }, bestDelay);
+  }
+  // On app focus / load, if today is a training day with an unlogged session,
+  // fire a system notification immediately. This handles the "user opens the
+  // app at 6am" case without needing a backend.
+  function maybePingTodayReminder() {
+    if (localStorage.getItem('local-reminders-enabled') !== '1') return;
+    if (!_hasNotificationApi() || Notification.permission !== 'granted') return;
+    // Throttle: only ping once per day per session.
+    const todayKey = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('reminder-pinged-' + todayKey) === '1') return;
+    const todayName = DAYS[(new Date().getDay() + 6) % 7];
+    const s = (planState.sessions || {})[todayName];
+    if (!s || s.type === 'rest' || s.completed || (s.duration || 0) === 0) return;
+    try {
+      new Notification("Today's session is on", {
+        body: `${s.name || 'Training'} · ${s.duration} min. Tap Adapt for details.`,
+        icon: '/icon.svg',
+        tag: 'adapt-workout-day',
+      });
+      localStorage.setItem('reminder-pinged-' + todayKey, '1');
+    } catch (e) {}
+  }
+  // Wire focus + load triggers.
+  window.addEventListener('load', () => {
+    setTimeout(maybePingTodayReminder, 1500);
+    if (localStorage.getItem('local-reminders-enabled') === '1') {
+      scheduleNextWorkoutReminder();
+    }
+    // Update the button label if reminders are already on.
+    if (localStorage.getItem('local-reminders-enabled') === '1') {
+      const btn = document.getElementById('enableRemindersBtn');
+      if (btn) btn.innerHTML = btn.innerHTML.replace('Turn on workout reminders', '✓ Workout reminders on');
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) maybePingTodayReminder();
+  });
 
   function openReadinessModal() {
     trackEvent('readiness_viewed');
@@ -10724,6 +11058,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof renderRaceDayCard === 'function') renderRaceDayCard();
     if (typeof renderPRBanner === 'function') renderPRBanner();
     if (typeof renderWeeklyRecap === 'function') renderWeeklyRecap();
+    if (typeof renderStravaAuthBanner === 'function') renderStravaAuthBanner();
   }
 
   // ── Streak tracking ──
@@ -11721,6 +12056,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (ts) planState.stravaSyncedAt = parseInt(ts, 10);
       const days = localStorage.getItem('strava-sync-days');
       if (days) planState.stravaSyncDays = parseInt(days, 10);
+      // Restore the persisted auth-error so the banner survives reload.
+      const authErr = localStorage.getItem('strava-auth-error');
+      if (authErr) planState.stravaAuthError = authErr;
     } catch (e) {}
   }
   // Pick a sync depth that covers Performance range + a buffer.
@@ -11869,6 +12207,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setStravaMsg('Syncing recent activities…', 'info');
     try {
       const acts = await syncStravaActivities(getDesiredSyncDays());
+      // Clear any stale auth error on success.
+      planState.stravaAuthError = null;
+      try { localStorage.removeItem('strava-auth-error'); } catch (e) {}
       // Auto-mark planned sessions complete based on Strava activity matches
       const marked = (typeof autoMarkSessionsFromStrava === 'function') ? autoMarkSessionsFromStrava() : 0;
       const markedSuffix = marked > 0 ? ` · Auto-marked ${marked} planned session${marked > 1 ? 's' : ''} complete.` : '';
@@ -11877,7 +12218,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       renderStravaUI();
     } catch (e) {
       setStravaMsg(`Sync failed: ${e.message}`, 'err');
+      // Persist auth-failure state so the Plan / Pulse tabs can surface a
+      // banner, not just a transient toast that disappears on tab switch.
+      const isAuthErr = /401|expired|revoked|re-?authorize|invalid_grant/i.test(e.message);
+      if (isAuthErr) {
+        planState.stravaAuthError = e.message;
+        try { localStorage.setItem('strava-auth-error', e.message); } catch (err) {}
+        renderAll();
+      }
     }
+  }
+
+  // Persistent banner for Strava auth failures. Renders into a slot on
+  // both Plan and Pulse tabs. Auto-clears when the user successfully syncs.
+  function renderStravaAuthBanner() {
+    const err = planState.stravaAuthError || (() => {
+      try { return localStorage.getItem('strava-auth-error') || ''; } catch (e) { return ''; }
+    })();
+    ['planStravaAuthBanner', 'pulseStravaAuthBanner'].forEach(id => {
+      const slot = document.getElementById(id);
+      if (!slot) return;
+      if (!err) { slot.style.display = 'none'; slot.innerHTML = ''; return; }
+      slot.style.display = 'block';
+      slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+        <div style="font-weight:700; margin-bottom:4px;">⚠ Strava connection lost</div>
+        <div style="margin-bottom:8px;">Recent activities aren't syncing. Reconnect to keep your training data flowing.</div>
+        <button onclick="showScreen('profile')" style="background:#C44545; color:#fff; border:0; padding:7px 14px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;">Open Profile to reconnect</button>
+      </div>`;
+    });
   }
   // Strava activity → display icon
   function iconForStravaType(type) {
