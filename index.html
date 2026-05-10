@@ -1981,7 +1981,7 @@
       <div id="todayChangeBanner"></div>
 
       <!-- 1. Race countdown — slim strip, sets context without dominating -->
-      <div id="todayRaceBanner" onclick="showScreen('plan')" style="background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer;">
+      <div id="todayRaceBanner" onclick="showScreen('plan')" style="background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer;">
         <div id="raceDaysCount" style="background: rgba(255,255,255,0.25); padding: 5px 12px; border-radius: 100px; font-size: 14px; font-weight: 800; min-width: 36px; text-align: center;">47</div>
         <div style="flex:1; min-width:0;">
           <div id="raceLabelTop" style="font-size: 14px; font-weight: 700; line-height: 1.25;">days to your race</div>
@@ -1989,6 +1989,12 @@
         </div>
         <div style="font-size: 16px; opacity: 0.7;">›</div>
       </div>
+
+      <!-- DAILY READINESS — the "today's number" most successful fitness apps
+           lead with (Whoop recovery, Garmin training readiness, intervals.icu
+           form). One look-at-it card, big number, color-coded verdict. Taps
+           into the existing readiness modal for the deeper breakdown. -->
+      <div id="todayReadinessCard" onclick="openReadinessModal()" style="display:none; padding:14px 16px; border-radius:14px; margin-bottom:14px; cursor:pointer; transition:transform 0.1s;"></div>
 
       <!-- Smart summary — answers 'what's today, where's my body, what's next' in 3 lines -->
       <div class="section-label s-today" style="margin-top: 4px;">Here's your day</div>
@@ -2045,9 +2051,11 @@
       <!-- 4. Coach insights — categorized, collapsible -->
       <div id="todayInsights"></div>
 
-      <!-- 5. Coming up — next 2 non-rest sessions -->
-      <div class="section-label s-upcoming">Coming up</div>
-      <div id="todayComingUp"></div>
+      <!-- "Coming up" was here. Removed — the month calendar on the Plan
+           tab covers it visually and prevents Home from competing with
+           Plan for "what's next" attention. The renderTodayComingUp()
+           function is now a no-op (kept callable for renderAll safety). -->
+      <div id="todayComingUp" style="display:none;"></div>
 
       <!-- 6. Quick actions footer — check-in + weekly review -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;">
@@ -2133,12 +2141,19 @@
       </div>
     </div>
     <div class="screen-inner">
-      <!-- Banners (only show when relevant) -->
-      <div id="planSourceBannerPlan"></div>
-      <div id="planSummaryCard"></div>
-      <div id="planInjuryBanner"></div>
-      <div id="planChangeBanner"></div>
-      <div id="planPeakBanner"></div>
+      <!-- Single priority-ranked banner. Was previously 5 stacked strips
+           (source/summary/injury/change/peak) all competing for attention.
+           renderPlanPriorityBanner() now picks the most relevant of the
+           five and emits HTML into this slot. -->
+      <div id="planPriorityBanner"></div>
+      <!-- Hidden stubs so existing renderers that still write into the
+           old IDs don't crash. Their content gets folded into the priority
+           banner via renderPlanPriorityBanner. -->
+      <div id="planSourceBannerPlan" style="display:none;"></div>
+      <div id="planSummaryCard" style="display:none;"></div>
+      <div id="planInjuryBanner" style="display:none;"></div>
+      <div id="planChangeBanner" style="display:none;"></div>
+      <div id="planPeakBanner" style="display:none;"></div>
 
       <!-- 1. CALENDAR — the visual anchor of the Plan tab -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -2174,12 +2189,12 @@
         <div id="courseIntelCard"></div>
       </details>
 
-      <details style="margin-top: 4px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>6-week plan arc</summary>
-        <div class="card" style="margin-top: 8px;">
-          <div id="weekArc" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px 14px; font-size: 13px;"></div>
-        </div>
-      </details>
+      <!-- The "6-week plan arc" expander used to live here. The new month
+           calendar above renders the same information visually + spans
+           more weeks, so we removed the redundant table. The weekArc data
+           is still computed by the engine and used by the calendar /
+           insight engine — just not surfaced here. -->
+      <div id="weekArc" style="display:none;"></div>
 
       <!-- Hidden stubs for renderer compatibility (the data lives in Pulse tab now) -->
       <div style="display:none;">
@@ -2561,7 +2576,10 @@
           <div style="color: var(--text-soft); font-size: 13px; margin-top: 2px;" id="profileGoalDate"></div>
         </div>
 
-        <div style="padding: 12px 0 6px;">
+        <!-- Stepping-stone goal block is hidden by default — niche feature
+             gated behind validation. Show via showSteppingStone() if you
+             want to test it. -->
+        <div id="profileSteppingStone" style="display:none; padding: 12px 0 6px;">
           <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Stepping-stone</div>
           <div style="color: var(--text-soft); font-size: 13px; margin-bottom: 8px;">None yet — add one to stay motivated between now and race day.</div>
           <button onclick="showScreen('onboard'); onbStep(3); toggleStone();" style="background: var(--primary-soft); border: 0; color: var(--primary-dark); font-weight:600; font-size:13px; padding: 8px 14px; border-radius: 10px; cursor:pointer; font-family:inherit;">+ Add stepping-stone goal</button>
@@ -6987,11 +7005,88 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
 
+  // Single priority-ranked banner for the Plan tab. Replaces the old stack
+  // of 5 separate banner slots that all competed for attention.
+  // Priority order (highest first):
+  //   1. Active injury — health overrides everything else
+  //   2. Race week / race day urgency
+  //   3. Rule-engine fallback warning (the AI plan failed to load)
+  //   4. Recent plan change (transient acknowledgement)
+  //   5. Peak-week / phase callout (informational)
+  // Only ONE renders at a time. Lower-priority items wait their turn.
+  function renderPlanPriorityBanner() {
+    const slot = document.getElementById('planPriorityBanner');
+    if (!slot) { return; }
+    const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    const arc = planState.weekArc || [];
+    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+    const planSource = planState.planSource || '';
+
+    // 1. Injury (always wins).
+    if (planState.injury && planState.injury.area) {
+      const inj = planState.injury;
+      const sev = inj.severity || 'low';
+      const sevLabel = sev === 'high' ? '🚫 Plan paused' : '⚠ Injury flagged';
+      slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+        <strong>${sevLabel} — ${escapeHtml(inj.area)} · ${escapeHtml(sev)}.</strong>
+        ${sev === 'high' ? 'See a doctor or PT before resuming. Plan modifications active.' : 'Plan adapted to protect this area. Update daily in your check-in.'}
+      </div>`;
+      return;
+    }
+
+    // 2. Race day / race week.
+    if (days != null && days >= 0 && days <= 7) {
+      slot.innerHTML = `<div style="background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+        <strong>🏁 Race week.</strong> Volume drops, intensity stays sharp. Your job is to arrive fresh — sleep + fuel matter most right now.
+      </div>`;
+      return;
+    }
+
+    // 3. Rule-engine fallback alert. Surface only when the AI plan engine
+    // failed and the user is on the locally-built plan.
+    if (planSource === 'fallback') {
+      slot.innerHTML = `<div style="background:#fef6e0; border:1px solid #e8c46b; color:#7a5a18; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+        <strong>⚠ Local plan in use.</strong> The AI coach didn't connect, so we built a local plan with phase-based scaling. Tap the rebuild button in Coach Chat to retry once your network is back.
+      </div>`;
+      return;
+    }
+
+    // 4. Recent plan change — transient feedback after a tool ran.
+    if (planState.lastChange) {
+      slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5; display:flex; align-items:center; gap:10px;">
+        ${icon('sync', { size: 16, color: '#2E6B51' })}
+        <div><strong>Plan updated:</strong> ${escapeHtml(planState.lastChange)}</div>
+      </div>`;
+      return;
+    }
+
+    // 5. Peak / phase informational callout.
+    if (arc.length > 0 && currentIdx >= 0) {
+      const peakIdx = arc.findIndex(w => /peak/i.test(w.focus || ''));
+      if (peakIdx === currentIdx) {
+        slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+          <strong>This is peak week.</strong> Highest volume of the cycle. Sleep + fuel matter most right now.
+        </div>`;
+        return;
+      }
+      if (peakIdx > currentIdx) {
+        const weeksAway = peakIdx - currentIdx;
+        slot.innerHTML = `<div style="background:#f0f5f2; border:1px solid #c8d8d0; color:#2E6B51; padding:10px 14px; border-radius:12px; margin-bottom:14px; font-size:12.5px; line-height:1.5;">
+          <strong>Peak week is ${weeksAway} week${weeksAway > 1 ? 's' : ''} out.</strong> That's your dress rehearsal — biggest volume, race-pace work.
+        </div>`;
+        return;
+      }
+    }
+
+    // Nothing pressing — empty.
+    slot.innerHTML = '';
+  }
+
   function renderBanners() {
     const changeHtml = planState.lastChange
       ? `<div class="change-banner"><div class="icon">${icon('sync', { size: 16 })}</div><div><strong>Plan updated:</strong> ${escapeHtml(planState.lastChange)}</div></div>`
       : '';
-    ['planChangeBanner','todayChangeBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = changeHtml; });
+    ['todayChangeBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = changeHtml; });
 
     if (!planState.injury) {
       ['planInjuryBanner','todayInjuryBanner'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
@@ -9220,10 +9315,67 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // Readiness pills cut from headers — readiness now surfaces only via Today rationale
   function renderReadinessPills() {
+    // Old small pills are no longer the primary surface — keep them hidden
+    // (they live in the headers but compete with the new readiness card).
     ['rp-today', 'rp-plan', 'rp-data', 'rp-prep'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
+
+    // Daily readiness card on Home — the "today's number" surface.
+    const card = document.getElementById('todayReadinessCard');
+    if (!card) return;
+    let r = null;
+    try {
+      r = (typeof computeRaceReadiness === 'function') ? computeRaceReadiness() : null;
+    } catch (e) { r = null; }
+    // Hide if no plan or race is over.
+    const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    if (!r || days == null || days < 0) {
+      card.style.display = 'none';
+      return;
+    }
+    // Pull a body-readiness signal from the morning check-in if present.
+    const checkin = planState.lastCheckin || null;
+    const bodyMap = { 'Fresh': 'Fresh', 'OK': 'OK', 'Drained': 'Drained', 'Exhausted': 'Drained' };
+    const bodyLabel = checkin && checkin.body ? (bodyMap[checkin.body] || checkin.body) : null;
+    const sleepLabel = checkin && checkin.sleep ? checkin.sleep : null;
+
+    // Color shape: green = on-track / good, gold = slightly behind / OK,
+    // red = behind / drained.
+    const isGood = r.status === 'on-track' && (!bodyLabel || bodyLabel === 'Fresh' || bodyLabel === 'OK');
+    const isAlert = r.status === 'behind' || bodyLabel === 'Drained';
+    const palette = isAlert
+      ? { bg: '#fde8e8', border: '#f5b5b5', text: '#7a2828', accent: '#C44545' }
+      : !isGood
+      ? { bg: '#fef6e0', border: '#e8c46b', text: '#7a5a18', accent: '#D9A94A' }
+      : { bg: '#DCEADF', border: '#3B8968', text: '#2E6B51', accent: '#3B8968' };
+
+    const verdict = isAlert ? 'Take it easy today'
+      : !isGood ? 'Stay steady'
+      : 'You\'re ready to push';
+
+    const subline = checkin
+      ? `Body: ${bodyLabel || '—'}${sleepLabel ? ' · Sleep: ' + sleepLabel : ''}`
+      : 'Tap the morning check-in below to refine this number.';
+
+    card.style.background = palette.bg;
+    card.style.border = `1px solid ${palette.border}`;
+    card.style.color = palette.text;
+    card.style.display = 'block';
+    card.innerHTML = `
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div style="background:${palette.accent}; color:#fff; width:54px; height:54px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0;">
+          <div style="font-size:22px; font-weight:800; line-height:1;">${r.score}</div>
+          <div style="font-size:9px; font-weight:700; opacity:0.8; letter-spacing:0.3px; margin-top:2px;">/ 100</div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.5px; opacity:0.75; text-transform:uppercase;">Today's readiness</div>
+          <div style="font-size:16px; font-weight:700; margin-top:1px;">${escapeHtml(verdict)}</div>
+          <div style="font-size:12px; opacity:0.85; margin-top:2px; line-height:1.4;">${escapeHtml(subline)}</div>
+        </div>
+        <div style="font-size:18px; opacity:0.5;">›</div>
+      </div>`;
   }
 
   function openReadinessModal() {
@@ -10269,6 +10421,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderPerformanceTab();
     renderWeekArc();
     renderBanners();
+    renderPlanPriorityBanner();
     renderInsights();
     renderCourseIntel();
     renderReadinessPills();
