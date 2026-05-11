@@ -7285,13 +7285,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         : isRest && isInMonth ? 'Rest day — tap for why' : '';
 
       if (isRaceDay) {
-        // Race day gets its own dramatic layout — gold gradient, large
-        // centered flag, "RACE DAY" label below, day number in corner.
-        // No more flag-overlapping-the-date collision.
-        cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px; background:linear-gradient(135deg, #FBF0D3 0%, #F0D9A0 100%); border:2.5px solid #D9A94A; border-radius:10px; ${cursor} overflow:hidden; box-shadow: 0 2px 8px rgba(217,169,74,0.35);">
-          <div style="position:absolute; top:3px; left:5px; font-size:10px; font-weight:800; color:#7a5a18; line-height:1;">${d.getDate()}</div>
-          <div style="font-size:22px; line-height:1; margin-top:6px;">🏁</div>
-          <div style="font-size:8px; font-weight:900; color:#7a5a18; letter-spacing:0.8px; margin-top:3px; line-height:1;">RACE DAY</div>
+        // Race day — minimal, distinct, on-grid. Same shape as every other
+        // cell (day number top-left like the rest), gold tint to mark it
+        // out, single small 🏁 in the top-right corner using the same dot
+        // pattern as training days. No competing "RACE DAY" label. The
+        // pep-talk modal carries the celebration weight; the cell just
+        // needs to be unmistakable at a glance.
+        cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:#FBF0D3; border:2px solid #D9A94A; border-radius:8px; ${cursor} overflow:hidden;">
+          <div style="font-size:12px; font-weight:800; color:#7a5a18; line-height:1;">${d.getDate()}</div>
+          <div style="position:absolute; top:3px; right:4px; font-size:11px; line-height:1;">🏁</div>
         </div>`;
       } else {
         cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
