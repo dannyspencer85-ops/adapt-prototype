@@ -9389,8 +9389,36 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function openSessionModal(day, weekOffset) {
     weekOffset = weekOffset || 0;
-    const s = planState.sessions[day];
+    let s = planState.sessions[day];
+    // For future weeks, prefer fullPlan over the current-week shape.
+    if (weekOffset !== 0 && planState.fullPlan && Array.isArray(planState.fullPlan.weeks)) {
+      const arc = planState.weekArc || [];
+      const curIdx = arc.findIndex(w => w.current);
+      const baseIdx = curIdx >= 0 ? curIdx : (planState.activeWeekIdx || 0);
+      const wk = planState.fullPlan.weeks[baseIdx + weekOffset];
+      if (wk && wk.sessions && wk.sessions[day]) s = wk.sessions[day];
+    }
     if (!s) return;
+    // Race-week taper at READ time. Both the rule fallback and the AI plan
+    // sometimes leave race-week sessions un-tapered (or only weakly tapered)
+    // for the user's CURRENT week. Compute the absolute target date and
+    // run through _enforceRaceWeekTaper so T-1/T-2/T-3 are capped at
+    // 20/20/30 min regardless of source.
+    try {
+      const _today = new Date(); _today.setHours(0,0,0,0);
+      const _todayDow = _today.getDay();
+      const _daysBackToMon = (_todayDow + 6) % 7;
+      const _currentMon = new Date(_today);
+      _currentMon.setDate(_today.getDate() - _daysBackToMon);
+      const _dayIdxInWeek = DAYS.indexOf(day);
+      if (_dayIdxInWeek >= 0) {
+        const _targetDate = new Date(_currentMon);
+        _targetDate.setDate(_currentMon.getDate() + weekOffset * 7 + _dayIdxInWeek);
+        if (typeof _enforceRaceWeekTaper === 'function') {
+          s = _enforceRaceWeekTaper(s, _targetDate);
+        }
+      }
+    } catch (e) { /* non-fatal — show original session */ }
     currentEditDay = day;
 
     let scaleFactor = 1;
@@ -9404,7 +9432,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (arcEntry) {
         const baseHours = parseWeekHours((arc[currentIdx] || arc[0] || {}).hours || '5:00');
         const targetHours = parseWeekHours(arcEntry.hours);
-        scaleFactor = baseHours > 0 ? targetHours / baseHours : 1;
+        // Don't double-scale a session we just re-capped via the race-week
+        // taper guard; that helper already set the right duration.
+        if (!s || !s._raceWeekCapped) {
+          scaleFactor = baseHours > 0 ? targetHours / baseHours : 1;
+        }
         phaseLabel = arcEntry.focus;
       }
       weekLabel = weekOffset > 0 ? `${weekOffset} week${weekOffset > 1 ? 's' : ''} from now` : `${Math.abs(weekOffset)} week${Math.abs(weekOffset) > 1 ? 's' : ''} ago`;
@@ -11362,6 +11394,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       notesForUser: ['This plan was generated locally. Re-connect AI in Profile to get a fully periodized version with calibrated paces.'],
     };
     planState.activeWeekIdx = 0;
+    // If race week is the user's CURRENT week (the plan is short / late
+    // onboarding), planState.sessions still holds the un-tapered base
+    // sessions. The week-arc / fullPlan loop tapered week N-1 correctly,
+    // but planState.sessions = newSessions was assigned BEFORE that loop.
+    // Override current-week sessions with the tapered race-week version
+    // so the session modal + Today screen render the right durations.
+    try {
+      const _curIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+      if (_curIdx >= 0 && fullPlanWeeks[_curIdx] && fullPlanWeeks[_curIdx].sessions) {
+        planState.sessions = { ...fullPlanWeeks[_curIdx].sessions };
+      }
+    } catch (e) {}
     saveUserData();
   }
 
@@ -11541,20 +11585,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // R14: race-week sanity — T-1/T-2 minimal
       if (isRaceWeek && inputs.raceDayInWeekIdx != null) {
         const rDay = inputs.raceDayInWeekIdx;
+        let preRaceTotal = 0;
         DAYS.forEach((d, di) => {
           const s = sessions[d] || {};
           const dur = Number(s.duration || 0);
           const daysToRace = rDay - di;
+          if (daysToRace > 0 && daysToRace <= 7) preRaceTotal += dur;
           if (daysToRace === 1 && dur > 25) {
             _push('error', wi, d, 'TAPER_T1_TOO_LONG', `T-1 session ${dur} min — race-week T-1 should be ≤20-25 min (Bosquet 2007 taper meta).`);
           }
           if (daysToRace === 2 && dur > 30) {
             _push('error', wi, d, 'TAPER_T2_TOO_LONG', `T-2 session ${dur} min — race-week T-2 should be ≤25-30 min activation.`);
           }
+          if (daysToRace === 3 && dur > 40) {
+            _push('error', wi, d, 'TAPER_T3_TOO_LONG', `T-3 session ${dur} min — race-week T-3 should be ≤30-40 min light primer.`);
+          }
           if (di > rDay && dur > 0) {
             _push('error', wi, d, 'POST_RACE_SESSION', `Session ${dur} min scheduled after race day in race week — should be rest.`);
           }
         });
+        // The T-3/T-2/T-1 trio should total no more than ~70 min combined.
+        // User reported 3+ hours across these days — exactly this failure.
+        if (preRaceTotal > 90) {
+          _push('error', wi, null, 'TAPER_TOTAL_TOO_HIGH', `T-1 + T-2 + T-3 combined ${preRaceTotal} min — should be ≤70-90 min total. Race-week sharpening, not training.`);
+        }
       }
       // R15: post-race-day weeks shouldn't exist (the build engine should
       // end at race week). If any week WI > race-week-idx has training,
@@ -11984,7 +12038,73 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       });
   }
 
+  // Race-week sanity gate. Walks planState.sessions and forces every day in
+  // the current Mon-Sun window through the taper helper IF the current week
+  // contains race day. Runs on every renderAll so stale fullPlans / AI plans
+  // that didn't honor the taper rule still display correct durations.
+  //
+  // Why this exists (in addition to _sessionForDate's runtime guard):
+  // renderWeekSessions, renderTodayHero, openSessionModal for current week —
+  // all read planState.sessions DIRECTLY, bypassing _sessionForDate. If
+  // current week IS race week, those surfaces would render the un-tapered
+  // session durations (the bug the user just reported: 3+ hours T-3/T-2/T-1
+  // for a Thursday Half Ironman).
+  function _enforceCurrentWeekTaper() {
+    if (!planState.sessions) return;
+    let raceDate, raceDayInWeekIdx;
+    try {
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (!raceStr) return;
+      raceDate = new Date(raceStr + 'T00:00:00');
+      if (isNaN(raceDate.getTime())) return;
+      raceDayInWeekIdx = (raceDate.getDay() + 6) % 7; // Mon=0..Sun=6
+    } catch (e) { return; }
+    // Compute current week's Mon-Sun window.
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay();
+    const daysBackToMon = (todayDow + 6) % 7;
+    const weekMon = new Date(today);
+    weekMon.setDate(today.getDate() - daysBackToMon);
+    const weekSun = new Date(weekMon);
+    weekSun.setDate(weekMon.getDate() + 6);
+    if (raceDate < weekMon || raceDate > weekSun) return; // not race week
+    // Walk each day, apply the taper.
+    DAYS.forEach((d, dayIdx) => {
+      const s = planState.sessions[d];
+      if (!s) return;
+      // Strictly AFTER race day → force rest.
+      if (dayIdx > raceDayInWeekIdx) {
+        if (s.type !== 'rest' || (s.duration || 0) > 0) {
+          planState.sessions[d] = { name: 'Rest (post-race recovery)', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest', prescription: 'Race recovery. Sleep, hydrate, eat. Walk only if you want to.' };
+        }
+        return;
+      }
+      // Race day itself → race-day marker (kept short / token).
+      if (dayIdx === raceDayInWeekIdx) {
+        const evtName = (planState && planState.raceEvent) || 'race';
+        // Don't overwrite a custom race-day session if the user already
+        // logged it; check by completed flag.
+        if (!s.completed && (s.type !== 'rest' || s.intensity !== 'race')) {
+          planState.sessions[d] = { name: 'Race day', meta: evtName, duration: 0, type: 'rest', intensity: 'race', prescription: `Race day — ${evtName}. Trust the work. Tested breakfast 2-3 hr before, warm up easy, start at goal pace not 10 sec faster.` };
+        }
+        return;
+      }
+      // Pre-race-day inside race week → taper guard.
+      if (s.completed) return; // honor what the user already trained
+      if (typeof _raceWeekTaperSession !== 'function') return;
+      const tapered = _raceWeekTaperSession(s, raceDayInWeekIdx, dayIdx);
+      // Only override when tapered is SMALLER (preserves any well-chosen
+      // short session the engine produced).
+      if ((tapered.duration || 0) < (s.duration || 0)) {
+        planState.sessions[d] = tapered;
+      }
+    });
+  }
+
   function renderAll() {
+    // Guarantee current-week race-week taper BEFORE any surface reads
+    // planState.sessions. Cheap (skips when not in race week).
+    _enforceCurrentWeekTaper();
     recomputeWeekDates();
     renderPlanSourceBanner();
     renderTodayGreetingAndRace();
