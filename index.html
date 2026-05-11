@@ -514,8 +514,11 @@
     z-index: 100;
   }
   .modal-bg.show { display: flex; }
-  /* Center variant — used for small confirmation dialogs */
-  .modal-bg.center { align-items: center; padding: 20px; }
+  /* Center variant — used for small confirmation dialogs + popovers that
+     can open ON TOP of a bottom-sheet modal (e.g. tap a glossary term
+     INSIDE the session modal). Higher z-index so they float above the
+     larger sheet rather than render hidden underneath it. */
+  .modal-bg.center { align-items: center; padding: 20px; z-index: 200; }
   .modal {
     background: var(--bg);
     width: 100%;
