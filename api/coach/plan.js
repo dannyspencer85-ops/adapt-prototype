@@ -144,7 +144,11 @@ export default async function handler(req) {
 
   // Validate + normalize. If validation fails, return the failure to the
   // caller — the frontend can fall back to its rule engine.
-  const validation = validatePlan(parsed, { event, hours, days, weeksToRace, availableDisciplines });
+  // Pass profile + fitnessMarkers — validatePlan's beginner-runner cap is
+  // gated on isBeginnerRunner which reads profile.exp / fitnessMarkers
+  // .runAbility. Previously those were undefined, so the cap NEVER fired
+  // and a 5K beginner could get a 60-min "easy run" if the AI slipped.
+  const validation = validatePlan(parsed, { event, hours, days, weeksToRace, availableDisciplines, profile, fitnessMarkers });
   if (!validation.ok) {
     return new Response(JSON.stringify({
       ok: false,
@@ -664,6 +668,16 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
       }
       if (!sess.intensity) sess.intensity = sess.type === 'rest' ? 'rest' : 'Z2';
       if (typeof sess.prescription !== 'string') sess.prescription = '';
+      // Non-rest sessions must have a meaningful prescription. The AI prompt
+      // demands it ("prescription MUST reference specific zones, drills, or
+      // intervals"), but the old validator just coerced missing values to ''
+      // and let them through — producing blank workout descriptions in the
+      // session modal. Now: empty prescription on a non-rest session backfills
+      // a minimum useful description from name + duration + intensity.
+      if (sess.type !== 'rest' && sess.durationMin > 0 && (!sess.prescription || sess.prescription.trim().length < 8)) {
+        const intLabel = sess.intensity && sess.intensity !== 'rest' ? ` at ${sess.intensity}` : '';
+        sess.prescription = `${sess.durationMin} min ${sess.name || sess.type}${intLabel}. ${sess.targets ? 'Targets: ' + sess.targets + '.' : ''}`.trim();
+      }
       if (typeof sess.targets !== 'string') sess.targets = sess.targets ? String(sess.targets) : '';
       // Non-training day enforcement — if user didn't pick this day, force it to rest.
       if (!trainingDaySet.has(dayName) && sess.durationMin > 0) {

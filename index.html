@@ -6102,6 +6102,21 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { sessions: target.sessions, label, isCurrent: false };
   }
 
+  // Mirror current-week edits into fullPlan.weeks[currentIdx].sessions so
+  // (a) Coach Chat's next context payload sees the user's actual current
+  // state, (b) the calendar's _sessionForDate lookup is consistent, (c)
+  // background regens don't read stale data.
+  function _mirrorCurrentWeekToFullPlan(day) {
+    try {
+      const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
+      if (!fullPlan) return;
+      const curIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+      if (curIdx < 0 || !fullPlan.weeks[curIdx]) return;
+      fullPlan.weeks[curIdx].sessions = fullPlan.weeks[curIdx].sessions || {};
+      fullPlan.weeks[curIdx].sessions[day] = planState.sessions[day];
+    } catch (e) { /* non-fatal */ }
+  }
+
   function tool_moveSession({ fromDay, toDay, reason, weekOffset }) {
     const slot = _resolveWeekSessions(weekOffset);
     if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
@@ -6111,7 +6126,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!from) return { success: false, message: `No session on ${fromDay} (${slot.label}).` };
     sess[toDay] = from;
     sess[fromDay] = to;
-    if (slot.isCurrent) renderWeekSessions();
+    if (slot.isCurrent) {
+      _mirrorCurrentWeekToFullPlan(fromDay);
+      _mirrorCurrentWeekToFullPlan(toDay);
+      renderWeekSessions();
+    }
     const msg = `Moved ${from.name} from ${fromDay} to ${toDay} (${slot.label}). ${to ? `${to.name} now on ${fromDay}.` : ''}`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
@@ -6125,7 +6144,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.duration = newMinutes;
-    if (slot.isCurrent) renderWeekSessions();
+    if (slot.isCurrent) {
+      _mirrorCurrentWeekToFullPlan(day);
+      renderWeekSessions();
+    }
     const msg = `Shortened ${day} to ${newMinutes} min (${slot.label}): ${s.name}`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
@@ -6136,10 +6158,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
     const s = slot.sessions[day];
     if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
-    // Defensive: if the source was a rest day (duration 0), the AI is really
-    // trying to add a session on a previously-rest day. Set a sane default
-    // duration so the new session is actually trainable. The AI should be
-    // calling openTrainingDay for this — but make swapDiscipline robust too.
     if ((!s.duration || s.duration === 0) && newType !== 'rest') {
       s.duration = 45;
       if (!newName) newName = 'Easy ' + newType;
@@ -6148,7 +6166,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.type = newType;
-    if (slot.isCurrent) renderWeekSessions();
+    if (slot.isCurrent) {
+      _mirrorCurrentWeekToFullPlan(day);
+      renderWeekSessions();
+    }
     const msg = `${day} (${slot.label}) is now ${s.name} (${newType}, ${s.duration} min).`;
     setChange(msg);
     return { success: true, message: msg, reason: reason || '' };
@@ -6172,6 +6193,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       localStorage.setItem('tri-limiter', limiter);
       localStorage.setItem('tri-strategy', strategy);
       planState.triFocus = { limiter, strategy };
+      // Persist to the account snapshot. Without this save, _clearUserScopedLocal
+      // on the next login would wipe these values before account-replay restores
+      // anything — and the snapshot didn't have them anyway.
+      saveUserData();
       const msg = `Your ${event} plan is already focused on ${/Marathon|10K|5K|Half Marathon/i.test(event) ? 'running' : event.toLowerCase()}. I noted your preference but no rebuild is needed — every session is already discipline-specific.`;
       return { success: true, message: msg, needsGoalChange: false };
     }
@@ -6255,9 +6280,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const _lbl = document.getElementById('rebuildPlanBtnLabel');
     if (_btn) _btn.disabled = true;
     if (_lbl) _lbl.textContent = 'Rebuilding…';
-    const event = localStorage.getItem('race-event') || planState.raceEvent || '';
-    const eventDate = localStorage.getItem('race-date') || planState.raceDate || '';
-    const eventLocation = localStorage.getItem('race-location') || planState.raceLocation || '';
+    // Standardized read order: planState first, localStorage second. Every
+    // other call site reads in this order; flipping it here let stale
+    // localStorage win over fresh planState mutations.
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const eventDate = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+    const eventLocation = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
     const hours = parseFloat(localStorage.getItem('hours-per-week') || '5');
     let days = [];
     try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
@@ -6947,31 +6975,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // periodization used in the rule-fallback plan builder so projected
   // weeks beyond the explicit plan window match what the engine WOULD
   // have built.
-  function _phaseRatioForWeekOffset(offsetFromCurrent, weeksFromTodayToRace) {
+  // Phase ratio for a week, given that week's offset from today's week AND
+  // the offset of race week itself. raceWeekOffset = 0 means race is THIS
+  // week; raceWeekOffset = 1 means race is next week; etc.
+  function _phaseRatioForWeekOffset(offsetFromCurrent, raceWeekOffset) {
     if (offsetFromCurrent < 0) return 1.0; // past — don't scale
-    if (weeksFromTodayToRace == null || weeksFromTodayToRace <= 0) return 0.85;
-    const i = offsetFromCurrent;
-    const totalRemaining = Math.max(1, weeksFromTodayToRace);
-    if (i === totalRemaining - 1) return 0.5;   // race week
-    if (i === totalRemaining - 2) return 0.75;  // taper
-    if (i === totalRemaining - 3) return 0.85;  // back-off
-    if (i === totalRemaining - 4) return 1.0;   // peak
-    const buildLen = Math.max(1, totalRemaining - 4);
-    const t = Math.min(1, i / buildLen);
-    const isDeload = (i + 1) % 4 === 0 && i < totalRemaining - 4;
+    if (raceWeekOffset == null || raceWeekOffset < 0) return 0.85;
+    if (offsetFromCurrent === raceWeekOffset) return 0.5;       // race week itself
+    if (offsetFromCurrent === raceWeekOffset - 1) return 0.75;  // taper
+    if (offsetFromCurrent === raceWeekOffset - 2) return 0.85;  // back-off
+    if (offsetFromCurrent === raceWeekOffset - 3) return 1.0;   // peak
+    // Earlier: base ramp 70% → 95% over the available pre-peak window.
+    const buildLen = Math.max(1, raceWeekOffset - 3);
+    const t = Math.min(1, offsetFromCurrent / buildLen);
+    const isDeload = (offsetFromCurrent + 1) % 4 === 0 && offsetFromCurrent < raceWeekOffset - 3;
     const base = 0.7 + (0.95 - 0.7) * t;
     return isDeload ? base * 0.8 : base;
   }
-  function _phaseLabelForWeekOffset(offsetFromCurrent, weeksFromTodayToRace) {
+  function _phaseLabelForWeekOffset(offsetFromCurrent, raceWeekOffset) {
     if (offsetFromCurrent < 0) return '';
-    const totalRemaining = Math.max(1, weeksFromTodayToRace || 1);
-    const i = offsetFromCurrent;
-    if (i === totalRemaining - 1) return 'Race week';
-    if (i === totalRemaining - 2) return 'Taper';
-    if (i === totalRemaining - 3) return 'Back-off';
-    if (i === totalRemaining - 4) return 'Peak';
-    const buildLen = Math.max(1, totalRemaining - 4);
-    const t = i / buildLen;
+    if (raceWeekOffset == null) return '';
+    if (offsetFromCurrent === raceWeekOffset) return 'Race week';
+    if (offsetFromCurrent === raceWeekOffset - 1) return 'Taper';
+    if (offsetFromCurrent === raceWeekOffset - 2) return 'Back-off';
+    if (offsetFromCurrent === raceWeekOffset - 3) return 'Peak';
+    const buildLen = Math.max(1, raceWeekOffset - 3);
+    const t = offsetFromCurrent / buildLen;
     if (t < 0.33) return 'Base 1';
     if (t < 0.66) return 'Base 2';
     return 'Build';
@@ -6983,21 +7012,36 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function _projectSessionForDate(targetDate, daysFromCurrentMon, dayName) {
     const template = planState.sessions ? planState.sessions[dayName] : null;
     if (!template) return null;
-    // Don't project past race day. If the user is post-race (negative
-    // days-to-race), don't fabricate ghost workouts forever — the calendar
-    // should go quiet beyond the race.
-    let weeksFromTodayToRace = null;
+    // Compute the WEEK INDEX that contains race day, relative to the current
+    // week's Monday. This is the correct frame for "which weeks should the
+    // calendar populate." The old code used Math.ceil(days/7) which counts
+    // "week buckets" and had an off-by-one that killed race week entirely
+    // when race day was a few days into the upcoming week — user reported
+    // seeing zero sessions between today and a Thu race 4 days away.
+    let raceWeekOffset = null;
     try {
-      const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
-      if (days != null && days < 0) return null; // post-race: no projection
-      if (days != null && days >= 0) weeksFromTodayToRace = Math.ceil(days / 7);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const todayDow = today.getDay();
+      const daysBackToMon = (todayDow + 6) % 7;
+      const currentMon = new Date(today);
+      currentMon.setDate(today.getDate() - daysBackToMon);
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (raceStr) {
+        const race = new Date(raceStr + 'T00:00:00');
+        if (!isNaN(race.getTime())) {
+          if (race < today) return null; // past race: no projection
+          const daysToRaceFromCurrentMon = Math.round((race - currentMon) / (24 * 60 * 60 * 1000));
+          raceWeekOffset = Math.floor(daysToRaceFromCurrentMon / 7);
+        }
+      }
     } catch (e) {}
     const offsetFromCurrent = Math.floor(daysFromCurrentMon / 7);
-    // Project up to and INCLUDING race week, not past it.
-    if (weeksFromTodayToRace != null && offsetFromCurrent >= weeksFromTodayToRace) {
+    // Project for every week from this week through race week, INCLUSIVE.
+    // Beyond race week → null (don't fabricate post-race ghost workouts).
+    if (raceWeekOffset != null && offsetFromCurrent > raceWeekOffset) {
       return null;
     }
-    const ratio = _phaseRatioForWeekOffset(offsetFromCurrent, weeksFromTodayToRace);
+    const ratio = _phaseRatioForWeekOffset(offsetFromCurrent, raceWeekOffset);
     const dur = Math.round((Number(template.duration) || 0) * ratio);
     if (dur <= 0 || template.type === 'rest') {
       return { ...template, duration: 0, type: 'rest', _projected: true };
@@ -10894,7 +10938,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Now we generate N weeks with phase-based volume scaling and a real
     // taper. Each week reuses the current week's discipline allocation
     // (same Mon–Sun shape) but durations scale per phase ratio.
-    const weeksToRace = Math.max(1, Math.ceil(getDaysToRace() / 7));
+    // getDaysToRace() may return null (general-fitness path, or invalid date).
+    // Default to a 16-week build to avoid NaN propagating through scaling.
+    const _daysToRaceForBuild = getDaysToRace();
+    const weeksToRace = _daysToRaceForBuild == null
+      ? 16
+      : Math.max(1, Math.ceil(_daysToRaceForBuild / 7));
     const totalWeeks = Math.min(24, Math.max(4, weeksToRace));
     const weekArc = [];
     const fullPlanWeeks = [];
@@ -11271,9 +11320,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Re-runs the AI plan generation using the user's current onboarding inputs
   // pulled from localStorage. Used by the fallback banner's retry link.
   function retryAIPlan() {
-    const event = localStorage.getItem('race-event') || planState.raceEvent || 'Half Ironman';
-    const eventDate = localStorage.getItem('race-date') || planState.raceDate || '';
-    const eventLocation = localStorage.getItem('race-location') || planState.raceLocation || '';
+    // Standardized read order: planState first, localStorage second.
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || 'Half Ironman';
+    const eventDate = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+    const eventLocation = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
     const hours = parseFloat(localStorage.getItem('hours-per-week') || '5');
     let days = [];
     try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
@@ -11813,11 +11863,26 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     _clearUserScopedLocal();
     if (!acct || !acct.data) return;
     if (acct.data.planState) {
-      planState.sessions = acct.data.planState.sessions || planState.sessions;
-      planState.dates = acct.data.planState.dates || planState.dates;
-      planState.weekArc = acct.data.planState.weekArc || planState.weekArc;
-      planState.injury = acct.data.planState.injury || null;
-      planState.courseIntel = acct.data.planState.courseIntel || null;
+      // Restore EVERYTHING that was saved, not just five hand-picked fields.
+      // The old narrow restore dropped fullPlan, lastCheckin, planSource,
+      // aiPlanSummary, raceEvent/raceDate, triFocus, raceWeek/postRace,
+      // stravaActivities, activeWeekIdx. Result: a user who logged out + in
+      // saw the rule-fallback shape even if their account had a multi-week
+      // AI plan saved, and Coach Chat lost its full plan context. Same
+      // class as the raceEvent bug — multiple sources of truth diverging.
+      const saved = acct.data.planState;
+      const RESTORE_FIELDS = [
+        'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
+        'fullPlan', 'aiPlanSummary', 'aiPlanNotes', 'planSource',
+        'raceEvent', 'raceDate', 'raceLocation',
+        'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
+        'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
+        'stravaAuthError', 'lastCheckin', 'notifications',
+        'aiPlanError', 'profile',
+      ];
+      RESTORE_FIELDS.forEach(f => {
+        if (saved[f] !== undefined) planState[f] = saved[f];
+      });
       planState.lastChange = null;
     }
     // Restore every user-scoped localStorage key from the account record.
@@ -13978,14 +14043,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const todayDay = (typeof getTodayDay === 'function') ? getTodayDay() : '';
     const todayDateStr = (typeof getTodayDateString === 'function') ? getTodayDateString() : '';
     const daysToRace = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    // The Strava normalizer (mapStravaActivity, ~line 12305) writes
+    // moving_min / distance_km / avg_hr. The old code here looked for
+    // durationMin / distanceMi / avgHR which never exist on a normalized
+    // activity, so every synced activity went to the AI with null metrics.
+    // Same class as the raceEvent bug: prompt promised "use real numbers,"
+    // client sent field names the normalizer doesn't write.
     const acts = (planState.stravaActivities || []).slice(0, 30).map(a => ({
       date: a.date || a.start_date || '',
       type: a.type || a.discipline || '',
       name: a.name || '',
-      durationMin: a.durationMin || a.duration || a.moving_time_min || null,
-      distanceMi: a.distanceMi || a.distance_mi || null,
-      avgHR: a.avgHR || a.average_heartrate || null,
-      rpe: a.rpe || null,
+      durationMin: a.moving_min ?? a.durationMin ?? a.duration ?? null,
+      distanceKm: a.distance_km ?? a.distanceKm ?? null,
+      avgHR: a.avg_hr ?? a.avgHR ?? a.average_heartrate ?? null,
+      rpe: a.rpe ?? null,
     }));
 
     // Build a day-by-day timeline anchored on today, with the session on each
@@ -15139,13 +15210,44 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     return { success: true, message: msg };
   }
 
+  // Keep every source of truth for "today's session for this day" in sync.
+  // Tools previously edited only planState.sessions; planState.fullPlan and
+  // localStorage 'training-days' diverged immediately. Background regen
+  // paths read the stale data and rebuilt without the user's edits.
+  function _propagateCurrentWeekEdit(day) {
+    // Mirror into fullPlan.weeks[currentIdx] so Coach Chat's context payload
+    // (which serializes fullPlan) and _sessionForDate (calendar grid) see
+    // the same value.
+    try {
+      const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
+      if (fullPlan) {
+        const curIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+        if (curIdx >= 0 && fullPlan.weeks[curIdx]) {
+          fullPlan.weeks[curIdx].sessions = fullPlan.weeks[curIdx].sessions || {};
+          fullPlan.weeks[curIdx].sessions[day] = planState.sessions[day];
+        }
+      }
+    } catch (e) { /* non-fatal — calendar will fall back to planState.sessions */ }
+    // Recompute localStorage 'training-days' from the live session map so
+    // _regeneratePlanInBackground / retryAIPlan see the user's actual choice.
+    try {
+      const liveTrainingDays = DAYS.filter(d =>
+        planState.sessions[d] && planState.sessions[d].type !== 'rest' &&
+        (planState.sessions[d].duration || 0) > 0
+      );
+      localStorage.setItem('training-days', JSON.stringify(liveTrainingDays));
+    } catch (e) {}
+  }
+
   function tool_openTrainingDay({ day }) {
     const s = planState.sessions[day];
     if (s && s.type !== 'rest') {
       return { success: false, message: `${day} is already a training day (${s.name}). No change made.` };
     }
-    planState.sessions[day] = { name: 'Easy aerobic', meta: '45 min · Zone 2', duration: 45, type: 'run' };
+    planState.sessions[day] = { name: 'Easy aerobic', meta: '45 min · Zone 2', duration: 45, type: 'run', intensity: 'Z2' };
+    _propagateCurrentWeekEdit(day);
     renderWeekSessions();
+    if (typeof saveUserData === 'function') saveUserData();
     const msg = `Opened ${day} as a training day. Added an easy 45-min Zone 2 run to start — adjust discipline or duration anytime ("${day} only 30 min" or "make ${day} a swim").`;
     setChange(msg);
     return { success: true, message: msg };
@@ -15161,7 +15263,9 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     }
     const prevName = s.name;
     planState.sessions[day] = { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' };
+    _propagateCurrentWeekEdit(day);
     renderWeekSessions();
+    if (typeof saveUserData === 'function') saveUserData();
     const msg = `Removed ${day} from your training schedule. ${prevName} was dropped — if you want to reschedule it, use "move ${day} to [day]" first next time.`;
     setChange(msg);
     return { success: true, message: msg };
