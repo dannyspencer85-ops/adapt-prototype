@@ -7240,18 +7240,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         badgeHtml = `<div style="position:absolute; top:3px; left:3px; font-size:10px;">🏁</div>`;
       }
       // Tappable when the day has a session AND it's within the plan window.
-      // Past sessions aren't tappable — the session modal is for adjusting
-      // future workouts, not editing history. Past sessions surface their
-      // actual data via the Strava activity card on Plan / Pulse instead.
-      // Completed past sessions stay non-tappable here too — the Strava
-      // activity entry is the canonical place to inspect what happened.
-      const tappable = isInMonth && s && !isRest && !isPast;
+      // Tap rules:
+      // - Future + training session → open session modal
+      // - Future + rest day → open mini "Rest day · here's why" popover
+      // - Race day → open motivational pep-talk popover
+      // - Past sessions → not tappable (history lives on Strava card)
+      const tappable = isInMonth && !isPast && (isRaceDay || s);
       const onclick = tappable ? `onclick="_openCalendarDay(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})"` : '';
       const cursor = tappable ? 'cursor:pointer;' : 'cursor:default;';
       // Tooltip for hover/long-press.
-      const tooltip = s && !isRest
+      const tooltip = isRaceDay
+        ? 'Race day — tap for pep talk'
+        : s && !isRest
         ? `${escapeAttr(c.label)}${dur ? ' · ' + dur + ' min' : ''}${s.name ? ' — ' + escapeAttr(sanitizeSessionName(s.name)) : ''}`
-        : isRest && isInMonth ? 'Rest day' : '';
+        : isRest && isInMonth ? 'Rest day — tap for why' : '';
       cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
         <div style="font-size:12px; font-weight:${isToday ? '700' : '500'}; color:${textColor}; line-height:1;">${d.getDate()}</div>
         ${dotHtml}
@@ -7268,7 +7270,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     el.innerHTML = `
       <div class="section-label plain" style="margin: 4px 0 8px; display:flex; align-items:center; gap:6px;">${icon('calendar', { size: 14 })} Training calendar</div>
-      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Each day's color shows the planned activity. Tap any day to see details. <strong>Dashed borders</strong> are projected weeks — the plan extends to race day in tentative form, then adapts week-to-week based on what you actually train.</div>
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Each day's color shows the planned activity. Tap any day — workouts open the session detail, rest days tell you why you're resting, race day gets a pep talk. <strong>Dashed borders</strong> are projected weeks — the plan adapts week-to-week based on what you actually train.</div>
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${legendHtml}</div>
       <div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px;">
         ${headerHtml}
@@ -7278,8 +7280,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     `;
   }
 
-  // Resolve a real Date back into (dayName, weekOffset) so openSessionModal
-  // can show the right session even for future weeks.
+  // Calendar tap router. Three modes:
+  //   - Race day → motivational pep-talk modal
+  //   - Rest day → "here's why" popover with adjacent-session reasoning
+  //   - Training session → standard session modal with full prescription
   function _openCalendarDay(year, monthIdx, dateNum) {
     const target = new Date(year, monthIdx, dateNum);
     target.setHours(0,0,0,0);
@@ -7292,7 +7296,188 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const weekOffset = Math.floor(daysFromCurrentMon / 7);
     const dayInWeek = daysFromCurrentMon - weekOffset * 7;
     const dayName = DAYS[(dayInWeek % 7 + 7) % 7];
+
+    // Is this race day?
+    let raceDate = null;
+    try {
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (raceStr) {
+        const r = new Date(raceStr + 'T00:00:00');
+        if (!isNaN(r.getTime())) raceDate = r;
+      }
+    } catch (e) {}
+    if (raceDate && target.getTime() === raceDate.getTime()) {
+      _showRaceDayPepTalk(target);
+      return;
+    }
+
+    const s = (typeof _sessionForDate === 'function') ? _sessionForDate(target) : null;
+    const isRest = !s || s.type === 'rest' || !(s.duration || s.durationMin);
+    if (isRest) {
+      _showRestDayReason(target, weekOffset, dayName);
+      return;
+    }
     if (typeof openSessionModal === 'function') openSessionModal(dayName, weekOffset);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // REST-DAY POPOVER
+  // Reads adjacent sessions to explain WHY this day is rest (e.g. "tomorrow
+  // is a quality day," "yesterday was a long session"). Falls back to a
+  // generic recovery rationale when nothing specific applies.
+  // ──────────────────────────────────────────────────────────────────────
+  function _showRestDayReason(targetDate, weekOffset, dayName) {
+    const dayLabels = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const friendlyDate = `${dayLabels[dayName] || dayName} · ${monthShort[targetDate.getMonth()]} ${targetDate.getDate()}`;
+
+    // Look at the day before and the day after to compose a reason.
+    const dayBefore = new Date(targetDate); dayBefore.setDate(targetDate.getDate() - 1);
+    const dayAfter = new Date(targetDate); dayAfter.setDate(targetDate.getDate() + 1);
+    const sBefore = (typeof _sessionForDate === 'function') ? _sessionForDate(dayBefore) : null;
+    const sAfter = (typeof _sessionForDate === 'function') ? _sessionForDate(dayAfter) : null;
+
+    const isQuality = (s) => s && (s.type === 'quality' || s.type === 'brick' || /interval|tempo|threshold|race[\s-]*pace|hill/i.test(s.name || ''));
+    const isLong = (s) => s && (s.duration || 0) >= 75;
+
+    let reason = '';
+    if (isLong(sBefore)) {
+      reason = `Yesterday was a long session. Your body is rebuilding — the adaptations from yesterday happen TODAY, not during the run. Sleep, eat, hydrate.`;
+    } else if (isQuality(sAfter)) {
+      reason = `Tomorrow is a quality day. Going into intervals fresh is the difference between a strong session and a half-hearted one. Today is the setup.`;
+    } else if (isLong(sAfter)) {
+      reason = `Tomorrow's long session needs fresh legs. Stretch, walk, eat well — the long session goes better when today is quiet.`;
+    } else if (isQuality(sBefore)) {
+      reason = `Yesterday was a hard day. Recovery IS the workout today — micro-damage repairs, adaptations consolidate. Don't shortcut it.`;
+    } else {
+      reason = `Built-in rest. Endurance research is clear: athletes who train 7/7 have higher injury rates, higher cortisol, lower HRV. Rest IS the workout — supercompensation happens while you're recovering, not while you're training.`;
+    }
+
+    const tips = [
+      'Sleep 7-8+ hours tonight',
+      'Hydrate steadily',
+      'Light walking is fine',
+      "Don't sneak in a workout — recovery is productive training",
+    ];
+
+    _showCalendarPopover({
+      icon: '😴',
+      tag: 'REST DAY',
+      title: friendlyDate,
+      body: reason,
+      tips,
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // RACE-DAY PEP-TALK MODAL
+  // Encouraging + motivating message. Used when the user taps the race-day
+  // cell — could be days/weeks out, or could be race day itself.
+  // ──────────────────────────────────────────────────────────────────────
+  function _showRaceDayPepTalk(targetDate) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const targetMidnight = new Date(targetDate); targetMidnight.setHours(0,0,0,0);
+    const daysOut = Math.round((targetMidnight - today) / (24*60*60*1000));
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || 'your race';
+    const location = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const friendlyDate = `${monthShort[targetDate.getMonth()]} ${targetDate.getDate()}`;
+
+    let title, body, tips;
+    if (daysOut < 0) {
+      // Past race — celebrate the finish, prompt for retro if not done.
+      title = `${event} · ${friendlyDate}`;
+      body = `You did it. ${Math.abs(daysOut)} day${Math.abs(daysOut) === 1 ? '' : 's'} ago you crossed the line. The training is done — the memory is yours.`;
+      tips = [
+        'Open the post-race retro card on Home if you haven\'t already',
+        'Take a real break — 1-2 weeks of unstructured movement',
+        'When the itch comes back, talk to Coach about the next goal',
+      ];
+    } else if (daysOut === 0) {
+      title = `🏁 RACE DAY · ${event}`;
+      body = `Today is the day. Every training session, every early morning, every "I don't feel like it but I will" — all of it lands here. Trust the work. You're ready.`;
+      tips = [
+        'Eat your tested breakfast 2-3 hr before start',
+        'Warm up easy, let HR rise gradually',
+        'Start at goal pace, NOT 10 sec faster',
+        'First quarter conservative, second steady, finish strong',
+        'Whatever happens, you trained for this',
+      ];
+    } else if (daysOut <= 7) {
+      title = `${event} · ${friendlyDate} · ${daysOut} day${daysOut === 1 ? '' : 's'} out`;
+      body = `Race week. The fitness is already in the bank — nothing you do this week makes you fitter, but everything you do this week makes you sharper or duller. Choose sharper. Sleep, hydrate, taper.`;
+      tips = [
+        'Light shakeouts only — no hero workouts',
+        'Cut volume, keep brief intensity touches at race pace',
+        'Tested breakfast, tested kit, tested fueling',
+        'Sleep T-3 and T-2 nights matter more than race-eve sleep',
+      ];
+    } else if (daysOut <= 28) {
+      title = `${event} · ${friendlyDate} · ${daysOut} days out`;
+      body = `You're in the final build. The big aerobic engine is mostly built — now it's about race-specific sharpening and protecting from injury. Trust the taper that's coming. Don't chase one more "key session" — the plan has it covered.`;
+      tips = [
+        'Sleep, fuel, recovery are now as important as the training',
+        'No new shoes, no new fueling, no new gear',
+        'Visualize the race — see yourself executing the early miles slowly',
+      ];
+    } else {
+      title = `${event} · ${friendlyDate} · ${daysOut} days out`;
+      body = `The race is on the horizon. The plan ahead is going to ask hard work of you — and that's the point. The fitness you'll have on race day is built one session at a time, starting with today.`;
+      tips = [
+        'Show up for the easy days — they\'re the foundation',
+        'Honor the rest days — they\'re where you actually get fitter',
+        'When life gets in the way, tell Coach Chat — the plan adapts',
+      ];
+    }
+
+    _showCalendarPopover({
+      icon: daysOut === 0 ? '🏁' : daysOut < 0 ? '🎖️' : '🎯',
+      tag: daysOut === 0 ? 'RACE DAY' : daysOut < 0 ? 'RACE COMPLETE' : 'YOUR RACE',
+      title,
+      body: location && daysOut !== 0 ? `${body}\n\n${location}` : body,
+      tips,
+      isRace: true,
+    });
+  }
+
+  // Shared popover renderer for rest-day + race-day taps. Renders an
+  // inline modal-bg without disturbing other modals.
+  function _showCalendarPopover({ icon: emoji, tag, title, body, tips, isRace }) {
+    // Create or reuse a singleton modal element.
+    let modal = document.getElementById('calendarTapPopover');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'calendarTapPopover';
+      modal.className = 'modal-bg center';
+      document.body.appendChild(modal);
+    }
+    const accentBg = isRace ? 'linear-gradient(135deg, #D9A94A, #E8B961)' : 'var(--bg-soft)';
+    const accentColor = isRace ? '#fff' : 'var(--text)';
+    const tagColor = isRace ? 'rgba(255,255,255,0.85)' : 'var(--text-soft)';
+    const tipsHtml = (tips || []).map(t => `<li style="margin-bottom:5px;">${escapeHtml(t)}</li>`).join('');
+    modal.innerHTML = `
+      <div class="modal" style="max-width:380px;">
+        <div style="background:${accentBg}; color:${accentColor}; margin:-20px -20px 14px; padding:18px 20px; border-radius:18px 18px 0 0;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:${tagColor};">${escapeHtml(tag)}</div>
+              <h2 style="font-size:20px; margin:4px 0 0 0; line-height:1.2;">${emoji} ${escapeHtml(title)}</h2>
+            </div>
+            <button onclick="_closeCalendarPopover()" style="background:none; border:0; font-size:24px; color:${accentColor}; opacity:0.8; cursor:pointer; padding:0; line-height:1;">×</button>
+          </div>
+        </div>
+        <div style="font-size:14px; line-height:1.55; color:var(--text); margin-bottom:14px; white-space:pre-line;">${escapeHtml(body)}</div>
+        ${tipsHtml ? `<div style="background:var(--bg-soft); padding:12px 14px; border-radius:12px;">
+          <div style="font-size:11px; font-weight:700; color:var(--text-soft); letter-spacing:0.4px; text-transform:uppercase; margin-bottom:6px;">${isRace ? 'Race-week cues' : 'How to rest well'}</div>
+          <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.55; color:var(--text);">${tipsHtml}</ul>
+        </div>` : ''}
+        <button class="btn btn-primary btn-full" onclick="_closeCalendarPopover()" style="margin-top:14px;">${isRace ? "Let's go" : "Got it"}</button>
+      </div>`;
+    modal.classList.add('show');
+  }
+  function _closeCalendarPopover() {
+    const m = document.getElementById('calendarTapPopover');
+    if (m) m.classList.remove('show');
   }
 
   // Tiny attribute-safe escape for tooltips.
