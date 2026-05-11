@@ -7178,7 +7178,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         badgeHtml = `<div style="position:absolute; top:3px; left:3px; font-size:10px;">🏁</div>`;
       }
       // Tappable when the day has a session AND it's within the plan window.
-      const tappable = isInMonth && s && !isRest;
+      // Past sessions aren't tappable — the session modal is for adjusting
+      // future workouts, not editing history. Past sessions surface their
+      // actual data via the Strava activity card on Plan / Pulse instead.
+      // Completed past sessions stay non-tappable here too — the Strava
+      // activity entry is the canonical place to inspect what happened.
+      const tappable = isInMonth && s && !isRest && !isPast;
       const onclick = tappable ? `onclick="_openCalendarDay(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})"` : '';
       const cursor = tappable ? 'cursor:pointer;' : 'cursor:default;';
       // Tooltip for hover/long-press.
@@ -9573,62 +9578,105 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // distances and weekly volume. New PRs get cached in localStorage with a
   // dismissed flag; the home banner surfaces undismissed ones.
   // ──────────────────────────────────────────────────────────────────────
+  // Cache PR results by stravaActivities length + last sync time. Avoids
+  // re-walking history on every renderAll. Bust the cache when activities
+  // change. Single-pass O(N) sliding window for biggest-week.
+  let _prCache = null;
+  let _prCacheKey = null;
+
   function detectPRs() {
     const acts = (planState.stravaActivities || []).filter(a => a && a.start_date && a.moving_min > 0);
     if (acts.length < 2) return [];
-    const sorted = acts.slice().sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
+    // Cache key — bust when activities count or last sync changes.
+    const key = `${acts.length}|${planState.stravaSyncedAt || 0}`;
+    if (_prCacheKey === key && _prCache) return _prCache;
+
+    // Single sort + parallel arrays of (timestamp, mins) so the sliding
+    // window doesn't allocate Date objects per inner iteration.
+    const sorted = acts.slice().sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    const ts = sorted.map(a => new Date(a.start_date).getTime());
+    const mins = sorted.map(a => a.moving_min || 0);
+
     const records = [];
-    // PR distances by sport (in km, for activities at least this long).
+
+    // ── Distance PRs — only TRUE-distance efforts qualify. ──
+    // Old code: `km >= target.dist - 0.2` allowed a 30K long run to be
+    // prorated as a "5K best." That's a pace projection, not a race PR.
+    // Tightened: actual distance must fall within [target, target + slop].
+    // The slop allows a "5K race" of 5.05 km to count, but rejects any
+    // genuinely longer effort.
     const distancePRs = [
-      { dist: 5,  sport: 'Run', name: '5K' },
-      { dist: 10, sport: 'Run', name: '10K' },
-      { dist: 21.1, sport: 'Run', name: 'Half Marathon' },
-      { dist: 42.2, sport: 'Run', name: 'Marathon' },
-      { dist: 40, sport: 'Ride', name: '40K bike' },
-      { dist: 100, sport: 'Ride', name: 'Century (100K)' },
+      { dist: 5,    slop: 0.5, sport: 'Run', name: '5K' },
+      { dist: 10,   slop: 1.0, sport: 'Run', name: '10K' },
+      { dist: 21.1, slop: 1.5, sport: 'Run', name: 'Half Marathon' },
+      { dist: 42.2, slop: 2.5, sport: 'Run', name: 'Marathon' },
+      { dist: 40,   slop: 5.0, sport: 'Ride', name: '40K bike' },
+      { dist: 100,  slop: 10,  sport: 'Ride', name: 'Century (100K)' },
     ];
+    // Pre-compute lower-cased sport types once.
+    const sportTypes = sorted.map(a => (a.type || a.sport_type || '').toLowerCase());
+    const kms = sorted.map(a => (a.distance_m || 0) / 1000);
+
     distancePRs.forEach(target => {
-      const eligible = sorted.filter(a => {
-        const sport = (a.type || a.sport_type || '').toLowerCase();
-        const km = (a.distance_m || 0) / 1000;
-        return sport.includes(target.sport.toLowerCase()) && km >= target.dist - 0.2;
-      });
-      if (eligible.length === 0) return;
-      // Pace-prorated time over the target distance.
+      const targetSport = target.sport.toLowerCase();
       let bestSecs = Infinity;
-      let bestActivity = null;
-      eligible.forEach(a => {
-        const km = (a.distance_m || 0) / 1000;
-        if (km <= 0) return;
-        const totalSecs = (a.moving_min || 0) * 60;
+      let bestIdx = -1;
+      for (let i = 0; i < sorted.length; i++) {
+        if (!sportTypes[i].includes(targetSport)) continue;
+        const km = kms[i];
+        if (km < target.dist || km > target.dist + target.slop) continue;
+        // Pace-prorated time over the target distance — but now km is
+        // close to target so this is essentially the actual time.
+        const totalSecs = mins[i] * 60;
         const proratedSecs = totalSecs * (target.dist / km);
         if (proratedSecs > 0 && proratedSecs < bestSecs) {
           bestSecs = proratedSecs;
-          bestActivity = a;
+          bestIdx = i;
         }
-      });
-      if (bestActivity) {
-        records.push({ id: `${target.name}_${bestActivity.id}`, label: `${target.name} best`, value: _fmtSecondsAsTime(bestSecs), activityId: bestActivity.id, date: bestActivity.start_date });
+      }
+      if (bestIdx >= 0) {
+        const a = sorted[bestIdx];
+        records.push({
+          id: `${target.name}_${a.id}`,
+          label: `${target.name} best`,
+          value: _fmtSecondsAsTime(bestSecs),
+          activityId: a.id,
+          date: a.start_date,
+        });
       }
     });
-    // Biggest training week (rolling 7-day max minutes).
-    let bestWeekStart = null;
+
+    // ── Biggest week — O(N) sliding window. ──
+    // Two pointers walk the timestamp array; window holds activities within
+    // 7 days. Maintain a running sum, track the max start timestamp.
+    const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
+    let bestWeekStartTs = null;
     let bestWeekMins = 0;
-    for (let i = 0; i < sorted.length; i++) {
-      const start = new Date(sorted[i].start_date);
-      const end = new Date(start); end.setDate(end.getDate() + 7);
-      const mins = sorted.filter(a => {
-        const ad = new Date(a.start_date);
-        return ad >= start && ad < end;
-      }).reduce((s, a) => s + (a.moving_min || 0), 0);
-      if (mins > bestWeekMins) {
-        bestWeekMins = mins;
-        bestWeekStart = start;
+    let windowStart = 0;
+    let windowSum = 0;
+    for (let end = 0; end < sorted.length; end++) {
+      windowSum += mins[end];
+      while (windowStart <= end && (ts[end] - ts[windowStart]) >= SEVEN_DAYS) {
+        windowSum -= mins[windowStart];
+        windowStart++;
+      }
+      if (windowSum > bestWeekMins) {
+        bestWeekMins = windowSum;
+        bestWeekStartTs = ts[windowStart];
       }
     }
-    if (bestWeekMins > 0 && bestWeekStart) {
-      records.push({ id: `BigWeek_${bestWeekStart.toISOString().slice(0,10)}`, label: 'Biggest week', value: `${formatMins(Math.round(bestWeekMins))}`, date: bestWeekStart.toISOString() });
+    if (bestWeekMins > 0 && bestWeekStartTs != null) {
+      const startDate = new Date(bestWeekStartTs);
+      records.push({
+        id: `BigWeek_${startDate.toISOString().slice(0, 10)}`,
+        label: 'Biggest week',
+        value: formatMins(Math.round(bestWeekMins)),
+        date: startDate.toISOString(),
+      });
     }
+
+    _prCache = records;
+    _prCacheKey = key;
     return records;
   }
   function _fmtSecondsAsTime(secs) {
@@ -9991,68 +10039,113 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function _hasNotificationApi() {
     return typeof window !== 'undefined' && 'Notification' in window;
   }
+  // iOS Safari quirk: notification permission can only be requested when
+  // the site is installed to the home screen. Calling requestPermission in
+  // browser-Safari throws or silently returns 'denied'. Detect this case so
+  // we can show actionable guidance instead of a dead-end.
+  function _isIOSBrowserNotInstalled() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    if (!isIOS) return false;
+    const inStandalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    return !inStandalone;
+  }
+  function _setRemindersButtonState(text) {
+    const btn = document.getElementById('enableRemindersBtn');
+    if (!btn) return;
+    // Replace any state label (Turn on / Reminders on / Reminders blocked).
+    btn.innerHTML = btn.innerHTML
+      .replace('Turn on workout reminders', text)
+      .replace('✓ Workout reminders on', text)
+      .replace('Reminders blocked — re-enable in settings', text)
+      .replace('Install to home screen to enable reminders', text);
+  }
   function enableLocalReminders() {
     if (!_hasNotificationApi()) {
-      alert("Your browser doesn't support notifications. Try Chrome, Safari, or Firefox.");
+      alert("Your browser doesn't support notifications. Try Chrome, Safari (iOS 16.4+), or Firefox.");
+      return;
+    }
+    // iOS Safari not-yet-installed: permission ask is a dead-end. Tell
+    // the user what to do instead — they need to add to Home Screen first.
+    if (_isIOSBrowserNotInstalled()) {
+      alert("On iOS, you need to add Adapt to your Home Screen before turning on reminders. Tap the share icon in Safari, then 'Add to Home Screen.' Open Adapt from your home screen and try again.");
+      _setRemindersButtonState('Install to home screen to enable reminders');
+      return;
+    }
+    // Already denied? Browser won't show another prompt — guide to settings.
+    if (Notification.permission === 'denied') {
+      alert("Notifications are blocked in your browser settings for this site. Open your browser settings → Site permissions → Notifications and allow Adapt, then try again.");
+      _setRemindersButtonState('Reminders blocked — re-enable in settings');
       return;
     }
     Notification.requestPermission().then((perm) => {
       if (perm === 'granted') {
         localStorage.setItem('local-reminders-enabled', '1');
-        // Test ping so the user sees it actually works.
         try {
           new Notification('Adapt reminders are on', {
-            body: "We'll remind you about today's session when you open the app.",
+            body: "We'll remind you about your sessions.",
             icon: '/icon.svg',
             tag: 'adapt-reminder-enabled',
           });
         } catch (e) {}
-        // Update the button label.
-        const btn = document.getElementById('enableRemindersBtn');
-        if (btn) {
-          btn.innerHTML = btn.innerHTML.replace('Turn on workout reminders', '✓ Workout reminders on');
-        }
-        // Schedule next-workout reminder while the page is open.
-        scheduleNextWorkoutReminder();
+        _setRemindersButtonState('✓ Workout reminders on');
+        scheduleAllUpcomingReminders();
         if (typeof trackEvent === 'function') trackEvent('reminders_enabled');
+      } else if (perm === 'denied') {
+        _setRemindersButtonState('Reminders blocked — re-enable in settings');
+        alert("You declined. To enable later, open browser settings → Notifications → Allow for Adapt.");
       } else {
-        alert('You can enable notifications later in your browser settings.');
+        // 'default' — user dismissed without choosing. Leave button alone.
       }
+    }).catch(() => {
+      // Some Safari versions throw on requestPermission rejection.
+      _setRemindersButtonState('Reminders unavailable in this browser');
     });
   }
-  function scheduleNextWorkoutReminder() {
+  // ── Reminder scheduling — queue every upcoming session independently. ──
+  // The old design chained: schedule ONE timer, fire, re-arm next. A tab
+  // suspend (iOS aggressive throttling) could swallow the entire chain.
+  // The new design queues each of the next 7 days' training sessions as a
+  // separate setTimeout, so missing one doesn't kill the rest. Also
+  // re-arms on visibilitychange so tab refocus reseeds any cleared timers.
+  const _scheduledReminderHandles = [];
+  function _clearScheduledReminders() {
+    while (_scheduledReminderHandles.length > 0) {
+      try { clearTimeout(_scheduledReminderHandles.pop()); } catch (e) {}
+    }
+  }
+  function scheduleAllUpcomingReminders() {
+    _clearScheduledReminders();
     if (!_hasNotificationApi() || Notification.permission !== 'granted') return;
-    // Find the next training session in the next 7 days.
     const sessions = planState.sessions || {};
     const now = new Date();
-    let bestDelay = null, bestSession = null;
     for (let off = 0; off < 7; off++) {
       const target = new Date(now);
       target.setDate(now.getDate() + off);
-      target.setHours(6, 30, 0, 0); // notify at 6:30am the morning of
-      if (target < now) continue;
+      target.setHours(6, 30, 0, 0); // 6:30am the morning of
+      if (target <= now) continue;
       const dayName = DAYS[(target.getDay() + 6) % 7];
       const s = sessions[dayName];
       if (!s || s.type === 'rest' || (s.duration || 0) === 0) continue;
       const delay = target - now;
-      if (bestDelay == null || delay < bestDelay) {
-        bestDelay = delay;
-        bestSession = { dayName, session: s };
-      }
+      // setTimeout max delay is ~24.8 days; 7 days is well under that.
+      const handle = setTimeout(() => {
+        try {
+          new Notification("Today's session is on", {
+            body: `${s.name || 'Training'} · ${s.duration} min. Open Adapt for details.`,
+            icon: '/icon.svg',
+            tag: 'adapt-workout-day-' + dayName,
+          });
+        } catch (e) {}
+      }, delay);
+      _scheduledReminderHandles.push(handle);
     }
-    if (!bestSession || bestDelay == null) return;
-    // setTimeout cap is 24.8 days; we schedule for at most the next 7 days.
-    setTimeout(() => {
-      try {
-        new Notification("Today's session is on", {
-          body: `${bestSession.session.name || 'Training'} · ${bestSession.session.duration} min. Open Adapt for details.`,
-          icon: '/icon.svg',
-          tag: 'adapt-workout-day',
-        });
-      } catch (e) {}
-      // Re-arm for the next session after this one fires.
-      scheduleNextWorkoutReminder();
-    }, bestDelay);
+  }
+  // Backward-compat shim — existing callers reference scheduleNextWorkoutReminder.
+  function scheduleNextWorkoutReminder() {
+    scheduleAllUpcomingReminders();
   }
   // On app focus / load, if today is a training day with an unlogged session,
   // fire a system notification immediately. This handles the "user opens the
@@ -10079,16 +10172,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   window.addEventListener('load', () => {
     setTimeout(maybePingTodayReminder, 1500);
     if (localStorage.getItem('local-reminders-enabled') === '1') {
-      scheduleNextWorkoutReminder();
+      scheduleAllUpcomingReminders();
     }
-    // Update the button label if reminders are already on.
+    // Update the button label to reflect current state. Order matters: check
+    // most-specific states first.
+    if (localStorage.getItem('local-reminders-enabled') === '1' && _hasNotificationApi() && Notification.permission === 'granted') {
+      _setRemindersButtonState('✓ Workout reminders on');
+    } else if (_hasNotificationApi() && Notification.permission === 'denied') {
+      _setRemindersButtonState('Reminders blocked — re-enable in settings');
+    } else if (_isIOSBrowserNotInstalled()) {
+      _setRemindersButtonState('Install to home screen to enable reminders');
+    }
+    // Original block kept for fall-through compatibility with shim above.
     if (localStorage.getItem('local-reminders-enabled') === '1') {
       const btn = document.getElementById('enableRemindersBtn');
       if (btn) btn.innerHTML = btn.innerHTML.replace('Turn on workout reminders', '✓ Workout reminders on');
     }
   });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) maybePingTodayReminder();
+    if (document.hidden) return;
+    maybePingTodayReminder();
+    // Re-seed scheduled reminders on focus. iOS Safari aggressively
+    // throttles or kills setTimeout timers when a tab is backgrounded,
+    // so refreshing the queue every time the user comes back ensures
+    // tomorrow's 6:30am reminder is still armed.
+    if (localStorage.getItem('local-reminders-enabled') === '1' &&
+        _hasNotificationApi() && Notification.permission === 'granted') {
+      scheduleAllUpcomingReminders();
+    }
   });
 
   function openReadinessModal() {
