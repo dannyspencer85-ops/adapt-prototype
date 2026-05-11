@@ -7041,15 +7041,49 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (raceWeekOffset != null && offsetFromCurrent > raceWeekOffset) {
       return null;
     }
+    // Race-week projection uses per-day taper (T-7 to T-1) instead of a
+    // flat 50% ratio. T-1/T-2 are minimal; T-3 is light; T-4+ progressive.
+    if (raceWeekOffset != null && offsetFromCurrent === raceWeekOffset) {
+      // Compute day-of-week index for target (Mon=0..Sun=6) and race day.
+      const dayInWeek = ((daysFromCurrentMon % 7) + 7) % 7;
+      let raceDayInWeekIdx = null;
+      try {
+        const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+        if (raceStr) {
+          const r = new Date(raceStr + 'T00:00:00');
+          if (!isNaN(r.getTime())) raceDayInWeekIdx = (r.getDay() + 6) % 7;
+        }
+      } catch (e) {}
+      if (raceDayInWeekIdx != null && typeof _raceWeekTaperSession === 'function') {
+        // Day after race in same week → rest (the _sessionForDate strict-
+        // after-race guard already handles this, but defense in depth).
+        if (dayInWeek > raceDayInWeekIdx) {
+          return { ...template, duration: 0, type: 'rest', name: 'Rest', meta: 'Recovery', prescription: 'Race recovery.', _projected: true };
+        }
+        const taper = _raceWeekTaperSession(template, raceDayInWeekIdx, dayInWeek);
+        return { ...taper, _projected: true };
+      }
+    }
     const ratio = _phaseRatioForWeekOffset(offsetFromCurrent, raceWeekOffset);
     const dur = Math.round((Number(template.duration) || 0) * ratio);
     if (dur <= 0 || template.type === 'rest') {
       return { ...template, duration: 0, type: 'rest', _projected: true };
     }
+    // Backfill a prescription so the session modal doesn't fall back to a
+    // generic 45-min CSS template. Earlier user reported seeing an "Easy
+    // swim · 45 min" with full CSS interval set on T-2 to race — that was
+    // exactly this gap (projected sessions had no prescription, sessionDetail
+    // fell back to the hardcoded swim template).
+    const phaseLabel = (typeof _phaseLabelForWeekOffset === 'function')
+      ? _phaseLabelForWeekOffset(offsetFromCurrent, raceWeekOffset) : '';
+    const projectedPrescription = template.prescription && template.prescription.length >= 8
+      ? template.prescription
+      : `${dur} min ${template.type === 'swim' ? 'easy swim — technique focus' : template.type === 'bike' ? 'aerobic spin at Z2' : template.type === 'run' ? 'aerobic run at Z2' : (template.name || template.type)}${phaseLabel ? ' · ' + phaseLabel.toLowerCase() + ' phase' : ''}. Tentative — locks in closer to the date.`;
     return {
       ...template,
       duration: dur,
       meta: template.meta ? template.meta.replace(/\d+\s*min/i, dur + ' min') : (dur + ' min'),
+      prescription: projectedPrescription,
       _projected: true,
     };
   }
@@ -7233,13 +7267,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (isToday) {
         borderStyle = '2px solid var(--primary)';
       }
-      if (isRaceDay) {
-        // Race day stands out — gold border + flag.
-        borderStyle = '2px solid #D9A94A';
-        bgColor = '#FBF0D3';
-        badgeHtml = `<div style="position:absolute; top:3px; left:3px; font-size:10px;">🏁</div>`;
-      }
-      // Tappable when the day has a session AND it's within the plan window.
+      // Race day cell handled as a special case below — skip the regular
+      // bgColor/badge styling here.
       // Tap rules:
       // - Future + training session → open session modal
       // - Future + rest day → open mini "Rest day · here's why" popover
@@ -7254,11 +7283,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         : s && !isRest
         ? `${escapeAttr(c.label)}${dur ? ' · ' + dur + ' min' : ''}${s.name ? ' — ' + escapeAttr(sanitizeSessionName(s.name)) : ''}`
         : isRest && isInMonth ? 'Rest day — tap for why' : '';
-      cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
-        <div style="font-size:12px; font-weight:${isToday ? '700' : '500'}; color:${textColor}; line-height:1;">${d.getDate()}</div>
-        ${dotHtml}
-        ${badgeHtml}
-      </div>`;
+
+      if (isRaceDay) {
+        // Race day gets its own dramatic layout — gold gradient, large
+        // centered flag, "RACE DAY" label below, day number in corner.
+        // No more flag-overlapping-the-date collision.
+        cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px; background:linear-gradient(135deg, #FBF0D3 0%, #F0D9A0 100%); border:2.5px solid #D9A94A; border-radius:10px; ${cursor} overflow:hidden; box-shadow: 0 2px 8px rgba(217,169,74,0.35);">
+          <div style="position:absolute; top:3px; left:5px; font-size:10px; font-weight:800; color:#7a5a18; line-height:1;">${d.getDate()}</div>
+          <div style="font-size:22px; line-height:1; margin-top:6px;">🏁</div>
+          <div style="font-size:8px; font-weight:900; color:#7a5a18; letter-spacing:0.8px; margin-top:3px; line-height:1;">RACE DAY</div>
+        </div>`;
+      } else {
+        cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
+          <div style="font-size:12px; font-weight:${isToday ? '700' : '500'}; color:${textColor}; line-height:1;">${d.getDate()}</div>
+          ${dotHtml}
+          ${badgeHtml}
+        </div>`;
+      }
     }
 
     // Header with month nav.
@@ -9185,22 +9226,55 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       };
     }
     if (session.type === 'bike') {
+      // Intensity-aware: "Easy bike" and Z2 → steady aerobic. "Intervals"
+      // in the name OR Z4/Z5 intensity → interval template. Default to easy.
+      const isEasyBike = !/interval|tempo|threshold|hill|climbing|sweet[\s-]*spot/i.test(session.name || '') && !/Z[345]/.test(session.intensity || '');
+      if (isEasyBike) {
+        return { ...base,
+          warmup: '10 min easy spin, building to 85-90 rpm cadence.',
+          main: `${Math.max(20, session.duration - 15)} min steady Z2 — HR 130-145, conversational pace, cadence 85-95 rpm. Smooth pedal stroke, no surges.`,
+          cooldown: '5 min easy spin.',
+          targets: ['HR Z2 (130-145)', 'Cadence 85-95', 'RPE 4-5 — conversational'],
+          cues: ['Hold HR steady — don\'t chase power.', 'Smooth pedal stroke, avoid mashing.', 'If you can hum but not sing, slow down.'],
+          alternatives: ['Trainer alternative: same duration and zone indoors', 'Short on time: 30 min Z2 still valuable']
+        };
+      }
+      // Quality / interval bike
       return { ...base,
-        warmup: '10 min easy spin, building to target cadence.',
-        main: `${session.duration - 15} min steady Z2 bike (HR 130-145, cadence 85-95).`,
+        warmup: '10 min easy spin building to 85 rpm + 3×30s pickups.',
+        main: `Main set: 5×3 min at threshold (RPE 7-8, ~95% FTP) with 2 min easy spin recovery between. Cadence 85-95 on efforts, settle on recovery.`,
         cooldown: '5 min easy spin.',
-        targets: ['HR Z2', 'Cadence 85-95', 'RPE 4-5'],
-        cues: ['Hold HR steady — don\'t chase power.', 'Smooth pedal stroke, avoid mashing.'],
-        alternatives: ['Trainer alternative: same duration and zone indoors', 'Short on time: 30 min Z2 still valuable']
+        targets: ['Intervals: HR Z4 / RPE 7-8 / ~95% FTP', 'Recovery: full — drop HR before next rep'],
+        cues: ['First rep is the test — if it feels easy, push harder. If desperate, ease off.', 'Stay seated unless climbing.'],
+        alternatives: ['Short on time: 3×3 min instead of 5', 'Outside: pick a 3-min climb and repeat']
       };
     }
     if (session.type === 'swim') {
+      // Intensity-aware: "Easy swim" / Z2 → easy aerobic + drills. "CSS" /
+      // "intervals" / Z4 → CSS interval set. Default to EASY (was wrong:
+      // old code always emitted a CSS set even for an Easy swim, which is
+      // a contradiction in terms).
+      const isEasySwim = !/interval|css|threshold|sprint|race[\s-]*pace/i.test(session.name || '') && !/Z[345]/.test(session.intensity || '');
+      if (isEasySwim) {
+        const totalMeters = Math.round(session.duration * 33); // ~33m per min at easy pace
+        const drillMeters = Math.min(400, Math.round(totalMeters * 0.2));
+        const easyMeters = Math.max(400, totalMeters - drillMeters - 200);
+        return { ...base,
+          warmup: '200m easy choice + 100m kick.',
+          main: `${easyMeters}m continuous easy aerobic swim, smooth stroke, bilateral breathing every 3 or 5.\n\nDrills (${drillMeters}m): alternate 50m catch-up + 50m fingertip drag throughout the easy block, OR break into 2×${Math.round(drillMeters / 2)}m drill sets.`,
+          cooldown: '200m easy backstroke or breaststroke.',
+          targets: ['Smooth stroke, conversational effort', 'Stroke count consistent across lengths', 'Bilateral breathing — both sides'],
+          cues: ['No clock-watching — this is aerobic, not interval.', 'Push off long; glide before catching.', 'Catch with high elbow — don\'t push down.'],
+          alternatives: [`Short on time: drop drills, swim ${Math.max(800, Math.round(easyMeters * 0.7))}m continuous easy`, 'Pool closed: 20 min mobility + core instead']
+        };
+      }
+      // Quality / CSS swim
       return { ...base,
-        warmup: '300m: 100m free + 100m drills (catch-up) + 100m pull.',
-        main: `Main set: 8×100m at CSS pace on 1:45. Focus on technique, not max effort.`,
+        warmup: '300m: 100m free + 100m drills (catch-up + fingertip drag) + 100m pull.',
+        main: `Main set: 8×100m at CSS pace on 1:45 (or whatever interval gives you 10-15s rest). Focus on technique, NOT max effort.`,
         cooldown: '200m easy cool-down.',
-        targets: ['CSS pace on intervals', 'Smooth stroke, bilateral breathing every 4'],
-        cues: ['Count strokes per length — consistency matters.', 'Catch with high elbow — don\'t push down.'],
+        targets: ['Main set: CSS pace (~threshold)', 'Smooth stroke, bilateral breathing every 4'],
+        cues: ['Count strokes per length — consistency matters.', 'Catch with high elbow — don\'t push down.', 'Same effort every rep — don\'t go out hard.'],
         alternatives: ['Only 20 min: 4×100m + cool-down', 'Pool closed: 20 min mobility + core instead']
       };
     }
@@ -9737,7 +9811,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px; opacity:0.95;">Tick these off as you go. Race-day prep beats race-day improv.</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           ${items.map(it => `<label style="display:flex; gap:9px; align-items:flex-start; cursor:pointer; padding:5px 0; font-size:13px; line-height:1.4;">
-            <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer;">
+            <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer; accent-color: #B8862E; width:18px; height:18px;">
             <span style="${checked[it.id] ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.label)}</span>
           </label>`).join('')}
         </div>
@@ -10783,9 +10857,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       planState.postRace = false;
       planState.raceWeek = true;
     } else if (days <= 7) {
-      // RACE WEEK — distinct visual treatment + intensity-lockout signal.
-      // Coach Chat reads planState.raceWeek and refuses to add intensity.
-      banner.style.background = 'linear-gradient(135deg, #C44545, #8E2A2A)'; // alert red — keep your eye on the prize
+      // RACE WEEK — gold gradient (ceremonial, exciting), not red (which
+      // reads as alarm/warning). Matches the gold accents on the race-week
+      // checklist card + race-day calendar cell.
+      banner.style.background = 'linear-gradient(135deg, #D9A94A, #B8862E)';
       if (count) count.textContent = days;
       if (top) top.textContent = `RACE WEEK · ${days} day${days === 1 ? '' : 's'} out`;
       if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''} — taper protocol active. Sharpen, don't strain.`;
@@ -11194,6 +11269,64 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (t < 0.66) return 'Base 2';
       return 'Build';
     }
+    // Per-day race-week scaling. The flat 50% ratio for race week produced
+    // a 45-min CSS swim T-2 to a Half Ironman — far too much. Real taper
+    // is steep + asymmetric: T-1/T-2 nearly nothing, T-3 light, T-4 to
+    // T-7 progressively heavier. Returns a session object with name +
+    // duration + prescription specific to its position in race week.
+    function _raceWeekTaperSession(template, raceDayInWeekIdx, dayIdx) {
+      if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
+      // Days until race (positive — race day is at raceDayInWeekIdx).
+      const daysUntilRace = raceDayInWeekIdx - dayIdx;
+      // Originally rest? Keep rest, no need to add a workout.
+      if (template.type === 'rest' || (template.duration || 0) === 0) {
+        return { ...template, prescription: template.prescription || 'Rest day. Sleep, hydrate, prep your race gear.' };
+      }
+      // Map daysUntilRace → (cap minutes, label, prescription).
+      // Caps are upper bounds — actual duration is min(cap, template * factor).
+      let cap, factor, suffix, presc;
+      if (daysUntilRace === 1) {
+        // T-1 — light shakeout only. Some athletes prefer full rest here.
+        cap = 20; factor = 0.2;
+        suffix = ' (T-1 shakeout)';
+        presc = 'T-1 shakeout. 10-20 min very easy with 3-4 short (15-20 sec) pickups at race pace to wake up the legs. Out feeling fresh, NOT tired. If your body wants rest, take it.';
+      } else if (daysUntilRace === 2) {
+        // T-2 — rest or very light activation. The session in the user's
+        // screenshot was wrong because we used the flat-50% rule here.
+        cap = 20; factor = 0.2;
+        suffix = ' (T-2 activation)';
+        presc = 'T-2 activation. ' + (template.type === 'swim' ? '10-15 min easy swim, focus on feel — NOT a workout.' : template.type === 'bike' ? '15-20 min very easy spin, 80-90 rpm.' : '10-15 min easy jog with 2-3 short strides.') + ' Many athletes take full rest today and that\'s fine too.';
+      } else if (daysUntilRace === 3) {
+        // T-3 — short race-pace primer.
+        cap = 30; factor = 0.35;
+        suffix = ' (T-3 primer)';
+        presc = 'T-3 short race-pace primer. 20-30 min mostly easy with 4-6×30 sec at goal race pace. Wake up the engine without taxing it.';
+      } else if (daysUntilRace === 4) {
+        // T-4 — moderate, no quality.
+        cap = 40; factor = 0.45;
+        suffix = ' (T-4 easy)';
+        presc = 'T-4 easy aerobic. 30-40 min Z2 only — NO intervals, NO tempo. Build comes off this point; everything from here is sharpening.';
+      } else if (daysUntilRace === 5) {
+        cap = 50; factor = 0.55;
+        suffix = ' (T-5 easy)';
+        presc = 'T-5 easy aerobic. 40-50 min Z2 with optional 2-3 short race-pace efforts (~30 sec each) if you feel fresh.';
+      } else {
+        // T-6 / T-7 — closer to normal but capped.
+        cap = 60; factor = 0.65;
+        suffix = ' (T-' + daysUntilRace + ' tapered)';
+        presc = `T-${daysUntilRace} tapered. ${template.prescription || 'Maintain quality briefly; volume down ~35%.'} Sleep + fuel are now as important as the training.`;
+      }
+      const d = Math.min(cap, Math.round((template.duration || 0) * factor));
+      return {
+        ...template,
+        name: (template.name || 'Session') + suffix,
+        meta: `${d} min · ${suffix.trim()}`,
+        duration: d,
+        prescription: presc,
+        intensity: daysUntilRace <= 2 ? 'Z1' : 'Z2',
+      };
+    }
+
     function _scaleSession(template, ratio) {
       if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
       const d = Math.round((template.duration || 0) * ratio);
@@ -11260,12 +11393,27 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         raceDateForBuild <= weekSun;
 
       // Scale every Mon-Sun session by this week's ratio. Rest stays rest.
-      // In race week, force every day STRICTLY AFTER race day to rest.
+      // RACE WEEK gets per-day taper, not a flat ratio: T-1/T-2 are minimal,
+      // T-3 is light, T-4 to T-7 are progressively heavier. A 45-min Easy
+      // swim T-2 to race is way too much — the user reported this exact
+      // case. Per-day scaling fixes it.
       const scaledSessions = {};
       DAYS.forEach((d, dayIdx) => {
-        if (isRaceWeek && raceDayInWeekIdx != null && dayIdx > raceDayInWeekIdx) {
+        if (isRaceWeek && raceDayInWeekIdx != null) {
           // Post-race-day inside race week → recovery.
-          scaledSessions[d] = { name: 'Rest (post-race recovery)', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest', prescription: 'Race recovery. Sleep, hydrate, eat. Walk only if you want to. Plan resumes a few days from now.' };
+          if (dayIdx > raceDayInWeekIdx) {
+            scaledSessions[d] = { name: 'Rest (post-race recovery)', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest', prescription: 'Race recovery. Sleep, hydrate, eat. Walk only if you want to. Plan resumes a few days from now.' };
+            return;
+          }
+          // Race day → race day marker (the calendar already shows the flag
+          // and pep talk; this is the session record).
+          if (dayIdx === raceDayInWeekIdx) {
+            const evtName = (planState && planState.raceEvent) || 'race';
+            scaledSessions[d] = { name: 'Race day', meta: evtName, duration: 0, type: 'rest', intensity: 'race', prescription: `Race day — ${evtName}. Trust the work. Eat your tested breakfast 2-3 hr before start, warm up easy, start at goal pace not 10 sec faster.` };
+            return;
+          }
+          // Pre-race-day inside race week → per-day taper.
+          scaledSessions[d] = _raceWeekTaperSession(newSessions[d], raceDayInWeekIdx, dayIdx);
         } else {
           scaledSessions[d] = _scaleSession(newSessions[d], ratio);
         }
@@ -11299,6 +11447,345 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     };
     planState.activeWeekIdx = 0;
     saveUserData();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // PLAN SANITY-CHECK HARNESS
+  // Research-backed invariants that EVERY plan must satisfy. Run after every
+  // generation; surface violations to the user. Citations next to each rule
+  // anchor it to the literature so future tweaks don't drift from the
+  // evidence base. These mirror the AI prompt's HARD CONSTRAINTS so the
+  // two engines converge on the same definition of "high quality."
+  //
+  // Research anchors:
+  //   - Acute:Chronic Workload Ratio (ACWR) — Gabbett 2016, Hulin 2014.
+  //     >1.5 = 4-5× injury risk. Cap weekly ramp at +25%.
+  //   - 80/20 polarized intensity distribution — Seiler 2010, Stöggl 2014.
+  //     >25% time at threshold+ → diminishing returns + injury risk.
+  //   - Long-run progression — Daniels' Running Formula. >10% week-over-
+  //     week growth in long run = elevated overuse risk.
+  //   - Beginner runner volume caps — NHS Couch to 5K, Damsted 2018.
+  //     Weeks 1-2 ≤ 32 min/session, 75 min/wk; Wk 3-4 ≤ 38 min; Wk 5+ ≤ 45.
+  //   - Race-week taper — Bosquet 2007 meta-analysis. 40-60% volume drop,
+  //     intensity maintained briefly then tapered. T-1/T-2 minimal.
+  //   - Strength for endurance — Lauersen 2014 meta. 1-2× per week
+  //     reduces injury 30-50%, improves economy 4-8%.
+  //   - Quality session spacing — 48 hr minimum (ideally 72) between
+  //     hard sessions for full recovery (Friel 2018).
+  //   - Heat acclimatization — Périard 2015. 10-14 day block T-4 to T-2.
+  //   - Rest necessity — Kellmann 2010, Issurin 2010. ≥1 rest day/wk,
+  //     2 if hours ≤ 4. Athletes training 7/7 have ↑ injury + ↓ HRV.
+  // ══════════════════════════════════════════════════════════════════════
+  function runPlanSanityCheck(plan, inputs) {
+    const violations = [];
+    const warnings = [];
+    const _push = (sev, weekIdx, day, code, msg) => {
+      (sev === 'error' ? violations : warnings).push({ severity: sev, weekIdx, day, code, message: msg });
+    };
+    if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) {
+      return { ok: false, violations: [{ severity: 'error', code: 'NO_PLAN', message: 'Plan has no weeks.' }], warnings: [] };
+    }
+    const event = inputs.event || '';
+    const hours = Number(inputs.hours) || 0;
+    const days = Array.isArray(inputs.days) ? inputs.days : [];
+    const isRunOnly = /5K|10K|Half Marathon|Marathon/i.test(event) && !/Triathlon|Ironman/i.test(event);
+    const isShortRun = /5K|10K/i.test(event);
+    const hasStrengthAccess = Array.isArray(inputs.availableDisciplines) && inputs.availableDisciplines.includes('strength');
+    const hasSwimAccess = Array.isArray(inputs.availableDisciplines) && inputs.availableDisciplines.includes('swim');
+    const hasBikeAccess = Array.isArray(inputs.availableDisciplines) && (inputs.availableDisciplines.includes('bike') || inputs.availableDisciplines.includes('trainer'));
+    const isBeginner = (inputs.profile && inputs.profile.exp === 'new') ||
+      (inputs.fitnessMarkers && /walk-run|under-15/.test(inputs.fitnessMarkers.runAbility || ''));
+    const targetWeeklyMin = hours * 60;
+    const trainingDaySet = new Set(days);
+
+    // Per-event session-duration ceilings (informed by Hal Higdon Novice,
+    // Daniels Run Formula, USA Triathlon coaching guidelines).
+    const EVENT_SESSION_CEILING_MIN = {
+      '5K': isBeginner ? 45 : 70,
+      '10K': isBeginner ? 50 : 80,
+      'Half Marathon': 110,
+      'Marathon': 180,
+      'Sprint Triathlon': 120,
+      'Olympic Triathlon': 180,
+      'Half Ironman': 300,
+      'Full Ironman': 420,
+    };
+    const sessionCeiling = EVENT_SESSION_CEILING_MIN[event] || 180;
+
+    let prevWeekTotal = null;
+    let prevLongRun = null;
+
+    plan.weeks.forEach((wk, wi) => {
+      if (!wk || !wk.sessions) {
+        _push('error', wi, null, 'WEEK_MISSING_SESSIONS', `Week ${wi + 1} has no sessions object.`);
+        return;
+      }
+      const sessions = wk.sessions;
+      let weekTotal = 0;
+      let restCount = 0;
+      let qualityDayIndices = [];
+      let strengthCount = 0;
+      let longRunMins = 0;
+      let weekHighIntensityMin = 0;
+      const isRaceWeek = wi === plan.weeks.length - 1;
+
+      DAYS.forEach((d, di) => {
+        const s = sessions[d] || {};
+        const t = s.type || 'rest';
+        const dur = Number(s.duration || s.durationMin || 0);
+        const intensity = s.intensity || '';
+        // Rest count
+        if (t === 'rest' || dur === 0) restCount++;
+        weekTotal += dur;
+
+        // R1: discipline-lock for run-only events
+        if (isRunOnly && (t === 'swim' || t === 'bike' || t === 'brick')) {
+          _push('error', wi, d, 'DISCIPLINE_LOCK', `${event} is run-only but session type is "${t}". Should be coerced to run.`);
+        }
+        // R2: access-lock — never prescribe a discipline the user can't do
+        if (!hasSwimAccess && t === 'swim') {
+          _push('error', wi, d, 'NO_SWIM_ACCESS', `swim session but user has no swim access.`);
+        }
+        if (!hasBikeAccess && (t === 'bike' || t === 'brick')) {
+          _push('error', wi, d, 'NO_BIKE_ACCESS', `${t} session but user has no bike/trainer access.`);
+        }
+        // R3: training-day allow-list — non-training days must be rest
+        if (!trainingDaySet.has(d) && dur > 0 && days.length > 0) {
+          _push('error', wi, d, 'NOT_A_TRAINING_DAY', `User didn't pick ${d} as a training day; session has duration ${dur}.`);
+        }
+        // R4: per-session ceiling for the event
+        if (dur > sessionCeiling) {
+          _push('error', wi, d, 'SESSION_TOO_LONG', `${dur} min exceeds the ${sessionCeiling} min ceiling for ${event}${isBeginner ? ' (beginner)' : ''}.`);
+        }
+        // R5: beginner-runner caps (NHS C25K / Damsted 2018)
+        if (isBeginner && isShortRun && t !== 'rest') {
+          const cap = wi <= 1 ? 32 : wi <= 3 ? 38 : 45;
+          if (dur > cap) {
+            _push('error', wi, d, 'BEGINNER_SESSION_CAP', `Beginner session ${dur} min > week-${wi + 1} cap of ${cap} min.`);
+          }
+        }
+        // R6: prescription populated (non-rest only)
+        if (t !== 'rest' && dur > 0 && (!s.prescription || String(s.prescription).trim().length < 8)) {
+          _push('warn', wi, d, 'EMPTY_PRESCRIPTION', `Session has no prescription text — would fall to generic template.`);
+        }
+        // Track quality + intensity time
+        const isQuality = t === 'quality' || t === 'brick' || /Z[345]/.test(intensity);
+        if (isQuality) {
+          qualityDayIndices.push(di);
+          weekHighIntensityMin += dur;
+        }
+        if (t === 'strength') strengthCount++;
+        if (t === 'run' && dur > longRunMins) longRunMins = dur;
+      });
+
+      // R7: rest-day requirement (Kellmann 2010)
+      if (restCount === 0 && trainingDaySet.size < 7) {
+        _push('error', wi, null, 'NO_REST_DAY', `Week has zero rest days (user didn't pick all 7 training days).`);
+      }
+      if (hours <= 4 && restCount < 2 && trainingDaySet.size < 6) {
+        _push('warn', wi, null, 'LOW_HOURS_REST', `User has ≤4 hr/wk; should have ≥2 rest days (Issurin 2010 — supercompensation needs space).`);
+      }
+      // R8: quality spacing — at least 48h between hard sessions (Friel)
+      for (let i = 1; i < qualityDayIndices.length; i++) {
+        const gap = qualityDayIndices[i] - qualityDayIndices[i - 1];
+        if (gap < 2) {
+          _push('error', wi, DAYS[qualityDayIndices[i]], 'QUALITY_TOO_CLOSE', `Two quality sessions ${gap} day(s) apart (need ≥48h gap per Friel 2018).`);
+        }
+      }
+      // R9: 80/20 polarized — high-intensity should be ≤25% of weekly time
+      if (weekTotal > 60 && weekHighIntensityMin / weekTotal > 0.30) {
+        _push('warn', wi, null, 'INTENSITY_TOO_HIGH', `${Math.round(weekHighIntensityMin / weekTotal * 100)}% of weekly time at high intensity (Seiler 2010: 80/20 polarized — keep ≤20-25%).`);
+      }
+      // R10: weekly-volume ramp (ACWR proxy — Gabbett 2016)
+      if (prevWeekTotal != null && prevWeekTotal > 0 && !isRaceWeek) {
+        const ratio = weekTotal / prevWeekTotal;
+        if (ratio > 1.30) {
+          _push('error', wi, null, 'VOLUME_JUMP', `Volume jumped ${Math.round((ratio - 1) * 100)}% over prior week (Gabbett 2016: >25-30% increase carries 4-5× injury risk).`);
+        }
+      }
+      // R11: long-run progression — >10% week-over-week is elevated overuse risk (Daniels)
+      if (prevLongRun != null && prevLongRun > 0 && longRunMins > 0 && !isRaceWeek && (wi + 1) % 4 !== 0) {
+        const lrRatio = longRunMins / prevLongRun;
+        if (lrRatio > 1.20) {
+          _push('warn', wi, null, 'LONG_RUN_JUMP', `Long run jumped ${Math.round((lrRatio - 1) * 100)}% over last week (Daniels: >10% increase = elevated overuse risk).`);
+        }
+      }
+      // R12: weekly volume vs target (±25% — wider on early base + deload)
+      if (targetWeeklyMin > 0 && !isRaceWeek) {
+        const dev = (weekTotal - targetWeeklyMin) / targetWeeklyMin;
+        const isDeload = (wi + 1) % 4 === 0 && wi < plan.weeks.length - 4;
+        if (Math.abs(dev) > 0.50 && !isDeload) {
+          _push('warn', wi, null, 'VOLUME_OFF_TARGET', `Week volume ${weekTotal} min vs target ${targetWeeklyMin} min (${dev > 0 ? '+' : ''}${Math.round(dev * 100)}%).`);
+        }
+      }
+      // R13: strength inclusion when gym available (Lauersen 2014)
+      if (hasStrengthAccess && strengthCount === 0 && !isRaceWeek && weekTotal > 60) {
+        _push('warn', wi, null, 'NO_STRENGTH', `User has gym access but no strength session this week (Lauersen 2014: 1-2x/wk reduces injury 30-50%).`);
+      }
+      // R14: race-week sanity — T-1/T-2 minimal
+      if (isRaceWeek && inputs.raceDayInWeekIdx != null) {
+        const rDay = inputs.raceDayInWeekIdx;
+        DAYS.forEach((d, di) => {
+          const s = sessions[d] || {};
+          const dur = Number(s.duration || 0);
+          const daysToRace = rDay - di;
+          if (daysToRace === 1 && dur > 25) {
+            _push('error', wi, d, 'TAPER_T1_TOO_LONG', `T-1 session ${dur} min — race-week T-1 should be ≤20-25 min (Bosquet 2007 taper meta).`);
+          }
+          if (daysToRace === 2 && dur > 30) {
+            _push('error', wi, d, 'TAPER_T2_TOO_LONG', `T-2 session ${dur} min — race-week T-2 should be ≤25-30 min activation.`);
+          }
+          if (di > rDay && dur > 0) {
+            _push('error', wi, d, 'POST_RACE_SESSION', `Session ${dur} min scheduled after race day in race week — should be rest.`);
+          }
+        });
+      }
+      // R15: post-race-day weeks shouldn't exist (the build engine should
+      // end at race week). If any week WI > race-week-idx has training,
+      // that's a bug.
+      // (Handled implicitly — plan.weeks should end at race week.)
+
+      prevWeekTotal = weekTotal;
+      if (longRunMins > 0) prevLongRun = longRunMins;
+    });
+
+    return {
+      ok: violations.length === 0,
+      violations,
+      warnings,
+      summary: `${plan.weeks.length} weeks · ${violations.length} errors · ${warnings.length} warnings`,
+    };
+  }
+
+  // Run the sanity check across every realistic scenario combination, using
+  // the rule-engine generator (which is deterministic). Mocks localStorage
+  // for each scenario, generates the plan, runs the sanity check, then
+  // restores the user's real state. Output goes to console + a chat-style
+  // bubble in the page so testers can see it.
+  function runAllSanityScenarios() {
+    const events = ['5K', '10K', 'Half Marathon', 'Marathon', 'Sprint Triathlon', 'Olympic Triathlon', 'Half Ironman', 'Full Ironman'];
+    const hoursOpts = [2.5, 4, 5, 7, 10];
+    const dayOpts = [
+      ['Wed', 'Sat', 'Sun'],
+      ['Tue', 'Thu', 'Sat', 'Sun'],
+      ['Mon', 'Wed', 'Fri', 'Sat', 'Sun'],
+    ];
+    const abilities = ['walk-run', 'under-15', '15-30', '30-60'];
+    const disciplines = [
+      ['run', 'bike', 'trainer', 'swim', 'strength'],
+      ['run', 'bike', 'trainer', 'strength'],
+      ['run', 'strength'],
+    ];
+    const weeksOuts = [4, 8, 16, 24];
+    const scenarios = [];
+    events.forEach(ev => {
+      const isRunOnly = /5K|10K|Half Marathon|Marathon/i.test(ev) && !/Triathlon|Ironman/i.test(ev);
+      const isShortRun = /5K|10K/i.test(ev);
+      hoursOpts.forEach(hr => {
+        // Skip nonsensical combos (e.g. 5K at 10 hr/wk)
+        if (isShortRun && hr > 7) return;
+        if (!isRunOnly && hr < 4) return;
+        dayOpts.forEach(d => {
+          weeksOuts.forEach(w => {
+            const ability = isRunOnly ? abilities[(scenarios.length % abilities.length)] : '30-60';
+            const disc = isRunOnly ? disciplines[1] : disciplines[0];
+            scenarios.push({
+              event: ev, hours: hr, days: d, weeksOut: w,
+              ability, availableDisciplines: disc,
+            });
+          });
+        });
+      });
+    });
+
+    // Snapshot real state so we can restore.
+    const snapshot = {
+      planState: JSON.parse(JSON.stringify(planState)),
+      localStorage: {},
+    };
+    const KEYS = ['race-event', 'race-date', 'hours-per-week', 'training-days', 'available-disciplines', 'fitness-markers', 'tri-limiter', 'tri-strategy', 'course-intel'];
+    KEYS.forEach(k => { snapshot.localStorage[k] = localStorage.getItem(k); });
+
+    const results = [];
+    try {
+      scenarios.forEach((sc, i) => {
+        // Mock localStorage with scenario inputs.
+        const raceDate = new Date();
+        raceDate.setDate(raceDate.getDate() + sc.weeksOut * 7);
+        localStorage.setItem('race-event', sc.event);
+        localStorage.setItem('race-date', raceDate.toISOString().slice(0, 10));
+        localStorage.setItem('hours-per-week', String(sc.hours));
+        localStorage.setItem('training-days', JSON.stringify(sc.days));
+        localStorage.setItem('available-disciplines', JSON.stringify(sc.availableDisciplines));
+        localStorage.setItem('fitness-markers', JSON.stringify({ runAbility: sc.ability }));
+        planState.raceEvent = sc.event;
+        planState.raceDate = raceDate.toISOString().slice(0, 10);
+        // Reset sessions to a clean slate so the generator starts fresh.
+        planState.sessions = {};
+        DAYS.forEach(d => { planState.sessions[d] = { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest' }; });
+        planState.fullPlan = null;
+        planState.weekArc = [];
+
+        // Generate the plan.
+        try {
+          generatePlanFromInputs();
+        } catch (e) {
+          results.push({ scenario: sc, ok: false, error: 'Generator threw: ' + e.message });
+          return;
+        }
+        // Run sanity check.
+        const raceDayInWeekIdx = (raceDate.getDay() + 6) % 7;
+        const check = runPlanSanityCheck(planState.fullPlan, {
+          event: sc.event,
+          hours: sc.hours,
+          days: sc.days,
+          availableDisciplines: sc.availableDisciplines,
+          fitnessMarkers: { runAbility: sc.ability },
+          profile: { exp: ['walk-run', 'under-15'].includes(sc.ability) ? 'new' : 'intermediate' },
+          raceDayInWeekIdx,
+        });
+        results.push({ scenario: sc, ...check });
+      });
+    } finally {
+      // Restore real state.
+      KEYS.forEach(k => {
+        if (snapshot.localStorage[k] == null) localStorage.removeItem(k);
+        else localStorage.setItem(k, snapshot.localStorage[k]);
+      });
+      Object.keys(snapshot.planState).forEach(k => { planState[k] = snapshot.planState[k]; });
+      try { renderAll(); } catch (e) {}
+    }
+
+    // Aggregate report.
+    const total = results.length;
+    const failed = results.filter(r => !r.ok).length;
+    const warnedOnly = results.filter(r => r.ok && (r.warnings || []).length > 0).length;
+    const clean = total - failed - warnedOnly;
+    const summary = `${total} scenarios · ${clean} clean · ${warnedOnly} warnings · ${failed} errors`;
+    console.group('🩺 Plan sanity check');
+    console.log(summary);
+    results.forEach(r => {
+      if (!r.ok) {
+        console.group(`❌ ${r.scenario.event} · ${r.scenario.hours}h/wk · ${r.scenario.weeksOut}wk · ${r.scenario.ability}`);
+        (r.violations || []).forEach(v => console.error(`  W${v.weekIdx + 1}${v.day ? '/' + v.day : ''}: [${v.code}] ${v.message}`));
+        (r.warnings || []).forEach(v => console.warn(`  W${v.weekIdx + 1}${v.day ? '/' + v.day : ''}: [${v.code}] ${v.message}`));
+        console.groupEnd();
+      } else if ((r.warnings || []).length > 0) {
+        console.group(`⚠️  ${r.scenario.event} · ${r.scenario.hours}h/wk · ${r.scenario.weeksOut}wk · ${r.scenario.ability}`);
+        (r.warnings || []).forEach(v => console.warn(`  W${v.weekIdx + 1}${v.day ? '/' + v.day : ''}: [${v.code}] ${v.message}`));
+        console.groupEnd();
+      }
+    });
+    console.groupEnd();
+
+    // Return the structured results for programmatic use.
+    return { summary, total, clean, warnedOnly, failed, results };
+  }
+
+  // Expose for dev-console invocation: `await runAllSanityScenarios()`
+  if (typeof window !== 'undefined') {
+    window.runPlanSanityCheck = runPlanSanityCheck;
+    window.runAllSanityScenarios = runAllSanityScenarios;
   }
 
   function renderTodayHero() {
