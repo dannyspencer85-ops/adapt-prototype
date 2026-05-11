@@ -444,6 +444,7 @@ Your plans MUST reflect these established frameworks:
 • Quality (high-intensity) sessions must be spaced at least 48 hours apart, ideally 72.
 • No week-over-week total-hours jump exceeds +25% or drops more than 35% (deload/taper aside).
 • Long session is on Sat or Sun if those are training days; otherwise on the last selected day.
+• **RACE DAY ENDS THE CYCLE.** In race week, the LAST training session is race day itself. Every day STRICTLY AFTER race day inside race week must be type:'rest' with duration:0 — recovery, not training. Don't schedule a "long swim" on the Saturday after a Thursday race. The plan ENDS at race day.
 • Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1-2 sentence description of the workout structure), targets (HR/pace/RPE guidance — use ranges and reference the appropriate Daniels/CTL anchor when applicable).
 • prescription MUST reference specific zones, drills, or intervals — not just "easy aerobic." E.g. "8x400m at I pace (~5K race pace) with 400m recoveries; 1mi WU + CD" not "intervals."
 • prescription MUST be populated on every non-rest session — never leave it blank.

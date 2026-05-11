@@ -7069,6 +7069,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const dayInWeek = ((daysFromCurrentMon % 7) + 7) % 7; // 0=Mon..6=Sun, safe for negatives
     const dayName = DAYS[dayInWeek];
 
+    // 🚦 POST-RACE-DAY GUARD 🚦
+    // The training cycle ENDS at race day. Days strictly AFTER race day —
+    // including the trailing days of race-week (Fri/Sat/Sun after a Thu
+    // race) — should be EMPTY, not "your normal Saturday long swim."
+    // This is the off-by-one twin of the earlier projection fix: race week
+    // is inclusive on the BUILD side, but exclusive on the RECOVERY side.
+    try {
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (raceStr) {
+        const race = new Date(raceStr + 'T00:00:00');
+        if (!isNaN(race.getTime())) {
+          // strictly AFTER race day → no session.
+          const targetMidnight = new Date(targetDate); targetMidnight.setHours(0, 0, 0, 0);
+          if (targetMidnight.getTime() > race.getTime()) return null;
+        }
+      }
+    } catch (e) {}
+
     if (!fullPlan) {
       // No multi-week plan — project the current-week shape forward all the
       // way to race day with phase-appropriate scaling.
@@ -11019,18 +11037,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
 
     // Anchor "current" week to whichever index is at the start of the plan.
-    // For now, always render forward from week 0 = current week.
+    // Identify which day-of-week race day falls on, so race-week days
+    // AFTER race day get forced to rest. Without this, a Thu race left a
+    // "long swim" programmed for that Saturday (2 days post-race).
+    let raceDateForBuild = null;
+    let raceWeekIdxInBuild = null; // index into the build loop
+    let raceDayInWeekIdx = null;   // 0=Mon..6=Sun within race week
+    try {
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (raceStr) {
+        const r = new Date(raceStr + 'T00:00:00');
+        if (!isNaN(r.getTime())) {
+          raceDateForBuild = r;
+          raceDayInWeekIdx = (r.getDay() + 6) % 7; // Mon=0..Sun=6
+        }
+      }
+    } catch (e) {}
+
     for (let i = 0; i < totalWeeks; i++) {
       const ratio = _ratioForWeek(i, totalWeeks);
       const phase = _phaseLabel(i, totalWeeks);
       const weekHours = Math.max(2, hours * ratio);
       const isCurrent = i === 0;
-
-      // Scale every Mon-Sun session by this week's ratio. Rest stays rest.
-      const scaledSessions = {};
-      DAYS.forEach(d => {
-        scaledSessions[d] = _scaleSession(newSessions[d], ratio);
-      });
 
       // Compute the calendar date label for this week's Monday.
       const today = new Date(); today.setHours(0,0,0,0);
@@ -11040,6 +11068,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       weekMon.setDate(today.getDate() - daysBackToMon + i * 7);
       const weekSun = new Date(weekMon);
       weekSun.setDate(weekMon.getDate() + 6);
+
+      // Race-week detection: does race day fall within this Mon-Sun window?
+      const isRaceWeek = raceDateForBuild &&
+        raceDateForBuild >= weekMon &&
+        raceDateForBuild <= weekSun;
+
+      // Scale every Mon-Sun session by this week's ratio. Rest stays rest.
+      // In race week, force every day STRICTLY AFTER race day to rest.
+      const scaledSessions = {};
+      DAYS.forEach((d, dayIdx) => {
+        if (isRaceWeek && raceDayInWeekIdx != null && dayIdx > raceDayInWeekIdx) {
+          // Post-race-day inside race week → recovery.
+          scaledSessions[d] = { name: 'Rest (post-race recovery)', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest', prescription: 'Race recovery. Sleep, hydrate, eat. Walk only if you want to. Plan resumes a few days from now.' };
+        } else {
+          scaledSessions[d] = _scaleSession(newSessions[d], ratio);
+        }
+      });
+
       const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const dateRange = `${monthShort[weekMon.getMonth()]} ${weekMon.getDate()}–${weekMon.getMonth() === weekSun.getMonth() ? weekSun.getDate() : monthShort[weekSun.getMonth()] + ' ' + weekSun.getDate()}`;
 
