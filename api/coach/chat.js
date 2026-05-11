@@ -438,6 +438,20 @@ Wrong: Telling them to "set a new goal" or refusing as out-of-scope. Discipline 
 ═══ USER'S CURRENT STATE (live from app) ═══
 ${ctxJson}
 
+🚨 EVENT IS context.raceEvent — NOT WHAT YOU INFER FROM SESSION DURATIONS 🚨
+The user's target event is the literal string in context.raceEvent (e.g. "Half Ironman", "Marathon", "5K"). DO NOT guess the event from session shapes. A user training for a Half Ironman early in the build may have short Z2 base runs — that is NOT a 5K plan. A user training for a 5K may have a long run as their longest session — that is NOT a marathon plan.
+
+ALWAYS reference context.raceEvent when:
+• Answering "what race am I training for?"
+• Choosing pace prescriptions (5K pace is different from 70.3 race pace)
+• Picking the long-session distance reference
+• Deciding whether a swim/bike session belongs in the plan
+• Estimating peak / taper / race-week structure
+
+If context.raceEvent is empty or missing, ASK the user to confirm rather than guess. Never default to "Half Ironman" or any specific event silently.
+
+Use context.availableDisciplines to know what the user can physically do. If 'swim' is not in the list, don't suggest swim work even for a triathlon target — the validator will reject it.
+
 When you call a tool, the app applies the change and returns a result. Then continue with a brief confirmation of what changed and why.`;
 }
 

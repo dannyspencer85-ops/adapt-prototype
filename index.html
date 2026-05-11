@@ -14042,13 +14042,24 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       };
     }
 
+    // Read race event + available disciplines from BOTH planState and
+    // localStorage. The bug fixed here: previously only raceDate was sent,
+    // forcing the AI to infer the event from session durations. A 5K-
+    // shaped week (short runs) read as a "5K plan" even when the user
+    // had configured Half Ironman. raceEvent is now an explicit field
+    // and the server prompt is updated to use it as source of truth.
+    const raceEvent = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    let availableDisciplines = [];
+    try { availableDisciplines = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
     return {
       today: { day: todayDay, label: todayDateStr },
       timeline,
       daysToRace,
+      raceEvent,                          // <— NEW: explicit event source-of-truth
       raceDate: planState.raceDate || null,
       raceWeek: !!planState.raceWeek,    // <=7 days out — intensity lockout
       postRace: !!planState.postRace,    // race date passed — recovery mode
+      availableDisciplines,              // <— NEW: what the user actually has access to
       sessions: planState.sessions || {},
       weekArc: (planState.weekArc || []).slice(0, 8),
       injury: planState.injury ? {
