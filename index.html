@@ -2224,11 +2224,12 @@
       <!-- 5. EXPANDERS at the bottom for less-frequent info -->
       <div style="margin-top: 18px;">
         <button onclick="openScheduleModal()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Edit schedule preferences</button>
-        <!-- Export the full plan to a .ics calendar file. Drops every
-             non-rest session in fullPlan into Apple/Google/Outlook with
-             title, duration, and prescription so the plan reaches the
-             user even when they don't open the app. -->
-        <button onclick="exportFullPlanToICS()" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>Export full plan to calendar (.ics)</button>
+        <!-- Calendar export removed per product direction. The .ics export
+             felt like the wrong primitive for an adaptive plan — once a
+             user drops 16 weeks of sessions into Apple/Google Calendar, the
+             plan's natural adjustments (skips, moves, taper changes) don't
+             flow back. Local notifications (below) reach the user without
+             that staleness risk. -->
         <!-- Reminders — open-time nudges the user can opt into. -->
         <button onclick="enableLocalReminders()" id="enableRemindersBtn" style="background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px 14px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; width:100%; text-align:left; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Turn on workout reminders</button>
       </div>
@@ -2877,10 +2878,6 @@
         <div style="color:var(--text-soft); font-size:13px;">Here's what comes next.</div>
       </div>
       <div id="firstSessionDetail" style="background:var(--bg-soft); padding:14px 16px; border-radius:14px; margin-bottom:14px;"></div>
-      <button onclick="exportFirstSessionToICS()" id="firstSessionICSBtn" style="background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; padding:11px 14px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; width:100%; margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
-        Add this week to my calendar
-      </button>
       <button onclick="closeFirstSessionModal()" class="btn btn-primary btn-full">I'll check the app — got it</button>
     </div>
   </div>
@@ -7092,6 +7089,59 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // Map a real Date to the planned session for that day. First checks the
+  // ──────────────────────────────────────────────────────────────────────
+  // _raceWeekTaperSession — module-scoped so both BUILD time (rule fallback
+  // in generatePlanFromInputs) and READ time (_enforceRaceWeekTaper inside
+  // _sessionForDate) can call it. Maps days-until-race → (cap, factor,
+  // suffix, prescription) per Bosquet 2007 taper meta:
+  //   T-1: ≤20 min shakeout · T-2: ≤20 min activation · T-3: ≤30 min primer
+  //   T-4: ≤40 min easy · T-5: ≤50 min easy · T-6/-7: ≤60 min tapered
+  // Idempotent — running on an already-correctly-sized session returns
+  // (approximately) the same thing.
+  // ──────────────────────────────────────────────────────────────────────
+  function _raceWeekTaperSession(template, raceDayInWeekIdx, dayIdx) {
+    if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
+    const daysUntilRace = raceDayInWeekIdx - dayIdx;
+    if (template.type === 'rest' || (template.duration || 0) === 0) {
+      return { ...template, prescription: template.prescription || 'Rest day. Sleep, hydrate, prep your race gear.' };
+    }
+    let cap, factor, suffix, presc;
+    if (daysUntilRace === 1) {
+      cap = 20; factor = 0.2;
+      suffix = ' (T-1 shakeout)';
+      presc = 'T-1 shakeout. 10-20 min very easy with 3-4 short (15-20 sec) pickups at race pace to wake up the legs. Out feeling fresh, NOT tired. If your body wants rest, take it.';
+    } else if (daysUntilRace === 2) {
+      cap = 20; factor = 0.2;
+      suffix = ' (T-2 activation)';
+      presc = 'T-2 activation. ' + (template.type === 'swim' ? '10-15 min easy swim, focus on feel — NOT a workout.' : template.type === 'bike' ? '15-20 min very easy spin, 80-90 rpm.' : '10-15 min easy jog with 2-3 short strides.') + ' Many athletes take full rest today and that\'s fine too.';
+    } else if (daysUntilRace === 3) {
+      cap = 30; factor = 0.35;
+      suffix = ' (T-3 primer)';
+      presc = 'T-3 short race-pace primer. 20-30 min mostly easy with 4-6×30 sec at goal race pace. Wake up the engine without taxing it.';
+    } else if (daysUntilRace === 4) {
+      cap = 40; factor = 0.45;
+      suffix = ' (T-4 easy)';
+      presc = 'T-4 easy aerobic. 30-40 min Z2 only — NO intervals, NO tempo. Build comes off this point; everything from here is sharpening.';
+    } else if (daysUntilRace === 5) {
+      cap = 50; factor = 0.55;
+      suffix = ' (T-5 easy)';
+      presc = 'T-5 easy aerobic. 40-50 min Z2 with optional 2-3 short race-pace efforts (~30 sec each) if you feel fresh.';
+    } else {
+      cap = 60; factor = 0.65;
+      suffix = ' (T-' + daysUntilRace + ' tapered)';
+      presc = `T-${daysUntilRace} tapered. ${template.prescription || 'Maintain quality briefly; volume down ~35%.'} Sleep + fuel are now as important as the training.`;
+    }
+    const d = Math.min(cap, Math.round((template.duration || 0) * factor));
+    return {
+      ...template,
+      name: (template.name || 'Session') + suffix,
+      meta: `${d} min · ${suffix.trim()}`,
+      duration: d,
+      prescription: presc,
+      intensity: daysUntilRace <= 2 ? 'Z1' : 'Z2',
+    };
+  }
+
   // explicit fullPlan window; falls back to a phase-aware projection so
   // the calendar shows a tentative pattern all the way to race day even
   // when the engine only built a subset of weeks.
@@ -7155,7 +7205,44 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
       return null;
     }
-    return fullPlan.weeks[targetWeekIdx].sessions ? fullPlan.weeks[targetWeekIdx].sessions[dayName] : null;
+    const rawSession = fullPlan.weeks[targetWeekIdx].sessions ? fullPlan.weeks[targetWeekIdx].sessions[dayName] : null;
+    // Race-week sessions get re-capped at READ time. A stale fullPlan built
+    // before the per-day taper fix can still have a 45-min Easy swim on
+    // T-2 to race; an AI plan that slips the taper rule can do the same.
+    // Force every race-week pre-race session through _raceWeekTaperSession
+    // so the visible session always reflects the correct day-of-week taper
+    // regardless of when the plan was generated.
+    return _enforceRaceWeekTaper(rawSession, targetDate);
+  }
+
+  // Cap a race-week session to its day-of-week-appropriate taper. Returns
+  // the session unchanged when outside race week. Idempotent — running it
+  // on already-correctly-sized sessions is a no-op.
+  function _enforceRaceWeekTaper(session, targetDate) {
+    if (!session) return session;
+    try {
+      const raceStr = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+      if (!raceStr) return session;
+      const race = new Date(raceStr + 'T00:00:00');
+      if (isNaN(race.getTime())) return session;
+      const target = new Date(targetDate); target.setHours(0, 0, 0, 0);
+      const daysUntilRace = Math.round((race - target) / (24 * 60 * 60 * 1000));
+      if (daysUntilRace < 1 || daysUntilRace > 7) return session; // not race week pre-race
+      if (session.type === 'rest' || (session.duration || 0) === 0) return session;
+      if (typeof _raceWeekTaperSession !== 'function') return session;
+      // Day-of-week indices for the helper signature.
+      const raceDayInWeekIdx = (race.getDay() + 6) % 7;
+      const dayIdx = raceDayInWeekIdx - daysUntilRace;
+      const tapered = _raceWeekTaperSession(session, raceDayInWeekIdx, dayIdx);
+      // Only override when the tapered version is SMALLER — never lengthen
+      // a session at read time. Preserves any well-chosen short AI session.
+      if ((tapered.duration || 0) < (session.duration || 0)) {
+        return tapered;
+      }
+      return session;
+    } catch (e) {
+      return session;
+    }
   }
 
   function renderUpcomingCalendar() {
@@ -10221,135 +10308,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (m) m.classList.remove('show');
   }
 
-  // Export the full upcoming week's sessions to an .ics file the user can
-  // double-click into Apple/Google/Outlook calendar. Workout name + duration
-  // become the event title; session prescription goes in the body.
-  function exportFirstSessionToICS() {
-    const sessions = planState.sessions || {};
-    const today = new Date(); today.setHours(7, 0, 0, 0); // 7am default start
-    const events = [];
-    for (let off = 0; off < 7; off++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + off);
-      const dow = (d.getDay() + 6) % 7;
-      const dayName = DAYS[dow];
-      const s = sessions[dayName];
-      if (!s || s.type === 'rest' || (s.duration || s.durationMin || 0) === 0) continue;
-      const dur = Number(s.duration || s.durationMin || 0);
-      const start = new Date(d);
-      const end = new Date(start.getTime() + dur * 60 * 1000);
-      const title = (typeof sanitizeSessionName === 'function') ? sanitizeSessionName(s.name || 'Training') : (s.name || 'Training');
-      const desc = String(s.prescription || s.meta || '').replace(/\n/g, '\\n');
-      events.push({ start, end, title: 'Adapt: ' + title, description: desc });
-    }
-    if (events.length === 0) {
-      alert('No sessions to export this week.');
-      return;
-    }
-    // Floating local time (no Z suffix, no TZID) — calendars treat this as
-    // "the user's local clock time" which is what we want for "7am workout."
-    // toISOString() with Z would produce UTC-shifted events in non-UTC zones.
-    const fmt = (d) => {
-      const pad = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    };
-    const lines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Adapt//Training Plan//EN',
-      'CALSCALE:GREGORIAN',
-    ];
-    events.forEach((e, i) => {
-      lines.push('BEGIN:VEVENT');
-      lines.push(`UID:adapt-${Date.now()}-${i}@adapt.app`);
-      lines.push(`DTSTAMP:${fmt(new Date())}`);
-      lines.push(`DTSTART:${fmt(e.start)}`);
-      lines.push(`DTEND:${fmt(e.end)}`);
-      lines.push(`SUMMARY:${e.title}`);
-      lines.push(`DESCRIPTION:${e.description}`);
-      lines.push('END:VEVENT');
-    });
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'adapt-this-week.ics';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if (typeof trackEvent === 'function') trackEvent('first_session_ics_exported', { count: events.length });
-  }
-
-  // Export the FULL plan — every non-rest session across every week in
-  // fullPlan.weeks — to a single .ics file. Lets the user drop the entire
-  // build into Apple/Google/Outlook in one go. Each event uses the real
-  // session date (computed from the current week's Monday + week offset).
-  function exportFullPlanToICS() {
-    const fullPlan = planState.fullPlan && Array.isArray(planState.fullPlan.weeks) ? planState.fullPlan : null;
-    if (!fullPlan) {
-      alert('No multi-week plan available yet. Try again after the plan finishes building.');
-      return;
-    }
-    const today = new Date(); today.setHours(7, 0, 0, 0);
-    const todayDow = today.getDay();
-    const daysBackToMon = (todayDow + 6) % 7;
-    const currentMon = new Date(today);
-    currentMon.setDate(today.getDate() - daysBackToMon);
-    const currentIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
-    const events = [];
-    fullPlan.weeks.forEach((wk, wIdx) => {
-      const weekOffset = wIdx - currentIdx;
-      if (weekOffset < 0) return; // skip past weeks
-      const sessions = wk.sessions || {};
-      DAYS.forEach((dayName, di) => {
-        const s = sessions[dayName];
-        if (!s || s.type === 'rest' || (s.duration || s.durationMin || 0) === 0) return;
-        const dur = Number(s.duration || s.durationMin || 0);
-        const start = new Date(currentMon);
-        start.setDate(currentMon.getDate() + weekOffset * 7 + di);
-        const end = new Date(start.getTime() + dur * 60 * 1000);
-        const title = (typeof sanitizeSessionName === 'function') ? sanitizeSessionName(s.name || 'Training') : (s.name || 'Training');
-        const desc = String(s.prescription || s.meta || '').replace(/\n/g, '\\n');
-        events.push({ start, end, title: 'Adapt: ' + title, description: desc });
-      });
-    });
-    if (events.length === 0) {
-      alert('No upcoming sessions to export.');
-      return;
-    }
-    // Floating local time (no Z suffix, no TZID) — calendars treat this as
-    // "the user's local clock time" which is what we want for "7am workout."
-    // toISOString() with Z would produce UTC-shifted events in non-UTC zones.
-    const fmt = (d) => {
-      const pad = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    };
-    const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Adapt//Training Plan//EN','CALSCALE:GREGORIAN'];
-    events.forEach((e, i) => {
-      lines.push('BEGIN:VEVENT');
-      lines.push(`UID:adapt-full-${Date.now()}-${i}@adapt.app`);
-      lines.push(`DTSTAMP:${fmt(new Date())}`);
-      lines.push(`DTSTART:${fmt(e.start)}`);
-      lines.push(`DTEND:${fmt(e.end)}`);
-      lines.push(`SUMMARY:${e.title}`);
-      lines.push(`DESCRIPTION:${e.description}`);
-      lines.push('END:VEVENT');
-    });
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `adapt-full-plan-${(planState.raceEvent || 'plan').replace(/\s+/g, '-').toLowerCase()}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if (typeof trackEvent === 'function') trackEvent('full_plan_ics_exported', { count: events.length });
-    alert(`Exported ${events.length} sessions across ${fullPlan.weeks.length} weeks. Open the .ics in your calendar app.`);
-  }
 
   // ──────────────────────────────────────────────────────────────────────
   // LOCAL NOTIFICATIONS — workout-day reminders.
@@ -11281,63 +11239,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (t < 0.66) return 'Base 2';
       return 'Build';
     }
-    // Per-day race-week scaling. The flat 50% ratio for race week produced
-    // a 45-min CSS swim T-2 to a Half Ironman — far too much. Real taper
-    // is steep + asymmetric: T-1/T-2 nearly nothing, T-3 light, T-4 to
-    // T-7 progressively heavier. Returns a session object with name +
-    // duration + prescription specific to its position in race week.
-    function _raceWeekTaperSession(template, raceDayInWeekIdx, dayIdx) {
-      if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
-      // Days until race (positive — race day is at raceDayInWeekIdx).
-      const daysUntilRace = raceDayInWeekIdx - dayIdx;
-      // Originally rest? Keep rest, no need to add a workout.
-      if (template.type === 'rest' || (template.duration || 0) === 0) {
-        return { ...template, prescription: template.prescription || 'Rest day. Sleep, hydrate, prep your race gear.' };
-      }
-      // Map daysUntilRace → (cap minutes, label, prescription).
-      // Caps are upper bounds — actual duration is min(cap, template * factor).
-      let cap, factor, suffix, presc;
-      if (daysUntilRace === 1) {
-        // T-1 — light shakeout only. Some athletes prefer full rest here.
-        cap = 20; factor = 0.2;
-        suffix = ' (T-1 shakeout)';
-        presc = 'T-1 shakeout. 10-20 min very easy with 3-4 short (15-20 sec) pickups at race pace to wake up the legs. Out feeling fresh, NOT tired. If your body wants rest, take it.';
-      } else if (daysUntilRace === 2) {
-        // T-2 — rest or very light activation. The session in the user's
-        // screenshot was wrong because we used the flat-50% rule here.
-        cap = 20; factor = 0.2;
-        suffix = ' (T-2 activation)';
-        presc = 'T-2 activation. ' + (template.type === 'swim' ? '10-15 min easy swim, focus on feel — NOT a workout.' : template.type === 'bike' ? '15-20 min very easy spin, 80-90 rpm.' : '10-15 min easy jog with 2-3 short strides.') + ' Many athletes take full rest today and that\'s fine too.';
-      } else if (daysUntilRace === 3) {
-        // T-3 — short race-pace primer.
-        cap = 30; factor = 0.35;
-        suffix = ' (T-3 primer)';
-        presc = 'T-3 short race-pace primer. 20-30 min mostly easy with 4-6×30 sec at goal race pace. Wake up the engine without taxing it.';
-      } else if (daysUntilRace === 4) {
-        // T-4 — moderate, no quality.
-        cap = 40; factor = 0.45;
-        suffix = ' (T-4 easy)';
-        presc = 'T-4 easy aerobic. 30-40 min Z2 only — NO intervals, NO tempo. Build comes off this point; everything from here is sharpening.';
-      } else if (daysUntilRace === 5) {
-        cap = 50; factor = 0.55;
-        suffix = ' (T-5 easy)';
-        presc = 'T-5 easy aerobic. 40-50 min Z2 with optional 2-3 short race-pace efforts (~30 sec each) if you feel fresh.';
-      } else {
-        // T-6 / T-7 — closer to normal but capped.
-        cap = 60; factor = 0.65;
-        suffix = ' (T-' + daysUntilRace + ' tapered)';
-        presc = `T-${daysUntilRace} tapered. ${template.prescription || 'Maintain quality briefly; volume down ~35%.'} Sleep + fuel are now as important as the training.`;
-      }
-      const d = Math.min(cap, Math.round((template.duration || 0) * factor));
-      return {
-        ...template,
-        name: (template.name || 'Session') + suffix,
-        meta: `${d} min · ${suffix.trim()}`,
-        duration: d,
-        prescription: presc,
-        intensity: daysUntilRace <= 2 ? 'Z1' : 'Z2',
-      };
-    }
+    // _raceWeekTaperSession lives at module scope (defined near _sessionForDate)
+    // so both build-time (rule fallback) AND read-time (calendar lookup) can
+    // call it. The local re-declaration that used to be here has been hoisted.
 
     function _scaleSession(template, ratio) {
       if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
