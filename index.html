@@ -7555,9 +7555,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return;
     }
 
-    // 2. Race day / race week.
+    // 2. Race day / race week — brand green (matches Home countdown +
+    // race-week checklist). Race-DAY cell on the calendar keeps gold.
     if (days != null && days >= 0 && days <= 7) {
-      slot.innerHTML = `<div style="background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
+      slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
         <strong>🏁 Race week.</strong> Volume drops, intensity stays sharp. Your job is to arrive fresh — sleep + fuel matter most right now.
       </div>`;
       return;
@@ -9800,7 +9801,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ];
       const completedCount = items.filter(i => checked[i.id]).length;
       slot.style.display = 'block';
-      slot.innerHTML = `<div style="background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; border-radius:14px; padding:14px 16px;">
+      // Race-week card uses the brand green palette — encouraging "you're
+      // peaking" feel rather than the cautionary gold. The race-DAY cell on
+      // the calendar still gets gold (the "arrived" moment); the lead-up
+      // is on-brand primary green.
+      slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; border-radius:14px; padding:14px 16px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <div>
             <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85;">RACE WEEK · T-${days}</div>
@@ -9811,7 +9816,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px; opacity:0.95;">Tick these off as you go. Race-day prep beats race-day improv.</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           ${items.map(it => `<label style="display:flex; gap:9px; align-items:flex-start; cursor:pointer; padding:5px 0; font-size:13px; line-height:1.4;">
-            <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer; accent-color: #B8862E; width:18px; height:18px;">
+            <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer; accent-color: #3B8968; width:18px; height:18px;">
             <span style="${checked[it.id] ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.label)}</span>
           </label>`).join('')}
         </div>
@@ -10857,10 +10862,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       planState.postRace = false;
       planState.raceWeek = true;
     } else if (days <= 7) {
-      // RACE WEEK — gold gradient (ceremonial, exciting), not red (which
-      // reads as alarm/warning). Matches the gold accents on the race-week
-      // checklist card + race-day calendar cell.
-      banner.style.background = 'linear-gradient(135deg, #D9A94A, #B8862E)';
+      // RACE WEEK — brand-green gradient. Encouraging "you're peaking"
+      // signal rather than cautionary gold or alarming red. Matches the
+      // primary palette + the race-week checklist card. Race DAY itself
+      // (the actual day-of cell on the calendar) keeps the gold flag
+      // treatment as the celebration / arrival moment.
+      banner.style.background = 'linear-gradient(135deg, #3B8968, #2E6B51)';
       if (count) count.textContent = days;
       if (top) top.textContent = `RACE WEEK · ${days} day${days === 1 ? '' : 's'} out`;
       if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''} — taper protocol active. Sharpen, don't strain.`;
