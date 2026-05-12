@@ -6995,6 +6995,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function _phaseLabelForWeekOffset(offsetFromCurrent, raceWeekOffset) {
     if (offsetFromCurrent < 0) return '';
     if (raceWeekOffset == null) return '';
+    // Short-plan branch — mirrors _phaseLabel's totalWeeks ≤ 4 behavior.
+    // A 4-week plan can't fit Base/Build/Peak/Taper; treat every pre-race
+    // week as "Sharpen" with a one-week Taper. Without this branch, the
+    // calendar's projection variant would label week 0 of a 4-week plan
+    // "Peak" while the build's week-arc says "Sharpen" — visible drift.
+    if (raceWeekOffset <= 3) {
+      if (offsetFromCurrent === raceWeekOffset) return 'Race week';
+      if (offsetFromCurrent === raceWeekOffset - 1) return 'Taper';
+      return 'Sharpen';
+    }
     if (offsetFromCurrent === raceWeekOffset) return 'Race week';
     if (offsetFromCurrent === raceWeekOffset - 1) return 'Taper';
     if (offsetFromCurrent === raceWeekOffset - 2) return 'Back-off';
@@ -7104,6 +7114,26 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const daysUntilRace = raceDayInWeekIdx - dayIdx;
     if (template.type === 'rest' || (template.duration || 0) === 0) {
       return { ...template, prescription: template.prescription || 'Rest day. Sleep, hydrate, prep your race gear.' };
+    }
+    // STRENGTH gets sport-specific race-week treatment: skipped entirely
+    // T-2 and T-1 (heavy loading inside 48hr of race is counterproductive),
+    // light maintenance T-3 to T-5, half-load T-6/-7. Without this branch,
+    // strength sessions were getting "10-15 min easy jog with strides"
+    // prescriptions — wrong sport, wrong cue, wrong message.
+    if (template.type === 'strength') {
+      if (daysUntilRace <= 2) {
+        return { ...template, name: 'Rest (no strength T-' + daysUntilRace + ')', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest', prescription: 'Skip strength inside T-2. Body needs to be fully recovered for race day. Walk if you want movement. Heavy loading within 48hr of race compromises race-day output (Häkkinen, neuromuscular recovery).' };
+      }
+      if (daysUntilRace === 3) {
+        return { ...template, name: 'Strength (race-week maintenance)', meta: '20 min · maintenance, no heavy', duration: 20, type: 'strength', prescription: 'T-3 strength maintenance. 20 min: 2 rounds of bodyweight squats, glute bridges, push-ups, planks. NO heavy loading. Stop well before failure (RPE 5).', targets: 'RPE 5 · bodyweight only · mobility focus', intensity: 'Z2' };
+      }
+      if (daysUntilRace <= 5) {
+        const d = Math.min(30, Math.round((template.duration || 0) * 0.5));
+        return { ...template, name: 'Strength (light)', meta: `${d} min · half normal load`, duration: d, type: 'strength', prescription: `T-${daysUntilRace} strength at half normal load. 2-3 rounds at RPE 5-6, stop 3-4 reps before failure. Last loaded session before the race.`, targets: 'RPE 5-6 · half normal weight · no max efforts', intensity: 'Z2' };
+      }
+      // T-6 / T-7 — closer to normal but still tapered.
+      const d = Math.min(35, Math.round((template.duration || 0) * 0.7));
+      return { ...template, name: 'Strength (tapered)', meta: `${d} min · 70% volume`, duration: d, type: 'strength', prescription: `T-${daysUntilRace} strength tapered. ${template.prescription || '3 rounds, posterior-chain compound work.'} Cut last set off each exercise; stay 2-3 reps from failure.`, targets: 'RPE 6 · 70% normal volume · controlled tempo', intensity: 'Z2' };
     }
     let cap, factor, suffix, presc;
     if (daysUntilRace === 1) {
@@ -11219,28 +11249,66 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (hasStrength) {
       const numStrengthSessions = isBeginnerRunner ? 1 : 2;
       // Preferred days for strength — book-end placement, spaced from long day.
+      // Critical change: we DO NOT require `days.includes(d)` anymore. Strength
+      // is a separate session from cardio; the "training-days" picker was for
+      // cardio scheduling. A user with [Wed,Sat,Sun] cardio days can absolutely
+      // gym on Mon/Fri — those are "rest from cardio" days, not literally rest.
+      // Without this fix, 3-day and 5-day schedules never received strength.
       const preferredOrder = ['Mon', 'Fri', 'Tue', 'Thu', 'Wed'];
+      const dayBeforeLong = DAYS[(DAYS.indexOf(longDay) + 6) % 7];
       let placedCount = 0;
+
+      const makeStrengthSession = () => isBeginnerRunner
+        ? { name: 'Mobility + light strength', meta: '20 min · hips, glutes, core', duration: 20, type: 'strength', prescription: '5 min dynamic warm-up + 3 rounds: 8 squats, 8 glute bridges, 6 single-leg deadlifts/side, 30s plank, 8 push-ups (knees OK). Quality over quantity.', targets: 'Form first · RPE 5-6 · stop 1-2 reps before failure', intensity: 'Z2' }
+        : { name: 'Strength', meta: '35 min · full-body, posterior chain focus', duration: 35, type: 'strength', prescription: '5 min dynamic warm-up + 3-4 rounds: 8 squats or deadlifts, 6 single-leg work/side, 8 push or pull, 8 hip hinge, 45s plank or anti-rotation. Compound > isolation.', targets: 'RPE 7 · don\'t fail · explosive concentric, controlled eccentric', intensity: 'Z2' };
+
+      // Pass 1: place on any day currently set to rest (whether that day is in
+      // the user's training-days list or not).
       for (const d of preferredOrder) {
         if (placedCount >= numStrengthSessions) break;
-        // Only inject on actual training days that are currently rest.
-        if (!days.includes(d)) continue;
         if (!newSessions[d] || newSessions[d].type !== 'rest') continue;
-        // Skip the day right before a long session (recovery).
-        const dayBeforeLong = DAYS[(DAYS.indexOf(longDay) + 6) % 7];
         if (d === dayBeforeLong) continue;
-        const strengthMins = isBeginnerRunner ? 20 : 35;
-        newSessions[d] = isBeginnerRunner
-          ? { name: 'Mobility + light strength', meta: `${strengthMins} min · hips, glutes, core`, duration: strengthMins, type: 'strength', prescription: '5 min dynamic warm-up + 3 rounds: 8 squats, 8 glute bridges, 6 single-leg deadlifts/side, 30s plank, 8 push-ups (knees OK). Quality over quantity.', targets: 'Form first · RPE 5-6 · stop 1-2 reps before failure', intensity: 'Z2' }
-          : { name: 'Strength', meta: `${strengthMins} min · full-body, posterior chain focus`, duration: strengthMins, type: 'strength', prescription: '5 min dynamic warm-up + 3-4 rounds: 8 squats or deadlifts, 6 single-leg work/side, 8 push or pull, 8 hip hinge, 45s plank or anti-rotation. Compound > isolation.', targets: 'RPE 7 · don\'t fail · explosive concentric, controlled eccentric', intensity: 'Z2' };
+        newSessions[d] = makeStrengthSession();
         placedCount++;
       }
-      // Fallback: if we couldn't find rest days (user picked few training
-      // days, all are filled), append a brief strength addendum to a quality
-      // day's prescription. Better to call it out than silently drop strength.
-      if (placedCount === 0 && qualityDay && newSessions[qualityDay]) {
-        const q = newSessions[qualityDay];
-        q.prescription = (q.prescription ? q.prescription + ' ' : '') + '[Add 15 min post-session strength: 3 rounds of 8 single-leg deadlifts, 8 squats, 30s plank.]';
+
+      // Pass 2 (fallback): if every preferred day is filled with cardio,
+      // convert the EASIEST cardio day to a strength + brief easy cardio
+      // combo. Pick by: not the long day, not the quality day, not the day
+      // before long. This means an "Easy aerobic" day gets traded for a
+      // hybrid session.
+      if (placedCount < numStrengthSessions) {
+        for (const d of preferredOrder) {
+          if (placedCount >= numStrengthSessions) break;
+          const s = newSessions[d];
+          if (!s || s.type === 'rest' || s.type === 'strength') continue;
+          if (s.type === 'brick' || s.type === 'quality') continue;
+          if (d === dayBeforeLong || d === longDay) continue;
+          if (!/easy/i.test(s.name || '')) continue;
+          const cardioType = s.type === 'run' ? 'jog' : s.type === 'bike' ? 'spin' : s.type === 'swim' ? 'swim' : 'easy';
+          const strengthMins = isBeginnerRunner ? 20 : 25;
+          const cardioMins = Math.min(20, s.duration || 20);
+          newSessions[d] = {
+            name: 'Strength + short easy ' + s.type,
+            meta: `${strengthMins} min strength + ${cardioMins} min easy ${cardioType}`,
+            duration: strengthMins + cardioMins,
+            type: 'strength',
+            prescription: `${strengthMins} min full-body strength: 3 rounds of squat, hinge, single-leg, push, plank. Then ${cardioMins} min easy ${cardioType} to flush legs. Strength first, cardio second — never reverse.`,
+            targets: 'Strength: RPE 6-7 · cardio: Z1-Z2 conversational',
+            intensity: 'Z2',
+          };
+          placedCount++;
+        }
+      }
+
+      // Final guard: even after both passes, if we still couldn't place a
+      // strength session (extreme case — every day is brick / quality / long
+      // OR the user picked exactly 1 training day that's the long day),
+      // append a strength addendum to the long session. This converts the
+      // long day into a "long + strength" event-aware workout.
+      if (placedCount === 0 && longDay && newSessions[longDay] && newSessions[longDay].type !== 'rest') {
+        const ld = newSessions[longDay];
+        ld.prescription = (ld.prescription ? ld.prescription + ' ' : '') + '[Optional 15 min post-session strength: 3 rounds of 8 single-leg deadlifts, 8 squats, 30s plank. Only if you have gas left.]';
       }
     }
 
@@ -11509,6 +11577,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     let prevWeekTotal = null;
     let prevLongRun = null;
+    // Track whether the prior week was a planned deload so R10 (weekly
+    // volume ramp) and R11 (long-run progression) don't fire spurious
+    // warnings on the week AFTER a deload — the bounce-back from a -15%
+    // deload to a normal-volume week is a legitimate +20-25% ramp that
+    // shouldn't be flagged as overuse risk.
+    let prevWasDeload = false;
 
     plan.weeks.forEach((wk, wi) => {
       if (!wk || !wk.sessions) {
@@ -11591,15 +11665,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (weekTotal > 60 && weekHighIntensityMin / weekTotal > 0.30) {
         _push('warn', wi, null, 'INTENSITY_TOO_HIGH', `${Math.round(weekHighIntensityMin / weekTotal * 100)}% of weekly time at high intensity (Seiler 2010: 80/20 polarized — keep ≤20-25%).`);
       }
-      // R10: weekly-volume ramp (ACWR proxy — Gabbett 2016)
-      if (prevWeekTotal != null && prevWeekTotal > 0 && !isRaceWeek) {
+      // R10: weekly-volume ramp (ACWR proxy — Gabbett 2016).
+      // Skip the week AFTER a deload — bouncing back from -15% volume is a
+      // legitimate +20-25% ramp, not overuse risk.
+      if (prevWeekTotal != null && prevWeekTotal > 0 && !isRaceWeek && !prevWasDeload) {
         const ratio = weekTotal / prevWeekTotal;
         if (ratio > 1.30) {
           _push('error', wi, null, 'VOLUME_JUMP', `Volume jumped ${Math.round((ratio - 1) * 100)}% over prior week (Gabbett 2016: >25-30% increase carries 4-5× injury risk).`);
         }
       }
-      // R11: long-run progression — >10% week-over-week is elevated overuse risk (Daniels)
-      if (prevLongRun != null && prevLongRun > 0 && longRunMins > 0 && !isRaceWeek && (wi + 1) % 4 !== 0) {
+      // R11: long-run progression — >10% week-over-week is elevated overuse risk (Daniels).
+      // Same exception: a long-run bounce-back from a deload week isn't an injury jump.
+      if (prevLongRun != null && prevLongRun > 0 && longRunMins > 0 && !isRaceWeek && (wi + 1) % 4 !== 0 && !prevWasDeload) {
         const lrRatio = longRunMins / prevLongRun;
         if (lrRatio > 1.20) {
           _push('warn', wi, null, 'LONG_RUN_JUMP', `Long run jumped ${Math.round((lrRatio - 1) * 100)}% over last week (Daniels: >10% increase = elevated overuse risk).`);
@@ -11616,6 +11693,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // R13: strength inclusion when gym available (Lauersen 2014)
       if (hasStrengthAccess && strengthCount === 0 && !isRaceWeek && weekTotal > 60) {
         _push('warn', wi, null, 'NO_STRENGTH', `User has gym access but no strength session this week (Lauersen 2014: 1-2x/wk reduces injury 30-50%).`);
+      }
+      // R16: triathlon events must include swim work — UNLESS the user
+      // explicitly has no swim access (R2 handles that). A tri plan with
+      // hasSwim=true but zero swim sessions = the engine forgot the
+      // swim leg, not a deliberate omission.
+      const _isTri = /Triathlon|Ironman/i.test(event);
+      if (_isTri && hasSwimAccess && !isRaceWeek) {
+        const swimCount = DAYS.filter(d => sessions[d] && (sessions[d].type === 'swim' ||
+          (sessions[d].type === 'brick' && /swim/i.test(sessions[d].name || ''))
+        )).length;
+        if (swimCount === 0 && weekTotal > 60) {
+          _push('error', wi, null, 'NO_SWIM_TRI', `${event} plan has zero swim sessions this week, but user has swim access. The engine forgot the swim leg.`);
+        }
       }
       // R14: race-week sanity — T-1/T-2 minimal
       if (isRaceWeek && inputs.raceDayInWeekIdx != null) {
@@ -11652,6 +11742,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
       prevWeekTotal = weekTotal;
       if (longRunMins > 0) prevLongRun = longRunMins;
+      // Track for R10/R11 bounce-back exception.
+      prevWasDeload = (wi + 1) % 4 === 0 && wi < plan.weeks.length - 4;
     });
 
     return {
