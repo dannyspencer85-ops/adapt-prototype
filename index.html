@@ -12520,6 +12520,44 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     if (dirty) saveAccounts(accounts);
     ensureDemoPersonaAccounts();
+    ensureTesterAccounts();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // TESTER ACCOUNTS — auto-provisioned on every device on first app load.
+  // Each tester gets a clean account that routes them through onboarding
+  // (NOT a pre-built demo persona). Password == username for simplicity
+  // during testing; tester picks their own race goal during onboarding.
+  // ──────────────────────────────────────────────────────────────────────
+  const TESTER_USERNAMES = ['bridget', 'jane', 'connor', 'luke', 'gabe'];
+  function ensureTesterAccounts() {
+    const accts = getAccounts();
+    let dirty = false;
+    TESTER_USERNAMES.forEach(u => {
+      const pwd = u; // simple credentials: username == password
+      if (!accts[u]) {
+        accts[u] = {
+          password: pwd,
+          createdAt: new Date().toISOString(),
+          isTester: true,
+          data: {
+            // Clean slate — no demoPersonaId, no planState — forces full
+            // onboarding on first login.
+            planState: null,
+            chatMode: 'rule',
+            apiKey: null,
+            onboardingComplete: false,
+          },
+        };
+        dirty = true;
+      } else {
+        // Self-heal password if it drifted. Don't touch data if the
+        // tester has already started onboarding — preserve their work.
+        if (accts[u].password !== pwd) { accts[u].password = pwd; dirty = true; }
+        if (!accts[u].isTester) { accts[u].isTester = true; dirty = true; }
+      }
+    });
+    if (dirty) saveAccounts(accts);
   }
 
   // Pre-creates one named account per demo persona so testers can log in with

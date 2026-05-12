@@ -57,25 +57,22 @@ Installing matters: notifications + offline only work after install.
 
 ## How to log in
 
-You have two options on the login screen:
+You have a pre-provisioned account waiting for you. On the login screen:
 
-**Option A — Sign up with your own account (recommended for full testing):**
-1. Tap **Sign up** on the login screen.
-2. Use your first name as the username (`bridget`, `jane`, `connor`, `luke`, `gabe` — lowercase).
-3. Pick any password ≥4 characters. Write it down — there's no password reset; accounts live in your browser.
-4. Go through onboarding for a real race goal.
+- **Username**: your first name, lowercase (e.g. `bridget`)
+- **Password**: same as your username (e.g. `bridget`)
 
-**Option B — Try a demo persona (skip onboarding, jump into a pre-built plan):**
-- `riley` / `riley` — first 5K, walk-run beginner, 10 weeks out
-- `jordan` / `jordan` — marathon PR chase, 18 weeks out, 6 hr/wk
-- `danny` / `danny` — Half Ironman in Boulder, 14 weeks out, veteran
-- `alex` / `alex` — first-time Sprint Triathlon, 12 weeks out
-- `sam` / `sam` — Full Ironman comeback, 24 weeks out
-- `morgan` / `morgan` — Half Marathon easing back from a knee niggle, 16 weeks out
+| Tester | Username | Password |
+|---|---|---|
+| Bridget | `bridget` | `bridget` |
+| Jane | `jane` | `jane` |
+| Connor | `connor` | `connor` |
+| Luke | `luke` | `luke` |
+| Gabe | `gabe` | `gabe` |
 
-If you want to test onboarding (most useful), use **Option A**. If you want to skip ahead and try Coach Chat / Plan tab / calendar features on a fully-built plan, use **Option B**.
+After logging in, you'll go through **onboarding** — pick a real race you'd actually train for (5K through Full Ironman), enter a race date 8–16 weeks out, and configure your training days + weekly hours.
 
-> Note: accounts live in your browser only — they don't sync across devices. If you want to test on phone + laptop, sign up on each separately.
+> Note: accounts live in your browser only — they don't sync across devices. If you want to test on phone + laptop, log in on each separately and you'll need to go through onboarding twice.
 
 ## How to send feedback
 
