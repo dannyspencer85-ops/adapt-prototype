@@ -9924,26 +9924,39 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         { id: 'travel', label: 'Travel logistics confirmed — wake-up time, transport, parking' },
       ];
       const completedCount = items.filter(i => checked[i.id]).length;
+      // Dismissal + collapse state — survive renders + reload. Dismissal
+      // is scoped to this specific race date so the card returns for the
+      // next race the user trains for.
+      const raceDateKey = planState.raceDate || localStorage.getItem('race-date') || 'unknown';
+      const dismissKey = 'race-week-checklist-dismissed-' + raceDateKey;
+      const collapseKey = 'race-week-checklist-collapsed-' + raceDateKey;
+      if (localStorage.getItem(dismissKey) === '1') {
+        slot.style.display = 'none';
+        return;
+      }
+      const isCollapsed = localStorage.getItem(collapseKey) === '1';
       slot.style.display = 'block';
       // Race-week card uses the brand green palette — encouraging "you're
-      // peaking" feel rather than the cautionary gold. The race-DAY cell on
-      // the calendar still gets gold (the "arrived" moment); the lead-up
-      // is on-brand primary green.
+      // peaking" feel rather than the cautionary gold.
       slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; border-radius:14px; padding:14px 16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:${isCollapsed ? '0' : '10px'};">
+          <div onclick="toggleRaceWeekChecklistCollapsed()" style="cursor:pointer; flex:1; min-width:0;">
             <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85;">RACE WEEK · T-${days}</div>
             <div style="font-size:18px; font-weight:800; margin-top:2px;">${escapeHtml(event)} · ${days} day${days === 1 ? '' : 's'} out</div>
           </div>
-          <div style="font-size:11px; font-weight:700; opacity:0.8;">${completedCount}/${items.length}</div>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <div style="font-size:11px; font-weight:700; opacity:0.8;">${completedCount}/${items.length}</div>
+            <button onclick="toggleRaceWeekChecklistCollapsed()" aria-label="${isCollapsed ? 'Expand' : 'Minimize'} checklist" title="${isCollapsed ? 'Expand' : 'Minimize'}" style="background:rgba(46,107,81,0.12); border:0; color:#2E6B51; width:26px; height:26px; border-radius:8px; cursor:pointer; font-size:14px; line-height:1; padding:0; display:flex; align-items:center; justify-content:center;">${isCollapsed ? '▾' : '▴'}</button>
+            <button onclick="dismissRaceWeekChecklist()" aria-label="Dismiss checklist" title="Dismiss for this race" style="background:rgba(46,107,81,0.12); border:0; color:#2E6B51; width:26px; height:26px; border-radius:8px; cursor:pointer; font-size:16px; line-height:1; padding:0; display:flex; align-items:center; justify-content:center;">×</button>
+          </div>
         </div>
-        <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px; opacity:0.95;">Tick these off as you go. Race-day prep beats race-day improv.</div>
+        ${isCollapsed ? '' : `<div style="font-size:12.5px; line-height:1.5; margin-bottom:10px; opacity:0.95;">Tick these off as you go. Race-day prep beats race-day improv.</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           ${items.map(it => `<label style="display:flex; gap:9px; align-items:flex-start; cursor:pointer; padding:5px 0; font-size:13px; line-height:1.4;">
             <input type="checkbox" ${checked[it.id] ? 'checked' : ''} onchange="toggleRaceWeekItem('${it.id}', this.checked)" style="margin-top:2px; flex-shrink:0; cursor:pointer; accent-color: #3B8968; width:18px; height:18px;">
             <span style="${checked[it.id] ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.label)}</span>
           </label>`).join('')}
-        </div>
+        </div>`}
       </div>`;
       return;
     }
@@ -9991,6 +10004,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try { state = JSON.parse(localStorage.getItem('race-week-checklist') || '{}'); } catch (e) {}
     state[id] = !!checked;
     localStorage.setItem('race-week-checklist', JSON.stringify(state));
+    renderRaceDayCard();
+  }
+  // Per-race-date keys so dismiss/collapse don't persist across future races.
+  function _raceWeekStateKey(prefix) {
+    const d = (planState && planState.raceDate) || localStorage.getItem('race-date') || 'unknown';
+    return prefix + '-' + d;
+  }
+  function toggleRaceWeekChecklistCollapsed() {
+    const k = _raceWeekStateKey('race-week-checklist-collapsed');
+    const cur = localStorage.getItem(k) === '1';
+    if (cur) localStorage.removeItem(k);
+    else localStorage.setItem(k, '1');
+    renderRaceDayCard();
+  }
+  function dismissRaceWeekChecklist() {
+    if (!confirm("Dismiss the race-week checklist for this race? You can restore it from Profile → Restore race-week checklist.")) return;
+    localStorage.setItem(_raceWeekStateKey('race-week-checklist-dismissed'), '1');
+    renderRaceDayCard();
+  }
+  function restoreRaceWeekChecklist() {
+    localStorage.removeItem(_raceWeekStateKey('race-week-checklist-dismissed'));
+    localStorage.removeItem(_raceWeekStateKey('race-week-checklist-collapsed'));
     renderRaceDayCard();
   }
   function markRaceComplete() {
