@@ -16264,7 +16264,19 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       area.scrollTop = area.scrollHeight;
     }
   }
-  function openCrunch() { document.getElementById('crunch').classList.add('show'); }
+  function openCrunch() {
+    // Reset the Apply button on every open — otherwise re-opening Adjust
+    // after an earlier apply would show the "✓ Applied" disabled state.
+    const applyBtn = document.querySelector('#crunch .btn.btn-primary');
+    if (applyBtn) {
+      applyBtn.textContent = 'Use this workout';
+      applyBtn.disabled = false;
+      applyBtn.style.background = '';
+      applyBtn.style.opacity = '';
+      applyBtn.style.cursor = '';
+    }
+    document.getElementById('crunch').classList.add('show');
+  }
   let _checkinFormHTML = null;
   function renderCheckinSummary(body, sleep, stress, notes) {
     const card = document.getElementById('todayCheckin');
@@ -16630,11 +16642,27 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     document.getElementById('rescheduleModal').classList.remove('show');
   }
 
+  // Single source of truth for the minutes the user selected in the
+  // Adjust modal. Reads from the active time chip OR the custom input —
+  // NEVER from the meta-string (some recommendations like "Strength
+  // session — 2 rounds · squat, hinge…" don't include a duration in
+  // their meta, so the regex parse would silently default to 25 min and
+  // ignore the user's actual choice).
+  function _getCrunchSelectedMins() {
+    const activeChip = document.querySelector('#timeOpts .time-opt.active');
+    if (activeChip) {
+      const m = (activeChip.textContent || '').match(/(\d+)/);
+      if (m) return parseInt(m[1], 10);
+    }
+    const custom = parseInt(document.getElementById('customMins')?.value || '', 10);
+    if (custom && custom >= 5 && custom <= 240) return custom;
+    return 25;
+  }
+
   function applyCrunch() {
     const title = document.getElementById('crunchTitle').textContent;
     const meta = document.getElementById('crunchMeta').textContent;
-    const mMatch = meta.match(/(\d+)\s*min/);
-    const mins = mMatch ? parseInt(mMatch[1]) : 25;
+    const mins = _getCrunchSelectedMins();
     const discs = getCrunchDiscs();
     trackEvent('today_adjusted', { mins, disciplines: discs.join(',') });
     lastSnapshot = JSON.parse(JSON.stringify(planState));
@@ -16658,21 +16686,38 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     else if (hasBike) newType = 'bike';
     else if (hasSwim) newType = 'swim';
     else newType = 'mobility';
+    // Build a meta line that always includes the chosen duration, even
+    // when the recommendation's meta didn't ("2 rounds · squat…").
+    // Downstream renderers parse durations from session.meta when needed.
+    const safeMeta = /\d+\s*min/.test(meta) ? meta : `${mins} min · ${meta}`;
     _runToolDirect('shortenSession', {
       day: today,
       newMinutes: mins,
       newName: title,
-      newMeta: meta,
+      newMeta: safeMeta,
       newType,
       reason: 'adjusted via Adjust Today tool',
     });
+
+    // Visual confirmation on the Apply button so users see the click landed.
+    // The modal closes 600 ms later — long enough to register the change.
+    const applyBtn = document.querySelector('#crunch .btn.btn-primary');
+    if (applyBtn) {
+      applyBtn.textContent = '✓ Applied';
+      applyBtn.disabled = true;
+      applyBtn.style.background = 'var(--primary-dark)';
+      applyBtn.style.opacity = '0.9';
+      applyBtn.style.cursor = 'default';
+    }
     // Force every dependent surface to re-render. shortenSession's
     // renderWeekSessions call only refreshes the Plan tab list; Today
     // hero / calendar / readiness card / week-arc all read planState
     // separately and need an explicit refresh.
     if (typeof renderAll === 'function') renderAll();
-    closeCrunch();
-    showScreen('today');
+    setTimeout(() => {
+      closeCrunch();
+      showScreen('today');
+    }, 600);
   }
   function closeCrunch() { document.getElementById('crunch').classList.remove('show'); }
   function recommendForMinutes(mins) {
