@@ -3416,6 +3416,7 @@
         <button class="chip active" data-disc="swim" onclick="toggleCrunchDisc(this)">🏊 Swim</button>
         <button class="chip active" data-disc="bike" onclick="toggleCrunchDisc(this)">🚴 Bike</button>
         <button class="chip active" data-disc="run" onclick="toggleCrunchDisc(this)">🏃 Run</button>
+        <button class="chip active" data-disc="strength" onclick="toggleCrunchDisc(this)">🏋️ Gym</button>
       </div>
       <div id="crunchDiscHint" style="font-size: 12px; color: var(--text-soft); margin-bottom: 14px; margin-top: -8px; display: none;"></div>
       <div class="card" style="background: var(--primary-soft); border: 0;">
@@ -6136,7 +6137,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { success: true, message: msg, reason: reason || '' };
   }
 
-  function tool_shortenSession({ day, newMinutes, newName, newMeta, reason, weekOffset }) {
+  function tool_shortenSession({ day, newMinutes, newName, newMeta, newType, reason, weekOffset }) {
     const slot = _resolveWeekSessions(weekOffset);
     if (!slot) return { success: false, message: `Can't reach week +${weekOffset || 0} — only this week and the next 2 are editable.` };
     const s = slot.sessions[day];
@@ -6144,6 +6145,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (newName) s.name = newName;
     if (newMeta) s.meta = newMeta;
     s.duration = newMinutes;
+    // Adjust Today tool sends newType (e.g. user swapped to mobility/strength
+    // because their cardio disciplines were all deselected). Honor it so the
+    // session card + calendar dot reflect the new sport.
+    if (newType) s.type = newType;
     if (slot.isCurrent) {
       _mirrorCurrentWeekToFullPlan(day);
       renderWeekSessions();
@@ -16633,7 +16638,39 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const discs = getCrunchDiscs();
     trackEvent('today_adjusted', { mins, disciplines: discs.join(',') });
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('shortenSession', { day: 'Wed', newMinutes: mins, newName: title, newMeta: meta, reason: 'adjusted today via time-crunch tool' });
+    // CRITICAL FIX: day was hardcoded as 'Wed' — every adjust modified Wed
+    // regardless of what today actually was. Use today's actual day.
+    // ALSO: use _runToolDirect not executeTool. The Adjust modal IS the
+    // confirmation step; routing through executeTool's gated chat-confirm
+    // queues an invisible card in Coach Chat instead of applying.
+    // Derive type from selected disciplines so the new session has the
+    // correct type — not stuck as whatever the original session was.
+    const today = (typeof getTodayDay === 'function') ? getTodayDay() : 'Mon';
+    const hasSwim = discs.includes('swim');
+    const hasBike = discs.includes('bike');
+    const hasRun = discs.includes('run');
+    const hasStrength = discs.includes('strength');
+    const cardioCount = (hasSwim ? 1 : 0) + (hasBike ? 1 : 0) + (hasRun ? 1 : 0);
+    let newType;
+    if (cardioCount === 0 && hasStrength) newType = 'strength';
+    else if (mins < 35) newType = 'strength'; // short windows -> strength/mobility
+    else if (hasRun) newType = 'run';
+    else if (hasBike) newType = 'bike';
+    else if (hasSwim) newType = 'swim';
+    else newType = 'mobility';
+    _runToolDirect('shortenSession', {
+      day: today,
+      newMinutes: mins,
+      newName: title,
+      newMeta: meta,
+      newType,
+      reason: 'adjusted via Adjust Today tool',
+    });
+    // Force every dependent surface to re-render. shortenSession's
+    // renderWeekSessions call only refreshes the Plan tab list; Today
+    // hero / calendar / readiness card / week-arc all read planState
+    // separately and need an explicit refresh.
+    if (typeof renderAll === 'function') renderAll();
     closeCrunch();
     showScreen('today');
   }
@@ -16722,10 +16759,20 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
 
     const hint = document.getElementById('crunchDiscHint');
     if (hint) {
-      const missing = ['swim','bike','run'].filter(x => !discs.includes(x));
-      if (missing.length === 0) { hint.style.display = 'none'; }
-      else if (discs.length === 0) { hint.style.display = 'block'; hint.textContent = 'Nothing selected — we\'ll offer strength/mobility only.'; }
-      else { hint.style.display = 'block'; hint.textContent = `Skipping: ${missing.join(', ')}. Workout swapped to use only what's available.`; }
+      // Use the same discipline set the strength chip lives in so the
+      // "Skipping ..." message considers gym as a valid option.
+      const allDiscs = ['swim','bike','run','strength'];
+      const missing = allDiscs.filter(x => !discs.includes(x));
+      if (discs.length === 0) {
+        hint.style.display = 'block';
+        hint.textContent = 'Nothing selected — pick what you can actually do today.';
+      } else if (missing.length === 0) {
+        hint.style.display = 'none';
+      } else {
+        const label = (m) => m === 'strength' ? 'gym' : m;
+        hint.style.display = 'block';
+        hint.textContent = `Skipping: ${missing.map(label).join(', ')}. Workout swapped to use only what's available.`;
+      }
     }
   }
 
@@ -16761,6 +16808,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const hasSwim = discs.includes('swim');
     const hasBike = discs.includes('bike');
     const hasRun = discs.includes('run');
+    const hasStrength = discs.includes('strength');
     const cardioCount = (hasSwim ? 1 : 0) + (hasBike ? 1 : 0) + (hasRun ? 1 : 0);
 
     const appendCapNote = (rec) => {
@@ -16771,11 +16819,24 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       return rec;
     };
 
-    // No cardio available — always fall back to strength/mobility
+    // Nothing selected — gentle nudge.
+    if (cardioCount === 0 && !hasStrength) {
+      return appendCapNote({ title: 'Rest + light walk', meta: `${mins} min · easy walk or full rest`, why: "Nothing selected — defaulting to rest. Pick what's actually available and we'll rebuild around that." });
+    }
+
+    // No cardio available — strength/mobility. Explicit when the user
+    // selected gym (more confident prescription), fallback when cardio
+    // was just deselected (mobility-first phrasing).
     if (cardioCount === 0) {
-      if (mins < 15) return appendCapNote({ title: 'Quick mobility', meta: `${mins} min · hip openers + activation`, why: 'No cardio available — low-intensity mobility keeps you moving without strain.' });
+      if (mins < 15) return appendCapNote({ title: 'Quick mobility', meta: `${mins} min · hip openers + activation`, why: hasStrength ? 'Strength selected at under 15 min — keep it to mobility + activation, no heavy work. Saves the real strength session for a day you have more time.' : 'No cardio available — low-intensity mobility keeps you moving without strain.' });
       const rounds = Math.max(2, Math.round(mins / 10));
-      return appendCapNote({ title: 'Strength + mobility', meta: `${rounds} rounds · squat, hinge, push, plank, hip mobility`, why: `No cardio available, so we\'re going strength. ${rounds} rounds of bodyweight work covers legs, core, upper body — valuable for endurance durability.` });
+      return appendCapNote({
+        title: hasStrength ? 'Strength session' : 'Strength + mobility',
+        meta: `${rounds} rounds · squat, hinge, push, plank, hip mobility`,
+        why: hasStrength
+          ? `Gym day — ${rounds} rounds of compound bodyweight work. Posterior chain focus (Lauersen 2014: 1-2x/wk reduces injury 30-50%). RPE 6-7, stop 1-2 reps before failure.`
+          : `No cardio available, so we're going strength. ${rounds} rounds of bodyweight work covers legs, core, upper body — valuable for endurance durability.`,
+      });
     }
 
     // Under 35 min — use generic short-session formula (not discipline-specific anyway)
