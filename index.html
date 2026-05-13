@@ -16884,16 +16884,59 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       });
     }
 
-    // Under 35 min — use generic short-session formula (not discipline-specific anyway)
-    if (mins < 15) return appendCapNote({ title: 'Movement snack', meta: `${mins} min · mobility + activation`, why: 'Under 15 min is for staying loose, not training. Short flow keeps you ready for tomorrow.' });
-    if (mins < 25) return appendCapNote({ title: 'Quick mobility flow', meta: `${mins} min · hip openers + activation`, why: 'Movement quality beats rushed cardio at this duration.' });
-    if (mins < 35) {
-      const rounds = Math.max(2, Math.round((mins - 5) / 10));
-      return appendCapNote({ title: 'Strength circuit', meta: `${rounds} rounds · glutes, core, hip mobility`, why: 'Short window — strength work is the highest-ROI use of this time for an endurance athlete.' });
+    // Pick the primary cardio discipline the user actually has — use it
+    // for the short-session branches too. This is the user's stated intent;
+    // ignoring it (the old code's mobility fallback for <35 min) felt to
+    // users like the discipline picker did nothing.
+    const primary = hasRun ? 'run' : hasBike ? 'bike' : 'swim';
+
+    // Under 15 min — too short for a real cardio set even when discipline
+    // is selected. Stay with activation flow but reference the chosen sport.
+    if (mins < 15) {
+      const flavor = primary === 'swim' ? 'pool warm-up flow — 100m easy + 50m kick' :
+                     primary === 'bike' ? 'easy spin, 80-90 rpm, no resistance' :
+                                          'easy walk-jog, conversational';
+      return appendCapNote({
+        title: primary === 'swim' ? 'Easy swim warm-up' : primary === 'bike' ? 'Easy spin' : 'Easy jog',
+        meta: `${mins} min · ${flavor}`,
+        why: `Under 15 min is too short for a real cardio set, but a light ${primary} flow keeps you loose without adding fatigue. Use it as activation, not training.`,
+      });
     }
 
-    // 35+ min — need to pick discipline based on availability
-    const primary = hasRun ? 'run' : hasBike ? 'bike' : 'swim';
+    // 15-35 min WITH a cardio discipline selected — short single-discipline
+    // session in the chosen sport. This is the case the user reported as
+    // broken: "I said I can swim but the only thing that changed [was the
+    // duration, not the discipline]." Now a 15-min swim selection produces
+    // an actual swim session, not a mobility flow.
+    if (mins < 35) {
+      if (primary === 'swim') {
+        const meters = Math.round(mins * 33);
+        const wu = 100;
+        const cd = 100;
+        const mainM = Math.max(200, meters - wu - cd);
+        return appendCapNote({
+          title: 'Easy swim',
+          meta: `${mins} min · ${meters}m total at conversational pace`,
+          why: `Short easy swim. ${wu}m WU + ${mainM}m continuous Z2 (smooth stroke, bilateral breathing) + ${cd}m CD. No intervals — this is aerobic activation, not a workout.`,
+        });
+      }
+      if (primary === 'bike') {
+        const main = Math.max(8, mins - 8);
+        return appendCapNote({
+          title: 'Easy spin',
+          meta: `${mins} min · steady Z2, cadence 85-95 rpm`,
+          why: `${mins}-min easy spin. ${main} min Z2 (HR 130-145 if you watch it, otherwise conversational), 5-min warm-up + 3-min cool-down built in. Smooth pedal stroke, no surges.`,
+        });
+      }
+      // Run
+      return appendCapNote({
+        title: 'Easy run',
+        meta: `${mins} min · Z2 conversational`,
+        why: `${mins}-min easy run. 5 min walk/easy build, ${Math.max(10, mins - 10)} min Z2 conversational, 5 min walk-down. Talk-test pace — if you can't hold a sentence, slow down.`,
+      });
+    }
+
+    // 35+ min — picks discipline based on availability (existing logic below).
     const noteSkipped = () => {
       const skipped = ['swim','bike','run'].filter(d => !discs.includes(d));
       return skipped.length > 0 ? ` (skipping ${skipped.join(', ')})` : '';
