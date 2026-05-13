@@ -6549,6 +6549,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // Render a confirmation card in the chat area for a pending change.
+  // Visually loud: green-tinted background, large Apply button, "✓ Apply
+  // this change" full-width primary CTA so it's unmistakable that the
+  // user must tap to commit. Includes a small "Pending" badge so the
+  // state is clear at a glance.
   function _renderPendingChangeCard(id) {
     const pc = _pendingChanges.get(id);
     if (!pc) return;
@@ -6556,42 +6560,61 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!area) return;
     const card = document.createElement('div');
     card.className = 'bubble system';
-    card.style.maxWidth = '100%';
+    card.style.cssText = 'max-width:100%; background:#DCEADF; border:1.5px solid #3B8968; padding:14px 16px;';
     card.id = 'pendingChange-' + id;
     card.innerHTML = `
-      <div style="font-weight:700; font-size:13px; margin-bottom:6px; color:var(--text);">⏳ Change ready — tap to apply</div>
-      <div style="font-size:13px; line-height:1.5; color:var(--text); margin-bottom:10px;">${escapeHtml(pc.description)}</div>
-      <div style="display:flex; gap:8px;">
-        <button onclick="applyPendingChange('${id}')" style="flex:1; padding:9px 12px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">✓ Apply</button>
-        <button onclick="cancelPendingChange('${id}')" style="flex:1; padding:9px 12px; background:#fff; color:var(--text-soft); border:1px solid var(--border); border-radius:100px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Cancel</button>
-      </div>`;
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <span style="display:inline-block; background:#3B8968; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.5px; padding:3px 8px; border-radius:100px;">PENDING</span>
+        <span style="font-weight:700; font-size:13px; color:#2E6B51;">Tap Apply to commit this change</span>
+      </div>
+      <div style="font-size:14px; line-height:1.5; color:var(--text); margin-bottom:14px;">${escapeHtml(pc.description)}</div>
+      <button id="pendingApplyBtn-${id}" onclick="applyPendingChange('${id}')" style="width:100%; padding:12px 14px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:8px; box-shadow:0 2px 8px rgba(59,137,104,0.25);">✓ Apply this change</button>
+      <button onclick="cancelPendingChange('${id}')" style="width:100%; padding:9px 14px; background:transparent; color:var(--text-soft); border:0; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Cancel</button>`;
     const sugg = area.querySelector('#suggestRow');
     if (sugg) area.insertBefore(card, sugg);
     else area.appendChild(card);
     area.scrollTop = area.scrollHeight;
   }
 
-  // User clicked Apply — actually run the tool and update the card.
+  // User clicked Apply — show a transient "Applying…" state, run the tool,
+  // then flip to "✓ Applied · check Today / Plan to see it" so the user
+  // gets unambiguous click feedback.
   function applyPendingChange(id) {
     const pc = _pendingChanges.get(id);
     if (!pc) return;
     const card = document.getElementById('pendingChange-' + id);
-    let result;
-    try {
-      result = _runToolDirect(pc.tool, pc.input);
-    } catch (err) {
-      result = { success: false, message: 'Apply failed: ' + err.message };
+    // Immediate visual feedback so the click is unmistakable.
+    const btn = document.getElementById('pendingApplyBtn-' + id);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Applying…';
+      btn.style.opacity = '0.85';
+      btn.style.cursor = 'default';
     }
-    if (card) {
-      const ok = result && result.success !== false;
-      card.style.background = ok ? 'var(--secondary-soft)' : '#fde8e8';
-      card.innerHTML = `
-        <div style="font-weight:700; font-size:13px; color:${ok ? 'var(--primary-dark)' : '#a33'};">${ok ? '✓ Applied' : '⚠ Failed'}</div>
-        <div style="font-size:13px; line-height:1.5; color:var(--text); margin-top:4px;">${escapeHtml(pc.description)}</div>
-        ${result && result.message ? `<div style="font-size:12px; color:var(--text-soft); margin-top:6px;">${escapeHtml(result.message)}</div>` : ''}`;
-    }
-    _pendingChanges.delete(id);
-    if (typeof renderAll === 'function') renderAll();
+    // Defer the actual tool run a tick so the "Applying…" state paints
+    // before the synchronous tool execution + renderAll.
+    setTimeout(() => {
+      let result;
+      try {
+        result = _runToolDirect(pc.tool, pc.input);
+      } catch (err) {
+        result = { success: false, message: 'Apply failed: ' + err.message };
+      }
+      if (card) {
+        const ok = result && result.success !== false;
+        card.style.background = ok ? '#DCEADF' : '#fde8e8';
+        card.style.border = ok ? '1.5px solid #3B8968' : '1.5px solid #f5b5b5';
+        card.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="display:inline-block; background:${ok ? '#3B8968' : '#C44545'}; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.5px; padding:3px 8px; border-radius:100px;">${ok ? '✓ APPLIED' : '⚠ FAILED'}</span>
+          </div>
+          <div style="font-size:13px; line-height:1.5; color:var(--text);">${escapeHtml(pc.description)}</div>
+          ${result && result.message ? `<div style="font-size:12px; color:var(--text-soft); margin-top:6px; line-height:1.4;">${escapeHtml(result.message)}</div>` : ''}
+          ${ok ? `<div style="font-size:11px; color:var(--text-soft); margin-top:8px;">Check the Today screen or Plan tab to see the update.</div>` : ''}`;
+      }
+      _pendingChanges.delete(id);
+      if (typeof renderAll === 'function') renderAll();
+    }, 80);
   }
 
   // User clicked Cancel — drop the change without running the tool.
