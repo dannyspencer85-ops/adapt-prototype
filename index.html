@@ -9085,6 +9085,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Insight cards are themselves a confirmation surface (user tapped "Apply
     // fix") — skip the chat-confirm gate to avoid double-confirming.
     _runToolDirect(fix.tool, fix.input);
+    // Tool functions only call renderWeekSessions internally (Plan tab list).
+    // Today hero, calendar grid, week-arc, readiness card all read planState
+    // separately and need a full re-render.
+    if (typeof renderAll === 'function') renderAll();
   }
 
   function applyAllFixes() {
@@ -9093,6 +9097,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     lastSnapshot = JSON.parse(JSON.stringify(planState));
     const fixesCopy = [...pendingFixes];
     fixesCopy.forEach(fix => _runToolDirect(fix.tool, fix.input));
+    if (typeof renderAll === 'function') renderAll();
   }
 
   // PAST_SESSIONS demo constant + openSessionReport function were deleted —
@@ -9170,6 +9175,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     _runToolDirect(notif.fix.tool, notif.fix.input);
     renderNotifList();
     renderNotifBadge();
+    // Today hero / calendar / week-arc all read planState separately;
+    // tool fns only refresh the Plan tab list. Force a full re-render.
+    if (typeof renderAll === 'function') renderAll();
   }
 
   function rejectNotif(id) {
@@ -16040,7 +16048,9 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     }
 
     if (intent.tool === 'showToday') {
-      const today = 'Wed';
+      // Was hardcoded 'Wed' — Quick Actions "what's today?" always answered
+      // with Wednesday's session regardless of actual day.
+      const today = (typeof getTodayDay === 'function') ? getTodayDay() : 'Mon';
       const s = planState.sessions[today];
       addBubble(`Today (${planState.dates[today]} · ${today}): ${s.name}. ${s.meta}.`, 'bot');
       return;
@@ -16097,14 +16107,25 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     area.appendChild(b);
     area.scrollTop = area.scrollHeight;
     pendingAction = null;
+    // Tool fns only refresh Plan tab list; force a full re-render so
+    // Today hero / calendar / week-arc all reflect the change.
+    if (typeof renderAll === 'function') renderAll();
   }
 
   function undoLastAction(btn) {
     if (!lastSnapshot) return;
+    // Restore everything captured in the snapshot — not just sessions/dates/
+    // weekArc/injury. Accepting a notification splices planState.notifications
+    // and morning check-in writes planState.lastCheckin; both were lost on
+    // undo before this fix.
     planState.sessions = lastSnapshot.sessions;
     planState.dates = lastSnapshot.dates;
     planState.weekArc = lastSnapshot.weekArc;
     planState.injury = lastSnapshot.injury;
+    if (lastSnapshot.notifications !== undefined) planState.notifications = lastSnapshot.notifications;
+    if (lastSnapshot.lastCheckin !== undefined) planState.lastCheckin = lastSnapshot.lastCheckin;
+    if (lastSnapshot.fullPlan !== undefined) planState.fullPlan = lastSnapshot.fullPlan;
+    if (lastSnapshot.activeWeekIdx !== undefined) planState.activeWeekIdx = lastSnapshot.activeWeekIdx;
     planState.lastChange = 'Reverted last change';
     renderAll();
     lastSnapshot = null;
@@ -16504,9 +16525,13 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     if (!p) { closeSoreness(); return; }
     const fullArea = p.side ? `${p.side} ${p.area}` : p.area;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('flagInjury', { area: fullArea, severity: p.severity, notes: p.originalText });
+    // The soreness modal IS the user confirmation. Use _runToolDirect for
+    // consistency + future-proofing (if flagInjury ever joins _GATED_TOOLS).
+    _runToolDirect('flagInjury', { area: fullArea, severity: p.severity, notes: p.originalText });
     pendingInjuryFromCheckin = null;
     closeSoreness();
+    // Injury banner + adjusted sessions show on Today hero — re-render.
+    if (typeof renderAll === 'function') renderAll();
   }
 
   function closeSoreness() {
@@ -16545,7 +16570,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
           'Training hard under these conditions increases injury risk and blunts adaptation'
         ],
         changeText: 'Shorten today\'s session by 30% and convert intervals to easy Zone 2.',
-        fix: { tool: 'shortenSession', input: { day: 'Wed', newMinutes: 40, newName: 'Easy aerobic (recovery day)', newMeta: '40 min · Zone 2', reason: 'morning check-in signaled low recovery' }}
+        fix: { tool: 'shortenSession', input: { day: (typeof getTodayDay === 'function') ? getTodayDay() : 'Mon', newMinutes: 40, newName: 'Easy aerobic (recovery day)', newMeta: '40 min · Zone 2', reason: 'morning check-in signaled low recovery' }}
       });
     }
     // Capture the conditional injury-status answer if it was rendered.
@@ -16558,6 +16583,9 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();
+    // Body-readiness card on Today reads planState.lastCheckin — needs a
+    // full re-render to reflect the new check-in scores.
+    if (typeof renderAll === 'function') renderAll();
   }
 
   // Open today's session detail modal — same one that opens when tapping the day pill on Plan tab.
@@ -16597,7 +16625,10 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     if (!s || s.type === 'rest') { alert("Today is a rest day — nothing to mark done."); return; }
     if (s.completed) { alert("Today's session is already marked done."); return; }
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('completeSession', { day: today });
+    // Direct apply — quick action is its own confirmation. Plus renderAll
+    // so Today hero flips to "Done" state instantly.
+    _runToolDirect('completeSession', { day: today });
+    if (typeof renderAll === 'function') renderAll();
   }
   function quickReschedule() {
     const today = getTodayDay();
