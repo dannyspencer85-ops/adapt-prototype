@@ -16611,7 +16611,10 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     if (!s || s.type === 'rest') { alert("Today is a rest day — nothing to skip."); return; }
     if (!confirm(`Skip today's ${s.name}? Plan will adapt.`)) return;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('skipSession', { day: today });
+    // Use _runToolDirect — the confirm() dialog above is the confirmation.
+    // executeTool would re-gate through Coach Chat (invisible to the user).
+    _runToolDirect('skipSession', { day: today });
+    if (typeof renderAll === 'function') renderAll();
   }
 
   function openReschedulePicker(fromDay) {
@@ -16633,10 +16636,18 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
   function applyReschedule(toDay) {
     const modal = document.getElementById('rescheduleModal');
     const fromDay = modal.dataset.fromDay;
-    modal.classList.remove('show');
-    if (!fromDay) return;
+    if (!fromDay) { modal.classList.remove('show'); return; }
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    executeTool('moveSession', { fromDay, toDay, reason: 'rescheduled via quick action' });
+    // The reschedule picker IS the confirmation step — the user tapped
+    // a specific target day. Routing through executeTool re-gates via
+    // the Coach Chat Apply/Cancel queue (invisible from this surface).
+    // Use _runToolDirect so the change applies immediately.
+    _runToolDirect('moveSession', { fromDay, toDay, reason: 'rescheduled via quick action' });
+    // Force every dependent surface to re-render — Today hero, calendar,
+    // week-arc, Plan tab. tool_moveSession's internal renderWeekSessions
+    // only refreshes the Plan tab list.
+    if (typeof renderAll === 'function') renderAll();
+    modal.classList.remove('show');
   }
   function closeRescheduleModal() {
     document.getElementById('rescheduleModal').classList.remove('show');
