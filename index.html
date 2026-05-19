@@ -1371,8 +1371,10 @@
     <span>100%</span>
   </div>
 
-  <!-- AUTH (login / signup) -->
-  <div id="screen-auth" class="screen active">
+  <!-- AUTH (login / signup) — shown AFTER the welcome panel's "Let's
+       build your plan" button. The welcome screen is the new active
+       default for non-logged-in users. -->
+  <div id="screen-auth" class="screen">
     <div class="onboard">
       <div class="logo">
         <div class="logo-mark">A</div>
@@ -1488,7 +1490,8 @@
         <p class="sub" style="margin-bottom: 20px; font-style: italic;">You'll still cross the finish line. Just on terms that actually work.</p>
 
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-lg btn-full" onclick="onbStep(1)">Let's build your plan</button>
+          <button class="btn btn-primary btn-lg btn-full" onclick="showScreen('auth')">Get started</button>
+          <div style="text-align:center; margin-top:10px; font-size:12px; color:var(--text-soft);">Already have an account? Same button — log in on the next screen.</div>
         </div>
       </div>
 
@@ -14780,7 +14783,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     if (!acct || !acct.data.onboardingComplete) {
       showScreen('onboard');
-      onbStep(0);
+      // Post-login: skip step 0 (welcome panel) — the user already saw it
+      // before tapping "Get started." Jump straight to step 1 (name +
+      // basics). Welcome is still reachable via the back button on step 1.
+      onbStep(1);
     } else if (!_hasRealPlan()) {
       // Account is "complete" but we have no real plan data (sessions all
       // empty/rest, no fullPlan). This happens if a previous plan-gen run
@@ -14823,7 +14829,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       enterApp();
     } else {
       trackEvent('app_open', { returning: false });
-      showScreen('auth');
+      // First-time visitors land on the welcome panel (onbStep 0). The
+      // "Let's build your plan" button then routes them to the auth screen.
+      // Was previously: showScreen('auth') — login came before any context.
+      showScreen('onboard');
+      if (typeof onbStep === 'function') onbStep(0);
     }
     renderAll();
     // Hydrate Coach Chat history from localStorage so prior conversations persist.
