@@ -2071,7 +2071,7 @@
         </div>
         <div class="hero-actions" id="heroLogActions">
           <button class="btn btn-on-hero" onclick="openTodaySessionDetails()">Full workout</button>
-          <button class="btn btn-on-hero-ghost" onclick="showScreen('log')">Log session</button>
+          <button class="btn btn-on-hero-ghost" onclick="openLogForDay(getTodayDay())">Log session</button>
           <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust</button>
         </div>
         <div id="heroActionsDone" style="display: none; margin-top: 14px;">
@@ -3329,6 +3329,10 @@
              session. Lets users with irregular schedules put their long
              workout on whatever day actually works that week. -->
         <div id="sdLongDayAction"></div>
+        <!-- Log-actuals action — populated by openSessionModal for this week's
+             training days so a user with no watch/Strava can enter their HR,
+             duration, distance + RPE for the session they just did. -->
+        <div id="sdLogAction"></div>
         <div style="display:flex; gap:8px; margin-top: 16px;">
           <button class="btn btn-ghost" style="flex:1;" onclick="closeSessionModal()">Close</button>
           <button class="btn btn-primary" style="flex:1;" onclick="startEditSession()">Edit</button>
@@ -5475,7 +5479,8 @@
     const activeRpe = document.querySelector('#rpe .rpe-btn.active');
     const rpe = activeRpe ? parseInt(activeRpe.textContent) : null;
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    const today = getTodayDay();
+    // Log targets the day chosen via openLogForDay (default today).
+    const today = logSessionDay || getTodayDay();
     const todayFull = DAY_FULL[today];
     const s = planState.sessions[today];
     // Manual "what you actually did" entry — for users without a connected
@@ -5502,6 +5507,8 @@
     ['logActualMins', 'logActualHr', 'logActualDist', 'logActualFeel'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    // Reset the log target back to today for the next time.
+    logSessionDay = null;
     if (typeof renderAll === 'function') renderAll();
     showScreen('today');
     renderNotifBadge();
@@ -9819,9 +9826,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         }
       } catch (e) { /* non-fatal */ }
     }
+    // Log-actuals action. Show "Log what I did" for current-week training
+    // sessions (today or earlier this week) so users without a watch/Strava
+    // can record HR/duration/distance/RPE by hand. Hidden for rest days and
+    // for other-week previews (you log the week you're actually in).
+    const logSlot = document.getElementById('sdLogAction');
+    if (logSlot) {
+      logSlot.innerHTML = '';
+      if (weekOffset === 0 && s && s.type !== 'rest' && (s.duration || 0) > 0) {
+        const logged = s.loggedManually || s.completed;
+        logSlot.innerHTML = `<button onclick="openLogForDay('${day}')" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">${logged ? '✎ Edit what I did' : '✓ Log what I did (HR, time, distance)'}</button>
+        <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">No watch or Strava? Enter your heart rate and session data by hand.</div>`;
+      }
+    }
     document.getElementById('sdView').style.display = 'block';
     document.getElementById('sdEdit').style.display = 'none';
     document.getElementById('sessionModal').classList.add('show');
+  }
+  // Open the Log screen targeting a specific day (default today). Lets the
+  // user record actuals for any current-week session, not just today's.
+  function openLogForDay(day) {
+    logSessionDay = day || getTodayDay();
+    closeSessionModal();
+    showScreen('log');
+    renderLogSession();
   }
 
   // Return the sessions map for a given week offset (0 = current week).
@@ -9868,6 +9896,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   let currentEditDay = null;
+  // Which day the Log screen is recording. null = today. Set by openLogForDay
+  // so users can log a session from the calendar, not just today's.
+  let logSessionDay = null;
   let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60, brickBike: 0, brickRun: 0 };
 
   // Parse "Bike 2:00 + Run 0:30" (or "... + Run 45 min") into {bike, run} mins.
@@ -11105,12 +11136,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function renderLogSession() {
-    const s = planState.sessions.Wed;
+    const day = logSessionDay || getTodayDay();
+    const s = planState.sessions[day];
     if (!s) return;
+    const isToday = day === getTodayDay();
+    // Header card: name + meta + which day this is.
+    const titleEl = document.querySelector('#screen-log .card .card-title');
+    if (titleEl) titleEl.textContent = isToday ? "Today's session" : `${DAY_FULL[day] || day}'s session`;
     const n = document.getElementById('logSessionName');
     const m = document.getElementById('logSessionMeta');
     if (n) n.textContent = s.name;
-    if (m) m.textContent = s.meta + ' · ' + (s.completed ? 'Completed' : 'Planned');
+    if (m) m.textContent = (s.meta || '') + ' · ' + (s.completed ? 'Completed' : 'Planned');
+    // Prefill the actuals + RPE if this session was already logged, so editing
+    // shows what's there instead of blank fields.
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null && v !== '') ? v : ''; };
+    setVal('logActualMins', s.actualMins);
+    setVal('logActualHr', s.actualHr);
+    setVal('logActualDist', s.actualDistance);
+    setVal('logActualFeel', s.actualFeel);
+    // RPE buttons — highlight the saved value if present.
+    document.querySelectorAll('#rpe .rpe-btn').forEach(b => {
+      b.classList.toggle('active', s.rpe != null && parseInt(b.textContent, 10) === s.rpe);
+    });
   }
 
   function formatRaceDate() {
