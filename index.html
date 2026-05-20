@@ -4374,6 +4374,35 @@
     let savedDisc = [];
     try { savedDisc = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
     const disciplines = availableDisciplines.length > 0 ? availableDisciplines : savedDisc;
+    // Estimate the user's CURRENT weekly training volume so the AI builds
+    // week 1 near where they actually are — not at their stated "available"
+    // hours. Prevents an injury-risk volume spike for someone who has time
+    // but isn't currently fit (Gabbett 2016 ACWR). Best signal: trailing
+    // 4-week Strava avg; else profile.freq / run-ability heuristic.
+    const currentWeeklyHours = (() => {
+      try {
+        const acts = (planState.stravaActivities || []).filter(a => a && a.start_date && a.moving_min > 0);
+        if (acts.length >= 3) {
+          const fourWeeksAgo = Date.now() - 28 * 24 * 3600 * 1000;
+          const recent = acts.filter(a => new Date(a.start_date).getTime() >= fourWeeksAgo);
+          if (recent.length >= 2) {
+            const totalMin = recent.reduce((s, a) => s + (a.moving_min || 0), 0);
+            return Math.round((totalMin / 4) / 6) / 10; // avg/wk in hours, 1 dp
+          }
+        }
+      } catch (e) {}
+      // No Strava — heuristic from frequency / ability / experience.
+      const fmk = readFitnessMarkers() || {};
+      if (profile.freq === 'high') return 5;
+      if (profile.freq === 'mid') return 3;
+      if (profile.freq === 'low') return 1.5;
+      if (fmk.runAbility === 'walk-run') return 1.5;
+      if (fmk.runAbility === 'under-15') return 2;
+      if (fmk.runAbility === '15-30') return 3;
+      if (fmk.runAbility === '30-60') return 4.5;
+      if (profile.exp === 'new') return 2;
+      return Math.round(hours * 0.65 * 10) / 10; // unknown — conservative
+    })();
     const todayStr = new Date().toISOString().slice(0, 10);
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 60000);
@@ -4385,6 +4414,7 @@
         body: JSON.stringify({
           event, raceDate: eventDate, location: eventLocation,
           hours, days, today: todayStr,
+          currentWeeklyHours,
           profile, courseIntel, triFocus,
           availableDisciplines: disciplines,
           fitnessMarkers: readFitnessMarkers(),
@@ -11539,30 +11569,93 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const weekArc = [];
     const fullPlanWeeks = [];
 
-    // Phase ratio for each week index given the total. Mirrors the AI
-    // prompt's periodization (base ramp → peak → taper).
+    // ── STARTING-FITNESS CALIBRATION ──
+    // The old ramp started every plan at 70% of STATED hours. But stated
+    // "available" hours ≠ current trainable volume. A beginner who says
+    // "10 hrs available" who currently trains ~2 hrs can't safely jump to
+    // 7 hrs in week 1 — that's a 3.5× acute:chronic spike (Gabbett 2016:
+    // >1.5 carries 4-5× injury risk). We estimate the user's CURRENT
+    // weekly volume and start the plan near it, ramping toward the stated
+    // hours at an ACWR-safe rate (~10%/wk).
+    const _startFrac = (() => {
+      const statedMin = hours * 60;
+      if (statedMin <= 0) return 0.7;
+      // Best signal: actual trailing 4-week Strava volume.
+      let estMin = null;
+      try {
+        const acts = (planState.stravaActivities || []).filter(a => a && a.start_date && (a.moving_min > 0));
+        if (acts.length >= 3) {
+          const now = Date.now();
+          const fourWeeksAgo = now - 28 * 24 * 3600 * 1000;
+          const recent = acts.filter(a => new Date(a.start_date).getTime() >= fourWeeksAgo);
+          if (recent.length >= 2) {
+            const total = recent.reduce((s, a) => s + (a.moving_min || 0), 0);
+            estMin = total / 4; // avg per week over the 4-week window
+          }
+        }
+      } catch (e) {}
+      // No Strava: estimate from profile.freq + run ability + experience.
+      if (estMin == null) {
+        const freq = (planState.profile && planState.profile.freq) || null;
+        const ability = fm && fm.runAbility ? fm.runAbility : null;
+        const exp = (planState.profile && planState.profile.exp) || null;
+        // Base estimate from training frequency.
+        let base;
+        if (freq === 'high') base = 5 * 60;
+        else if (freq === 'mid') base = 3 * 60;
+        else if (freq === 'low') base = 1.5 * 60;
+        else base = null;
+        // Or from run ability if no freq.
+        if (base == null) {
+          if (ability === 'walk-run') base = 1.5 * 60;
+          else if (ability === 'under-15') base = 2 * 60;
+          else if (ability === '15-30') base = 3 * 60;
+          else if (ability === '30-60') base = 4.5 * 60;
+          else base = statedMin * 0.65; // unknown — conservative default
+        }
+        // Brand-new athletes start lower regardless.
+        if (exp === 'new') base = Math.min(base, 2.5 * 60);
+        estMin = base;
+      }
+      // Starting fraction = current volume / stated, clamped to a sane band.
+      // Never start above stated hours; never below 35% (a real plan needs
+      // SOME volume to be worth following).
+      const frac = estMin / statedMin;
+      return Math.max(0.35, Math.min(1.0, frac));
+    })();
+
+    // Phase ratio for each week index given the total. Ramps from the
+    // calibrated starting fraction up toward peak, capped so week-over-week
+    // growth stays ACWR-safe (~12% max). Then back-off → taper → race week.
     function _ratioForWeek(i, total) {
       // Short plans (≤ 4 weeks) — late-onboarding case. We can't include
       // a Base/Build/Peak/Taper sequence in 4 weeks; treat all weeks as
-      // sharpening with descending volume.
+      // sharpening with descending volume. Start at the calibrated fraction.
       if (total <= 4) {
         if (i === total - 1) return 0.5;        // race week
         if (i === total - 2) return 0.75;       // sharpen taper
-        return 0.85;                              // sharpen
+        return Math.max(_startFrac, 0.7);        // sharpen — but honor start fitness
       }
       // Last week is race week (50%), week before is taper (75%).
       if (i === total - 1) return 0.5;
       if (i === total - 2) return 0.75;
-      // Penultimate two weeks are peak (100%), then back-off (85%).
+      // Penultimate two weeks are peak, then back-off.
       if (i === total - 3) return 0.85;
       if (i === total - 4) return 1.0;
-      // Earlier weeks: base ramp 70% → 95% over the build period.
+      // Earlier weeks: ramp from _startFrac → ~0.95 over the build period,
+      // but never grow faster than ~12%/week (ACWR-safe). Whichever is lower.
       const buildLen = Math.max(1, total - 4);
       const t = Math.min(1, i / buildLen);
-      // Every 4th week deload (drop 15%).
+      const linear = _startFrac + (0.95 - _startFrac) * t;
+      // ACWR cap: week i can be at most prior-week × 1.12. Approximate the
+      // prior-week ratio by evaluating the linear ramp at i-1.
+      const tPrev = Math.min(1, (i - 1) / buildLen);
+      const prevLinear = i > 0 ? _startFrac + (0.95 - _startFrac) * tPrev : _startFrac;
+      const acwrCapped = Math.min(linear, prevLinear * 1.12);
+      const base = Math.max(_startFrac, acwrCapped);
+      // Every 4th week deload (drop ~18%).
       const isDeload = (i + 1) % 4 === 0 && i < total - 4;
-      const base = 0.7 + (0.95 - 0.7) * t;
-      return isDeload ? base * 0.8 : base;
+      return isDeload ? base * 0.82 : base;
     }
     function _phaseLabel(i, total) {
       // Short plans get a flatter label scheme — calling week 1 "Peak" was

@@ -80,6 +80,12 @@ export default async function handler(req) {
   const inputs = body || {};
   const event = String(inputs.event || 'Half Ironman');
   const hours = Math.max(2, Math.min(20, Number(inputs.hours) || 5));
+  // Current weekly training volume (estimated client-side from Strava or
+  // profile). Used to set week-1 volume near where the athlete actually is,
+  // ramping toward `hours` — not starting at full stated hours (ACWR spike).
+  const currentWeeklyHours = (typeof inputs.currentWeeklyHours === 'number' && inputs.currentWeeklyHours > 0)
+    ? Math.max(0.5, Math.min(hours, inputs.currentWeeklyHours))
+    : null;
   const days = Array.isArray(inputs.days) && inputs.days.length > 0 ? inputs.days : ['Wed','Sat','Sun'];
   const raceDate = inputs.raceDate || '';
   const todayStr = inputs.today || new Date().toISOString().slice(0, 10);
@@ -543,8 +549,11 @@ Inputs:
 - Event: ${event}
 - Race date: ${raceDate || 'not set'}
 - Weeks to race: ${weeksToRace}
-- Weekly hours available: ${hours}
+- Weekly hours available (the CEILING to ramp toward): ${hours}
 - Training days: ${days.join(', ')}
+${currentWeeklyHours ? `- CURRENT weekly training volume (where the athlete is TODAY): ~${currentWeeklyHours} hr/week.
+  🚨 START WEEK 1 NEAR ${currentWeeklyHours} HR, NOT ${hours} HR. The ${hours} hr figure is what they can eventually GET to — not where they are now. Jumping straight to ${hours} hr is a ${(hours / currentWeeklyHours).toFixed(1)}× volume spike = high injury risk (Gabbett 2016 ACWR: >1.5× carries 4-5× injury risk).
+  Ramp from ~${currentWeeklyHours} hr in week 1 toward ${hours} hr over the base/build phase, increasing no more than ~10% per week. If the gap is large, the athlete may not reach ${hours} hr before race day — that's correct and safe. Note this in notesForUser if the ramp can't close the gap.` : `- No current-volume signal available. Start week 1 at ~65-70% of the ${hours} hr ceiling and ramp up conservatively.`}
 ${underVolume ? `\n⚠ UNDER-VOLUME ALERT: ${hours} hr/week is BELOW the safe minimum (${minProf.floorMin} hr) for a ${event}. Build the plan as a "base-fitness build" — do NOT promise race-day readiness. Use base aerobic work, conservative progression, no high-volume long sessions. In notesForUser, include a clear note: "Your weekly volume is below the safe minimum for ${event}. This plan builds base fitness — to safely race the distance, increase weekly hours or pick a shorter race."` : ''}${tightVolume ? `\n⚠ TIGHT VOLUME: ${hours} hr/week is on the low end for a ${event} (recommended ${minProf.recMin}+ hr). Build a finish-focused plan — prioritize the long session, drop optional quality where it would crowd recovery. In notesForUser, mention this is a finish-focused build, not a time-goal build.` : ''}
 ${location ? '- Location: ' + location : ''}
 ${discList ? '- Available disciplines (only prescribe these): ' + discList : ''}
