@@ -3329,6 +3329,11 @@
         </div>
         <div class="sub" id="sdWhen"></div>
         <div id="sdContent"></div>
+        <!-- Movable long-day action — populated by openSessionModal when this
+             is a future training day that isn't already the week's long
+             session. Lets users with irregular schedules put their long
+             workout on whatever day actually works that week. -->
+        <div id="sdLongDayAction"></div>
         <div style="display:flex; gap:8px; margin-top: 16px;">
           <button class="btn btn-ghost" style="flex:1;" onclick="closeSessionModal()">Close</button>
           <button class="btn btn-primary" style="flex:1;" onclick="startEditSession()">Edit</button>
@@ -9596,9 +9601,67 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (d.cues && d.cues.length) html += `<div class="detail-section"><div class="detail-label">Cues</div><ul class="detail-list">${d.cues.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
     if (d.alternatives && d.alternatives.length) html += `<div class="detail-section"><div class="detail-label">If life gets in the way</div><ul class="detail-list">${d.alternatives.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
     document.getElementById('sdContent').innerHTML = html;
+    // Movable long-day action. Show "Make this my long day this week" when:
+    //  - this is today or a future day (weekOffset >= 0)
+    //  - it's a training day (not rest)
+    //  - it is NOT already the week's longest session
+    // Lets irregular-schedule users put the long workout where it fits.
+    const longSlot = document.getElementById('sdLongDayAction');
+    if (longSlot) {
+      longSlot.innerHTML = '';
+      try {
+        if (weekOffset >= 0 && s && s.type !== 'rest' && (s.duration || 0) > 0) {
+          const weekSessions = _weekSessionsForOffset(weekOffset);
+          const longestDur = Math.max(0, ...DAYS.map(dd => (weekSessions[dd] && weekSessions[dd].duration) || 0));
+          const isAlreadyLong = (s.duration || 0) >= longestDur && longestDur > 0;
+          if (!isAlreadyLong) {
+            longSlot.innerHTML = `<button onclick="makeLongDay('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--secondary-soft); color:#7a5a18; border:1px solid var(--secondary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">↔ Make this my long day this week</button>
+            <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Swaps your long session onto ${day}. Use this when your week is irregular and the planned long day doesn't work.</div>`;
+          }
+        }
+      } catch (e) { /* non-fatal */ }
+    }
     document.getElementById('sdView').style.display = 'block';
     document.getElementById('sdEdit').style.display = 'none';
     document.getElementById('sessionModal').classList.add('show');
+  }
+
+  // Return the sessions map for a given week offset (0 = current week).
+  // Reads fullPlan for future weeks, planState.sessions for the current.
+  function _weekSessionsForOffset(weekOffset) {
+    if (weekOffset === 0 || !planState.fullPlan || !Array.isArray(planState.fullPlan.weeks)) {
+      return planState.sessions || {};
+    }
+    const arc = planState.weekArc || [];
+    let curIdx = arc.findIndex(w => w.current);
+    if (curIdx < 0) curIdx = (typeof planState.activeWeekIdx === 'number') ? planState.activeWeekIdx : 0;
+    const wk = planState.fullPlan.weeks[curIdx + weekOffset];
+    return (wk && wk.sessions) ? wk.sessions : (planState.sessions || {});
+  }
+
+  // Move the week's long session onto `targetDay`. Finds the current longest
+  // session in that week and swaps it with the target day, so the user's
+  // long workout lands on whatever day actually works for them this week.
+  function makeLongDay(targetDay, weekOffset) {
+    weekOffset = weekOffset || 0;
+    const weekSessions = _weekSessionsForOffset(weekOffset);
+    // Identify the current long day (longest-duration session in the week).
+    let longDayName = null, longest = 0;
+    DAYS.forEach(d => {
+      const dur = (weekSessions[d] && weekSessions[d].duration) || 0;
+      if (dur > longest) { longest = dur; longDayName = d; }
+    });
+    if (!longDayName || longDayName === targetDay) {
+      closeSessionModal();
+      return;
+    }
+    lastSnapshot = JSON.parse(JSON.stringify(planState));
+    // Swap via the existing moveSession tool (handles current + future weeks,
+    // mirrors into fullPlan, recomputes training-days). Direct apply — the
+    // modal button IS the confirmation.
+    _runToolDirect('moveSession', { fromDay: longDayName, toDay: targetDay, weekOffset, reason: 'user set their long day for this week' });
+    if (typeof renderAll === 'function') renderAll();
+    closeSessionModal();
   }
 
   function closeSessionModal() {
