@@ -391,7 +391,15 @@ Place strength sessions:
 • NEVER day before a long session
 • NEVER day before/after race-pace work in build phase
 
-For session type, use 'strength' in the session.type field. Duration: 30-50 min. Intensity: 'mixed' (it's neither cardio Z nor zoneless rest).`;
+For session type, use 'strength' in the session.type field. Duration: 30-50 min. Intensity: 'mixed' (it's neither cardio Z nor zoneless rest).${isRun ? `
+
+═══ RUN EVENT — RUNNING IS THE PRIMARY DISCIPLINE (HARD RULE) ═══
+
+This is a RUN event (${event}). Running is the keystone; strength is SUPPLEMENTARY. Non-negotiable rules for EVERY week:
+• Run sessions MUST outnumber strength sessions. NEVER schedule more strength days than run days. A week with 1 run + 2 strength is WRONG for a ${event} — it must be at least 2 runs before any strength.
+• Minimum 2 run sessions per week whenever the user has ≥2 training days. With exactly 2 training days, BOTH are runs (no strength). Add the 1st strength day only at ≥3 training days; a 2nd strength day only at ≥5 training days.
+• Strength is capped at 2/wk regardless of how many days are available. Extra days become easy runs, mobility, or rest — never a 3rd strength session.
+• Order of priority when filling days: long run → quality run → easy run(s) → THEN strength → mobility/rest. Running frequency drives 5K/10K fitness far more than gym work.` : ''}`;
   } else {
     strengthNote = `\n\nNo strength access — do NOT prescribe strength sessions. If a user-typical week would include strength, replace with mobility (15-20 min stretching + dynamic) or skip.`;
   }
@@ -740,6 +748,30 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
       if (sess.type === 'rest' || sess.durationMin === 0) restCount++;
       if (sess.type === 'quality' || sess.type === 'brick' || (sess.intensity && /Z[345]/.test(sess.intensity))) {
         qualityDays.push(DAYS_ORDER.indexOf(dayName));
+      }
+    }
+    // ── RUN-DOMINANCE COERCION (run events only) ──
+    // The AI sometimes builds a low-day run plan as 1 run + 2 strength —
+    // backwards for a 5K/10K where running IS the work. Enforce that runs
+    // outnumber strength and strength never exceeds 2/wk: convert the excess
+    // strength days into easy runs (one at a time, lowest-priority last).
+    if (isRunOnly) {
+      const trainDays = DAYS_ORDER.filter(d => {
+        const s = wk.sessions[d];
+        return s && s.type !== 'rest' && s.durationMin > 0;
+      });
+      let runCount = trainDays.filter(d => ['run', 'quality'].includes(wk.sessions[d].type)).length;
+      const strengthDays = trainDays.filter(d => wk.sessions[d].type === 'strength');
+      while (strengthDays.length > 0 && (strengthDays.length >= runCount || strengthDays.length > 2)) {
+        const d = strengthDays.pop();
+        const sess = wk.sessions[d];
+        const mins = sess.durationMin;
+        sess.type = 'run';
+        sess.name = 'Easy run';
+        sess.intensity = (sess.intensity && /Z[2-5]/.test(sess.intensity)) ? sess.intensity : 'Z2';
+        sess.targets = 'HR Z2 · RPE 3-4 · conversational';
+        sess.prescription = `Easy aerobic run, Z2 HR throughout, conversational pace. ~${mins} min. [Converted from a strength day — a ${event} needs running as its primary work; strength is supplementary (≤1-2×/wk and never more than your run days).]`;
+        runCount++;
       }
     }
     // Rest-day check: only enforce when the user has at least one non-training
