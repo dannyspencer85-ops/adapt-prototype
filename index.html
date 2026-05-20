@@ -2649,6 +2649,15 @@
         </div>
       </div>
 
+      <!-- INPUTS — quick edit for every onboarding step's worth of data
+           without re-doing the whole flow. Each row links to the specific
+           onb step that captures it. -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px;">Your inputs</div>
+        <div style="font-size:12px; color:var(--text-soft); margin-bottom:10px;">Plan rebuilds when you save changes here.</div>
+        <div id="profileInputsList"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">Training style</div>
         <div style="font-size: 15px; font-weight: 600;" id="profileStyle">Balanced · 75/25</div>
@@ -9459,13 +9468,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function openSessionModal(day, weekOffset) {
     weekOffset = weekOffset || 0;
     let s = planState.sessions[day];
+    // Track whether the session came from fullPlan (already phase-scaled by
+    // the build loop) vs the current-week shape (needs projection scaling).
+    let fromFullPlan = false;
     // For future weeks, prefer fullPlan over the current-week shape.
     if (weekOffset !== 0 && planState.fullPlan && Array.isArray(planState.fullPlan.weeks)) {
       const arc = planState.weekArc || [];
       const curIdx = arc.findIndex(w => w.current);
       const baseIdx = curIdx >= 0 ? curIdx : (planState.activeWeekIdx || 0);
       const wk = planState.fullPlan.weeks[baseIdx + weekOffset];
-      if (wk && wk.sessions && wk.sessions[day]) s = wk.sessions[day];
+      if (wk && wk.sessions && wk.sessions[day]) { s = wk.sessions[day]; fromFullPlan = true; }
     }
     if (!s) return;
     // Race-week taper at READ time. Both the rule fallback and the AI plan
@@ -9501,9 +9513,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (arcEntry) {
         const baseHours = parseWeekHours((arc[currentIdx] || arc[0] || {}).hours || '5:00');
         const targetHours = parseWeekHours(arcEntry.hours);
-        // Don't double-scale a session we just re-capped via the race-week
-        // taper guard; that helper already set the right duration.
-        if (!s || !s._raceWeekCapped) {
+        // Only apply the hours-ratio scaleFactor when PROJECTING from the
+        // current-week shape. If the session came straight from fullPlan it
+        // was ALREADY scaled by the build loop (_scaleSession) — re-scaling
+        // here is the double-scale bug that showed "180 min" on the card
+        // but "126 min" in the modal (or vice versa).
+        if (!fromFullPlan && (!s || !s._raceWeekCapped)) {
           scaleFactor = baseHours > 0 ? targetHours / baseHours : 1;
         }
         phaseLabel = arcEntry.focus;
@@ -11046,6 +11061,39 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const longDay = days.includes('Sat') ? 'Sat' : days.includes('Sun') ? 'Sun' : days[days.length - 1] || 'Sat';
     const qualityDay = days.find(d => d !== longDay && d !== 'Sat' && d !== 'Sun') || days.find(d => d !== longDay) || 'Wed';
     const easyDay = days.find(d => d !== longDay && d !== qualityDay);
+    // ALL remaining training days, not just the first. The old code only
+    // ever filled ONE easy day and dumped (weeklyTotal − long − quality)
+    // into it — producing 345-min "easy runs" for high-hour plans. We now
+    // spread leftover volume across every remaining training day, capped
+    // per discipline so no single session is absurd.
+    const easyDays = days.filter(d => d !== longDay && d !== qualityDay);
+    // Per-discipline single-session ceilings for EASY days (not the long
+    // session — that has its own event cap). A normal person's easy run
+    // tops out around 75 min; beyond that it's a "long run," not an
+    // easy day. Bike tolerates more, swim less.
+    const EASY_SESSION_CAP = { run: 75, bike: 120, swim: 60, strength: 45 };
+    // Distribute `totalMin` of easy volume across `dayList`, each session
+    // capped at EASY_SESSION_CAP[type]. Leftover beyond capacity is simply
+    // not scheduled — a capped, sane plan beats one monster session.
+    function _spreadEasy(dayList, totalMin, type, label) {
+      const out = {};
+      if (!dayList.length || totalMin <= 0) return out;
+      const cap = EASY_SESSION_CAP[type] || 75;
+      const per = Math.max(20, Math.min(cap, Math.round(totalMin / dayList.length)));
+      const discWord = type === 'run' ? 'run' : type === 'bike' ? 'spin' : type === 'swim' ? 'swim' : type;
+      dayList.forEach(d => {
+        out[d] = {
+          name: label,
+          meta: `${per} min · Zone 2`,
+          duration: per,
+          type,
+          prescription: `Easy aerobic ${discWord}, Z2 HR throughout. Conversational pace — should feel relaxed, not hard. ${per} min.`,
+          targets: 'HR Z2 · RPE 3-4 · conversational',
+          intensity: 'Z2',
+        };
+      });
+      return out;
+    }
 
     if (isBeginnerRunner) {
       // Couch-to-5K-style fallback. Three short walk/run sessions per week.
@@ -11123,21 +11171,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           intensity: 'Z4',
         };
       }
-      if (easyDay) {
-        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
-        if (easyMins > 30) {
-          newSessions[easyDay] = {
-            name: 'Easy aerobic',
-            meta: `${easyMins} min · Zone 2${surface === 'trail' ? ' · trail' : ''}`,
-            duration: easyMins,
-            type: 'run',
-            prescription: surface === 'trail'
-              ? `Easy aerobic run on trail or soft surface. Fits the ankle/glute strength your race surface demands. Keep HR in Z2.`
-              : `Easy aerobic run, Z2 HR throughout. Should feel relaxed.`,
-            intensity: 'Z2',
-          };
-        }
-      }
+      // Spread remaining weekly volume across ALL easy days, capped at
+      // 75 min/run. No more single 126-min "easy aerobic" sessions.
+      const totalEasy = hours * 60 - longMins - qualityMins;
+      Object.assign(newSessions, _spreadEasy(easyDays, totalEasy, 'run', 'Easy aerobic'));
     } else if (isTri) {
       // Triathlon — discipline-aware AND course-aware. Brick adapts to bike
       // profile (climbing course → climbing brick), quality adapts to bike
@@ -11211,17 +11248,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           newSessions[qualityDay] = { name: 'Strength + mobility', meta: `${Math.round(qualityMins)} min · full-body, controlled tempo`, duration: Math.round(qualityMins), type: 'strength' };
         }
       }
-      if (easyDay) {
-        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
-        if (easyMins > 30) {
-          if (hasRun) {
-            newSessions[easyDay] = { name: 'Easy aerobic run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run', intensity: 'Z2' };
-          } else if (hasBike) {
-            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike', intensity: 'Z2' };
-          } else if (hasSwim) {
-            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · drills + smooth aerobic`, duration: easyMins, type: 'swim', intensity: 'Z2' };
-          }
-        }
+      // Spread the remaining weekly volume across ALL easy days, rotating
+      // through the disciplines the user has so a tri week stays varied
+      // (run / bike / swim) instead of dumping 345 min into one run.
+      const totalEasy = hours * 60 - longMins - qualityMins;
+      if (totalEasy > 0 && easyDays.length) {
+        const rotation = [];
+        if (hasRun) rotation.push('run');
+        if (hasBike) rotation.push('bike');
+        if (hasSwim) rotation.push('swim');
+        if (rotation.length === 0) rotation.push('run');
+        const labelFor = (t) => t === 'run' ? 'Easy aerobic run' : t === 'bike' ? 'Easy bike' : 'Easy swim';
+        const perDay = totalEasy / easyDays.length;
+        easyDays.forEach((d, i) => {
+          const type = rotation[i % rotation.length];
+          const cap = EASY_SESSION_CAP[type] || 75;
+          const per = Math.max(20, Math.min(cap, Math.round(perDay)));
+          newSessions[d] = {
+            name: labelFor(type),
+            meta: `${per} min · Zone 2`,
+            duration: per,
+            type,
+            prescription: `Easy aerobic ${type === 'run' ? 'run' : type === 'bike' ? 'spin' : 'swim'}, Z2 throughout. Conversational pace. ${per} min.`,
+            targets: 'HR Z2 · RPE 3-4 · conversational',
+            intensity: 'Z2',
+          };
+        });
       }
     } else {
       // General fitness (no event) — discipline-aware variety week.
@@ -11255,21 +11307,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           newSessions[qualityDay] = { name: 'Swim CSS set', meta: `${Math.round(qualityMins)} min · technique + intervals`, duration: Math.round(qualityMins), type: 'quality' };
         }
       }
-      // Easy day — pick the discipline NOT yet used.
-      if (easyDay) {
-        const easyMins = Math.round(hours * 60 - longMins - qualityMins);
-        if (easyMins > 30) {
-          const used = new Set([newSessions[longDay] && newSessions[longDay].type, newSessions[qualityDay] && newSessions[qualityDay].type]);
-          if (hasBike && !used.has('bike') && !used.has('quality')) {
-            newSessions[easyDay] = { name: 'Easy bike', meta: `${easyMins} min · Zone 2 spin`, duration: easyMins, type: 'bike' };
-          } else if (hasRun && !used.has('run')) {
-            newSessions[easyDay] = { name: 'Easy run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
-          } else if (hasSwim && !used.has('swim')) {
-            newSessions[easyDay] = { name: 'Easy swim', meta: `${easyMins} min · technique`, duration: easyMins, type: 'swim' };
-          } else if (hasRun) {
-            newSessions[easyDay] = { name: 'Easy run', meta: `${easyMins} min · Zone 2`, duration: easyMins, type: 'run' };
-          }
-        }
+      // Easy days — spread remaining volume across all of them, rotating
+      // disciplines, capped per session. (Was: one day absorbing everything.)
+      const totalEasy = hours * 60 - longMins - qualityMins;
+      if (totalEasy > 0 && easyDays.length) {
+        const rotation = [];
+        if (hasRun) rotation.push('run');
+        if (hasBike) rotation.push('bike');
+        if (hasSwim) rotation.push('swim');
+        if (rotation.length === 0) rotation.push('run');
+        const labelFor = (t) => t === 'run' ? 'Easy run' : t === 'bike' ? 'Easy bike' : 'Easy swim';
+        const perDay = totalEasy / easyDays.length;
+        easyDays.forEach((d, i) => {
+          const type = rotation[i % rotation.length];
+          const cap = EASY_SESSION_CAP[type] || 75;
+          const per = Math.max(20, Math.min(cap, Math.round(perDay)));
+          newSessions[d] = {
+            name: labelFor(type),
+            meta: `${per} min · Zone 2`,
+            duration: per,
+            type,
+            prescription: `Easy aerobic ${type === 'run' ? 'run' : type === 'bike' ? 'spin' : 'swim'}, Z2 throughout. Conversational. ${per} min.`,
+            intensity: 'Z2',
+          };
+        });
       }
     }
 
@@ -11417,23 +11478,33 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // so both build-time (rule fallback) AND read-time (calendar lookup) can
     // call it. The local re-declaration that used to be here has been hoisted.
 
-    function _scaleSession(template, ratio) {
+    function _scaleSession(template, ratio, phase) {
       if (!template) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', intensity: 'rest' };
       const d = Math.round((template.duration || 0) * ratio);
-      // Race week: substitute long efforts with short race-pace primers.
-      const isRace = ratio <= 0.55;
-      const isTaper = ratio <= 0.8 && ratio > 0.55;
+      // Use PHASE not just ratio. The old ratio-only check confused planned
+      // deload weeks (ratio ~0.66 mid-build) with the actual taper (ratio
+      // ~0.75 in T-2). A user 66 days out from a 10K was seeing a
+      // "(taper)" label on a deload week — wrong, confusing, and made
+      // the user think the engine had its dates mixed up.
+      const isRaceWeek = phase === 'Race week';
+      const isTaperWeek = phase === 'Taper';
+      const isBackOffWeek = phase === 'Back-off';
+      const isDeload = !isRaceWeek && !isTaperWeek && !isBackOffWeek && ratio < 0.85;
       let name = template.name;
       let meta = template.meta;
       let prescription = template.prescription || '';
-      if (isRace && template.type !== 'rest') {
+      if (isRaceWeek && template.type !== 'rest') {
         name = template.name + ' (race-week primer)';
         meta = `${d} min · short race-pace primer`;
         prescription = `Short pre-race shakeout: ${d} min easy with 3-4 short pickups at race pace. Don't tire yourself out.`;
-      } else if (isTaper && (template.type === 'quality' || template.type === 'brick')) {
+      } else if (isTaperWeek && (template.type === 'quality' || template.type === 'brick')) {
         name = template.name + ' (taper)';
         meta = `${d} min · sharper, shorter`;
         prescription = `Taper-week version: ${prescription || 'maintain quality'}. Cut total volume; keep sharp efforts at race pace.`;
+      } else if (isDeload && template.type !== 'rest') {
+        name = template.name + ' (deload)';
+        meta = `${d} min · easier this week`;
+        prescription = `Deload week — same SHAPE as your normal ${template.type || 'session'}, ${Math.round((1 - ratio) * 100)}% less volume. ${prescription || 'Keep the intent, drop the reps.'} You'll come back stronger next week.`;
       }
       return {
         ...template,
@@ -11505,7 +11576,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           // Pre-race-day inside race week → per-day taper.
           scaledSessions[d] = _raceWeekTaperSession(newSessions[d], raceDayInWeekIdx, dayIdx);
         } else {
-          scaledSessions[d] = _scaleSession(newSessions[d], ratio);
+          scaledSessions[d] = _scaleSession(newSessions[d], ratio, phase);
         }
       });
 

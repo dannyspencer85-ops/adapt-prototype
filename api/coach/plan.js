@@ -611,6 +611,28 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
     if (weekIdx <= 3) return 38;      // weeks 3-4
     return 45;                         // weeks 5+ — never beyond this for beginners
   };
+  // Per-event, per-discipline single-session ceilings. The AI sometimes
+  // fills the weekly-hours budget by inflating ONE session — testers saw a
+  // 345-min "easy run" on a Full Ironman and a 126-min easy run on a 10K.
+  // These caps COERCE (not reject) any session beyond a sane max for its
+  // discipline + event. The LONG session of each event gets the higher cap;
+  // everything else gets the easy cap.
+  const _eventLongCap = (() => {
+    if (/Full Ironman/i.test(event)) return { run: 150, bike: 300, swim: 90, brick: 360, quality: 120, strength: 60 };
+    if (/Half Ironman/i.test(event)) return { run: 120, bike: 210, swim: 75, brick: 240, quality: 90, strength: 50 };
+    if (/Olympic Tri/i.test(event)) return { run: 90, bike: 150, swim: 60, brick: 150, quality: 75, strength: 45 };
+    if (/Sprint Tri/i.test(event)) return { run: 60, bike: 90, swim: 45, brick: 90, quality: 60, strength: 45 };
+    if (/Marathon/i.test(event) && !/Half/i.test(event)) return { run: 180, bike: 90, swim: 45, quality: 90, strength: 45 };
+    if (/Half Marathon/i.test(event)) return { run: 110, bike: 75, swim: 45, quality: 70, strength: 45 };
+    if (/10K/i.test(event)) return { run: 80, bike: 60, swim: 45, quality: 50, strength: 45 };
+    if (/5K/i.test(event)) return { run: 60, bike: 50, swim: 40, quality: 45, strength: 40 };
+    return { run: 120, bike: 180, swim: 75, brick: 240, quality: 90, strength: 60 };
+  })();
+  // Easy (non-long, non-quality) sessions cap much lower — an "easy run"
+  // over 75 min isn't easy, it's a long run mislabeled.
+  const _easyCap = { run: 75, bike: 120, swim: 60, brick: 240, quality: 90, strength: 60 };
+  // Track the longest session per discipline across the week so we know
+  // which one is "the long session" (gets the higher cap).
 
   let prevWeekMin = null;
   for (let wi = 0; wi < parsed.weeks.length; wi++) {
@@ -666,6 +688,22 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
         const original = sess.durationMin;
         sess.durationMin = cap;
         sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Capped from ${original} to ${cap} min — beginner-runner session limit for week ${wi + 1}. The remaining time is intentional rest, not missing.]`;
+      }
+      // Per-event session ceiling. The "key" session of the day (long /
+      // brick / quality / explicitly named "Long ...") gets the higher
+      // _eventLongCap; everything else gets the lower _easyCap. This stops
+      // the AI dumping the whole weekly-hours budget into one absurd
+      // session (the 345-min "easy run" testers reported).
+      if (sess.type !== 'rest' && sess.durationMin > 0) {
+        const isKey = sess.type === 'brick' || sess.type === 'quality' || /\blong\b/i.test(sess.name || '');
+        const capTable = isKey ? _eventLongCap : _easyCap;
+        const evCap = capTable[sess.type] || (isKey ? 180 : 75);
+        if (sess.durationMin > evCap) {
+          const original = sess.durationMin;
+          sess.durationMin = evCap;
+          // Keep the meta/name honest about the new duration if it embedded one.
+          sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Capped from ${original} to ${evCap} min — ${isKey ? 'long-session' : 'easy-session'} ceiling for ${event}. A single session beyond this adds fatigue, not fitness.]`;
+        }
       }
       if (!sess.intensity) sess.intensity = sess.type === 'rest' ? 'rest' : 'Z2';
       if (typeof sess.prescription !== 'string') sess.prescription = '';
