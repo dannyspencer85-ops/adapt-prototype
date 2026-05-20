@@ -1491,8 +1491,8 @@
 
         <div class="onboard-actions">
           <button class="btn btn-primary btn-lg btn-full" onclick="showScreen('auth')">Get started</button>
-          <div style="text-align:center; margin-top:10px; font-size:12px; color:var(--text-soft);">Already have an account? Same button — log in on the next screen.</div>
         </div>
+        <div style="text-align:center; margin-top:12px; font-size:12px; color:var(--text-soft);">Already have an account? Same button — log in on the next screen.</div>
       </div>
 
       <div id="onb-1" style="display:none;">
@@ -1631,14 +1631,9 @@
           <input type="date" id="eventDate">
         </div>
 
-        <!-- Curated race picker — auto-fills the course chips below if the user picks a known race. -->
-        <div class="field">
-          <label>Pick your race <span style="color: var(--text-soft); font-weight: 500;" id="racePickerLabel">(optional — auto-fills course details)</span></label>
-          <select id="racePickerSelect" onchange="onPickCuratedRace()">
-            <option value="">— I'll describe the course manually —</option>
-          </select>
-          <div id="racePickerSummary" style="display:none; margin-top:10px; padding:12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5;"></div>
-        </div>
+        <!-- Curated "Pick your race" picker removed by request — course
+             details are entered manually below. refreshRacePicker() /
+             onPickCuratedRace() are null-safe and no-op without the DOM. -->
 
         <!-- Course details — always visible, event-aware. The fields the user
              sees adapt to the race they picked above (run-only courses don't
@@ -3386,6 +3381,31 @@
             <input type="number" id="edDuration" min="0" max="360" oninput="refreshEditImpact()" style="flex: 1; padding: 6px 10px;">
             <span style="font-size: 12px; color: var(--text-soft);">min</span>
           </div>
+        </div>
+
+        <!-- Brick split — only shown when the Brick discipline is picked. Lets
+             the athlete set the bike + run legs independently instead of the
+             default 70/30 auto-split. Total duration = bike + run. -->
+        <div class="field" id="edBrickField" style="display:none;">
+          <label>Brick split</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Set each leg. Your session total updates automatically.</div>
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">🚴 Bike</div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="number" id="edBrickBike" min="0" max="360" oninput="pickEdBrickSplit()" style="flex:1; padding:6px 10px;">
+                <span style="font-size:12px; color:var(--text-soft);">min</span>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">🏃 Run</div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="number" id="edBrickRun" min="0" max="360" oninput="pickEdBrickSplit()" style="flex:1; padding:6px 10px;">
+                <span style="font-size:12px; color:var(--text-soft);">min</span>
+              </div>
+            </div>
+          </div>
+          <div id="edBrickTotal" style="font-size:12px; color:var(--primary-dark); font-weight:600; margin-top:8px;"></div>
         </div>
 
         <!-- Customize fine details (collapsed) -->
@@ -9848,20 +9868,44 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   let currentEditDay = null;
-  let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60 };
+  let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60, brickBike: 0, brickRun: 0 };
+
+  // Parse "Bike 2:00 + Run 0:30" (or "... + Run 45 min") into {bike, run} mins.
+  // Returns null if the meta isn't a recognizable brick split.
+  function _parseBrickMeta(meta) {
+    if (!meta) return null;
+    const toMin = (txt) => {
+      if (!txt) return null;
+      const hm = txt.match(/(\d+):(\d{1,2})/);
+      if (hm) return parseInt(hm[1], 10) * 60 + parseInt(hm[2], 10);
+      const m = txt.match(/(\d+)\s*min/);
+      if (m) return parseInt(m[1], 10);
+      return null;
+    };
+    const bikePart = meta.match(/bike[^+]*?(\d+(?::\d{1,2})?(?:\s*min)?)/i);
+    const runPart = meta.match(/run[^+]*?(\d+(?::\d{1,2})?(?:\s*min)?)/i);
+    const bike = bikePart ? toMin(bikePart[1]) : null;
+    const run = runPart ? toMin(runPart[1]) : null;
+    if (bike == null && run == null) return null;
+    return { bike: bike || 0, run: run || 0 };
+  }
 
   function startEditSession() {
     const day = currentEditDay;
     const s = planState.sessions[day];
     if (!s) return;
     // Pre-fill draft from current session
+    const parsedBrick = s.type === 'brick' ? _parseBrickMeta(s.meta) : null;
     _edDraft = {
       discipline: s.type === 'rest' ? 'rest'
                 : s.type === 'brick' ? 'brick'
                 : s.type === 'strength' ? 'strength'
                 : s.type === 'quality' ? inferDisciplineFromName(s.name) : s.type,
       intensity: inferIntensityFromSession(s),
-      duration: s.duration || 60
+      duration: s.duration || 60,
+      // Seed brick legs from the existing meta if present, else a 70/30 split.
+      brickBike: parsedBrick ? parsedBrick.bike : Math.round((s.duration || 60) * 0.7),
+      brickRun: parsedBrick ? parsedBrick.run : Math.max(15, (s.duration || 60) - Math.round((s.duration || 60) * 0.7))
     };
     document.getElementById('edName').value = s.name;
     document.getElementById('edDuration').value = s.duration;
@@ -9900,18 +9944,52 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.querySelectorAll('#edDurationChips [data-dur]').forEach(c => {
       c.classList.toggle('active', parseInt(c.dataset.dur, 10) === _edDraft.duration);
     });
-    // Hide intensity + duration when rest
+    // Hide intensity + duration when rest. For brick, swap the single
+    // duration picker for the two-leg brick split editor.
+    const isRest = _edDraft.discipline === 'rest';
+    const isBrick = _edDraft.discipline === 'brick';
     const intF = document.getElementById('edIntensityField');
     const durF = document.getElementById('edDurationField');
-    if (intF) intF.style.display = _edDraft.discipline === 'rest' ? 'none' : 'block';
-    if (durF) durF.style.display = _edDraft.discipline === 'rest' ? 'none' : 'block';
+    const brickF = document.getElementById('edBrickField');
+    if (intF) intF.style.display = isRest ? 'none' : 'block';
+    if (durF) durF.style.display = (isRest || isBrick) ? 'none' : 'block';
+    if (brickF) brickF.style.display = isBrick ? 'block' : 'none';
+    if (isBrick) {
+      const bikeEl = document.getElementById('edBrickBike');
+      const runEl = document.getElementById('edBrickRun');
+      const totEl = document.getElementById('edBrickTotal');
+      if (bikeEl) bikeEl.value = _edDraft.brickBike || 0;
+      if (runEl) runEl.value = _edDraft.brickRun || 0;
+      if (totEl) {
+        const tot = (_edDraft.brickBike || 0) + (_edDraft.brickRun || 0);
+        totEl.textContent = `Total: ${Math.floor(tot / 60)}h ${tot % 60}m (${tot} min)`;
+      }
+    }
   }
   function pickEdDiscipline(d) {
     _edDraft.discipline = d;
     if (d === 'rest') _edDraft.duration = 0;
     else if (_edDraft.duration === 0) _edDraft.duration = 60;
+    // Switching INTO brick — seed the legs from the current total (70/30) if
+    // they haven't been set yet, so the inputs aren't blank.
+    if (d === 'brick' && (!_edDraft.brickBike && !_edDraft.brickRun)) {
+      const tot = _edDraft.duration || 90;
+      _edDraft.brickBike = Math.round(tot * 0.7);
+      _edDraft.brickRun = Math.max(15, tot - Math.round(tot * 0.7));
+      _edDraft.duration = _edDraft.brickBike + _edDraft.brickRun;
+    }
     applyEdDraftToInputs();
     syncEdChipState();
+    refreshEditImpact();
+  }
+  // Brick-leg inputs changed — recompute total + meta from the two legs.
+  function pickEdBrickSplit() {
+    const bike = Math.max(0, parseInt(document.getElementById('edBrickBike')?.value, 10) || 0);
+    const run = Math.max(0, parseInt(document.getElementById('edBrickRun')?.value, 10) || 0);
+    _edDraft.brickBike = bike;
+    _edDraft.brickRun = run;
+    _edDraft.duration = bike + run;
+    applyEdDraftToInputs();
     refreshEditImpact();
   }
   function pickEdIntensity(level) {
@@ -9942,11 +10020,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       meta = 'Recovery';
       sessionType = 'rest';
     } else if (discipline === 'brick') {
-      const bikeMin = Math.round(duration * 0.7);
-      const runMin = Math.max(15, duration - bikeMin);
+      // Use the user-set legs when present; otherwise fall back to a 70/30
+      // split of the total. duration is kept in sync (= bike + run).
+      const bikeMin = (_edDraft.brickBike != null && (_edDraft.brickBike || _edDraft.brickRun))
+        ? _edDraft.brickBike : Math.round(duration * 0.7);
+      const runMin = (_edDraft.brickRun != null && (_edDraft.brickBike || _edDraft.brickRun))
+        ? _edDraft.brickRun : Math.max(15, duration - Math.round(duration * 0.7));
+      _edDraft.duration = bikeMin + runMin;
+      const fmtLeg = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
       name = intensity === 'long' ? 'Long brick' : 'Brick session';
-      meta = `Bike ${Math.floor(bikeMin / 60)}:${String(bikeMin % 60).padStart(2,'0')} + Run 0:${String(runMin).padStart(2,'0')}`;
+      meta = `Bike ${fmtLeg(bikeMin)} + Run ${fmtLeg(runMin)}`;
       sessionType = 'brick';
+      // Keep the live total readout in sync as the legs change.
+      const totEl = document.getElementById('edBrickTotal');
+      if (totEl) {
+        const tot = bikeMin + runMin;
+        totEl.textContent = `Total: ${Math.floor(tot / 60)}h ${tot % 60}m (${tot} min)`;
+      }
     } else if (discipline === 'strength') {
       name = 'Strength session';
       meta = `${duration} min · Compound lifts`;
@@ -9983,7 +10073,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (nameInput) nameInput.value = name;
     if (metaInput) metaInput.value = meta;
     if (typeInput) typeInput.value = sessionType;
-    if (durInput) durInput.value = duration;
+    // For brick, duration was recomputed to bike+run inside the branch.
+    if (durInput) durInput.value = _edDraft.duration;
   }
 
   function cancelEditSession() {
