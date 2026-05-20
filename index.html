@@ -2313,6 +2313,18 @@
            Optional; leave blank if Strava will fill it in. -->
       <div class="section-label plain">What you actually did <span style="font-weight:500; text-transform:none; color:var(--text-soft); font-size:11px;">(optional — leave blank if syncing from Strava)</span></div>
       <div class="card">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Workout type <span style="font-weight:500; text-transform:none;">— change it if you did something different than planned</span></label>
+          <div class="chip-row" id="logActualType" style="margin-top:6px; flex-wrap:wrap;">
+            <button type="button" class="chip" data-type="run" onclick="pickLogType(this)">🏃 Run</button>
+            <button type="button" class="chip" data-type="bike" onclick="pickLogType(this)">🚴 Bike</button>
+            <button type="button" class="chip" data-type="swim" onclick="pickLogType(this)">🏊 Swim</button>
+            <button type="button" class="chip" data-type="strength" onclick="pickLogType(this)">🏋️ Strength</button>
+            <button type="button" class="chip" data-type="brick" onclick="pickLogType(this)">🚴+🏃 Brick</button>
+            <button type="button" class="chip" data-type="quality" onclick="pickLogType(this)">⚡ Intervals</button>
+            <button type="button" class="chip" data-type="mobility" onclick="pickLogType(this)">🧘 Mobility</button>
+          </div>
+        </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div>
             <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Duration (min)</label>
@@ -4964,6 +4976,11 @@
     [...el.parentElement.children].forEach(c => c.classList.remove('active'));
     el.classList.add('active');
   }
+  // Log-screen "what type did you actually do" picker (single-select).
+  function pickLogType(el) {
+    [...el.parentElement.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
   // Onboarding step-4 schedule-consistency picker. Toggles the "you can set
   // days on the calendar" hint when the user says their schedule varies.
   function pickScheduleMode(el) {
@@ -5618,6 +5635,7 @@
     const actualHr = parseInt(document.getElementById('logActualHr')?.value || '', 10);
     const actualDist = (document.getElementById('logActualDist')?.value || '').trim();
     const actualFeel = (document.getElementById('logActualFeel')?.value || '').trim();
+    const actualType = document.querySelector('#logActualType .chip.active')?.dataset.type || null;
     if (s) {
       s.completed = true;
       s.rpe = rpe;
@@ -5625,8 +5643,15 @@
       if (actualHr && actualHr >= 60) s.actualHr = actualHr;
       if (actualDist) s.actualDistance = actualDist;
       if (actualFeel) s.actualFeel = actualFeel;
+      // Record the discipline actually performed. If it differs from what was
+      // planned, update s.type too so the calendar dot + discipline tallies
+      // reflect reality (you did a run, not the planned brick).
+      if (actualType) {
+        s.actualType = actualType;
+        if (actualType !== s.type) s.type = actualType;
+      }
       // Mark the data source so the UI can show "logged manually" vs Strava.
-      if (actualMins || actualHr || actualDist) s.loggedManually = true;
+      if (actualMins || actualHr || actualDist || actualType) s.loggedManually = true;
     }
     trackEvent('session_logged', { day: today, type: s ? s.type : null, rpe, name: s ? s.name : null, manual: !!(actualMins || actualHr || actualDist) });
     analyzeLoggedSession(today, rpe);
@@ -11449,6 +11474,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.querySelectorAll('#rpe .rpe-btn').forEach(b => {
       b.classList.toggle('active', s.rpe != null && parseInt(b.textContent, 10) === s.rpe);
     });
+    // Workout-type chips — default to what was actually logged, else the
+    // planned type. Maps unknown types onto the closest available chip.
+    const typeWrap = document.getElementById('logActualType');
+    if (typeWrap) {
+      const known = ['run', 'bike', 'swim', 'strength', 'brick', 'quality', 'mobility'];
+      let t = s.actualType || s.type || 'run';
+      if (!known.includes(t)) t = t === 'walk' ? 'run' : 'run';
+      [...typeWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.type === t));
+    }
   }
 
   function formatRaceDate() {
