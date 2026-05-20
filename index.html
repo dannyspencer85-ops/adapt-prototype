@@ -2305,6 +2305,30 @@
         </div>
       </div>
 
+      <!-- Manual data entry — for users without a connected watch/Strava.
+           Optional; leave blank if Strava will fill it in. -->
+      <div class="section-label plain">What you actually did <span style="font-weight:500; text-transform:none; color:var(--text-soft); font-size:11px;">(optional — leave blank if syncing from Strava)</span></div>
+      <div class="card">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Duration (min)</label>
+            <input type="number" id="logActualMins" min="1" max="600" placeholder="e.g. 42" style="width:100%; margin-top:4px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Avg HR</label>
+            <input type="number" id="logActualHr" min="60" max="220" placeholder="e.g. 148" style="width:100%; margin-top:4px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Distance</label>
+            <input type="text" id="logActualDist" placeholder="e.g. 5.2 mi or 8 km" style="width:100%; margin-top:4px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Effort feel</label>
+            <input type="text" id="logActualFeel" placeholder="e.g. strong, flat, heavy" style="width:100%; margin-top:4px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+          </div>
+        </div>
+      </div>
+
       <div class="section-label plain">Notes (optional)</div>
       <textarea rows="3" placeholder="Legs felt heavy from Saturday, kept swim easy..."></textarea>
 
@@ -5251,10 +5275,31 @@
     const today = getTodayDay();
     const todayFull = DAY_FULL[today];
     const s = planState.sessions[today];
-    if (s) { s.completed = true; s.rpe = rpe; }
-    trackEvent('session_logged', { day: today, type: s ? s.type : null, rpe, name: s ? s.name : null });
+    // Manual "what you actually did" entry — for users without a connected
+    // watch/Strava. Stored on the session so the Today hero + session report
+    // show the real numbers instead of em-dashes.
+    const actualMins = parseInt(document.getElementById('logActualMins')?.value || '', 10);
+    const actualHr = parseInt(document.getElementById('logActualHr')?.value || '', 10);
+    const actualDist = (document.getElementById('logActualDist')?.value || '').trim();
+    const actualFeel = (document.getElementById('logActualFeel')?.value || '').trim();
+    if (s) {
+      s.completed = true;
+      s.rpe = rpe;
+      if (actualMins && actualMins > 0) s.actualMins = actualMins;
+      if (actualHr && actualHr >= 60) s.actualHr = actualHr;
+      if (actualDist) s.actualDistance = actualDist;
+      if (actualFeel) s.actualFeel = actualFeel;
+      // Mark the data source so the UI can show "logged manually" vs Strava.
+      if (actualMins || actualHr || actualDist) s.loggedManually = true;
+    }
+    trackEvent('session_logged', { day: today, type: s ? s.type : null, rpe, name: s ? s.name : null, manual: !!(actualMins || actualHr || actualDist) });
     analyzeLoggedSession(today, rpe);
-    setChange(`Logged ${todayFull} session (RPE ${rpe || '—'}). Engine reassessing week.`);
+    setChange(`Logged ${todayFull} session (RPE ${rpe || '—'}${actualMins ? `, ${actualMins} min` : ''}). Engine reassessing week.`);
+    // Clear the manual inputs so the next log starts fresh.
+    ['logActualMins', 'logActualHr', 'logActualDist', 'logActualFeel'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    if (typeof renderAll === 'function') renderAll();
     showScreen('today');
     renderNotifBadge();
   }
@@ -12073,7 +12118,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dh = Math.floor(s.actualMins / 60);
         const dm = s.actualMins % 60;
         const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
-        duration.textContent = `${dStr}${s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : ''}`;
+        // Distance: Strava km if synced, else manually-entered string.
+        const distStr = s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km'
+          : s.actualDistance ? ' · ' + s.actualDistance : '';
+        const hrStr = s.actualHr ? ' · ' + s.actualHr + ' bpm' : '';
+        duration.textContent = `${dStr}${distStr}${hrStr}`;
       } else {
         duration.textContent = safeS.meta;
       }
