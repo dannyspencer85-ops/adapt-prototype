@@ -3666,8 +3666,9 @@
     });
     const target = n === 0 ? 'welcome' : n === 6 ? 'building' : String(n);
     document.getElementById('onb-' + target).style.display = 'block';
-    if (n === 4) { populateDisciplineChips(); updateHoursVolumeWarning(); }
+    if (n === 4) { populateDisciplineChips(); prefillStep4(); updateHoursVolumeWarning(); }
     if (n === 3) { updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent(); }
+    if (n === 2) { prefillStep2Profile(); }
     if (n === 5) { prefillFitnessMarkers(); adjustFmAdvancedVisibility(); }
     // Pre-fill the first-name field if we already have it stored (returning user
     // re-entering onboarding via "Edit goals" or "Start over").
@@ -3759,6 +3760,69 @@
   }
   function readFitnessMarkers() {
     try { return JSON.parse(localStorage.getItem('fitness-markers') || 'null'); } catch (e) { return null; }
+  }
+  // Canonical read for the step-2 background profile (freq/exp/injury/sleep).
+  // Prefers the live planState.profile, falls back to the persisted copy.
+  function readUserProfile() {
+    if (planState && planState.profile && (planState.profile.freq || planState.profile.exp)) {
+      return planState.profile;
+    }
+    try {
+      const p = JSON.parse(localStorage.getItem('user-profile') || 'null');
+      return p && typeof p === 'object' ? p : null;
+    } catch (e) { return null; }
+  }
+  // Restore the step-4 selections (hours, days, disciplines, coaching detail)
+  // when a returning user re-enters from a You-tab "Edit" link. Must run AFTER
+  // populateDisciplineChips() since that rebuilds the discipline chip set.
+  function prefillStep4() {
+    // Hours — match the saved value to its chip bucket.
+    const savedHours = parseFloat(localStorage.getItem('hours-per-week') || '');
+    if (Number.isFinite(savedHours) && savedHours > 0) {
+      const hWrap = document.getElementById('hoursChips');
+      if (hWrap) {
+        let best = null, bestDiff = Infinity;
+        [...hWrap.children].forEach(ch => {
+          ch.classList.remove('active');
+          const v = parseFloat(ch.dataset.hours);
+          if (Number.isFinite(v)) { const d = Math.abs(v - savedHours); if (d < bestDiff) { bestDiff = d; best = ch; } }
+        });
+        if (best) best.classList.add('active');
+      }
+    }
+    // Days — match by label text.
+    let savedDays = [];
+    try { savedDays = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) { savedDays = []; }
+    if (Array.isArray(savedDays) && savedDays.length) {
+      const dWrap = document.getElementById('daysChips');
+      if (dWrap) [...dWrap.children].forEach(ch => ch.classList.toggle('active', savedDays.includes(ch.textContent.trim())));
+    }
+    // Disciplines — match by data-disc.
+    let savedDisc = [];
+    try { savedDisc = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) { savedDisc = []; }
+    if (Array.isArray(savedDisc) && savedDisc.length) {
+      const cWrap = document.getElementById('discChips');
+      if (cWrap) [...cWrap.children].forEach(ch => ch.classList.toggle('active', savedDisc.includes(ch.dataset.disc)));
+    }
+    // Coaching detail level.
+    const cm = localStorage.getItem('complexity-mode');
+    if (cm) {
+      const cmWrap = document.getElementById('complexityChips');
+      if (cmWrap) [...cmWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.mode === cm));
+    }
+  }
+  // Restore the step-2 chips when a returning user re-enters this step from
+  // the You tab "Edit" links, so they see their saved answers, not defaults.
+  function prefillStep2Profile() {
+    const p = readUserProfile();
+    if (!p) return;
+    if (p.freq) setActiveChipVal('freqChips', p.freq);
+    if (p.exp) setActiveChipVal('bgChips', p.exp);
+    if (p.injury) setActiveChipVal('injuryChips', p.injury);
+    if (p.sleep) {
+      const wrap = document.getElementById('sleepChips');
+      if (wrap) [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.sleep === p.sleep));
+    }
   }
   function writeFitnessMarkers(m) {
     if (m) localStorage.setItem('fitness-markers', JSON.stringify(m));
@@ -4261,6 +4325,20 @@
     planState.raceEvent = event;
     planState.raceDate = eventDate;
 
+    // Persist the step-2 "current fitness / background" chips so they (a)
+    // can be shown + edited from the You tab, and (b) actually reach the
+    // plan engines. Previously these lived only in the DOM at onboarding
+    // time, so planState.profile was null for real users — which silently
+    // disabled the freq/exp branches in the starting-fitness heuristics.
+    const _onbProfile = {
+      exp: getActiveChipVal('bgChips') || 'some',
+      freq: getActiveChipVal('freqChips') || 'mid',
+      injury: getActiveChipVal('injuryChips') || 'none',
+      sleep: (document.querySelector('#sleepChips .chip.active')?.dataset.sleep) || '7to8',
+    };
+    planState.profile = _onbProfile;
+    localStorage.setItem('user-profile', JSON.stringify(_onbProfile));
+
     // Save course intel (Phase 1 + 2)
     const intel = readCourseIntelFromInputs();
     planState.courseIntel = intel;
@@ -4759,7 +4837,7 @@
     if (name === 'ask') updateChatState();
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); }
   }
   function goBack() {
     if (screenHistory.length === 0) return;
@@ -4961,6 +5039,76 @@
       <div style="display: flex; gap: 6px; justify-content: space-between; margin-bottom: 4px;">${pills}</div>
       ${summary}
       ${detailRows}`;
+  }
+
+  // Populate the You-tab "Your inputs" card with a quick-edit row per
+  // onboarding step's worth of data. Each row links straight to the step
+  // that captures it (no need to re-walk the whole flow). Values are read
+  // from the same sources the plan engines use, so what you see here is what
+  // the plan was built from.
+  function renderProfileInputs() {
+    const slot = document.getElementById('profileInputsList');
+    if (!slot) return;
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s));
+
+    const FREQ = { low: 'Not much', mid: '1–2× / week', high: '3+× / week' };
+    const EXP = { new: 'New to this', some: 'Some experience', veteran: '5+ years' };
+    const INJ = { none: 'No injuries', minor: 'Minor / managed', serious: 'Injury — getting cleared' };
+    const SLEEP = { under5: 'Under 5h', '5to6': '5–6h', '6to7': '6–7h', '7to8': '7–8h', '8plus': '8h+' };
+    const RUNABLE = { 'walk-run': 'Walk + short jogs', 'under-15': 'Up to 15 min', '15-30': '15–30 min', '30-60': '30–60 min', '60-plus': '60 min or more' };
+
+    // ── Gather current values ───────────────────────────────────────────
+    const name = (typeof getFirstName === 'function' && getFirstName()) || '';
+    const prof = (typeof readUserProfile === 'function' && readUserProfile()) || {};
+    const hoursRaw = parseFloat(localStorage.getItem('hours-per-week') || '');
+    let days = [];
+    try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) { days = []; }
+    let disc = [];
+    try { disc = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) { disc = []; }
+    const fm = (typeof readFitnessMarkers === 'function' && readFitnessMarkers()) || {};
+
+    // Step-2 background summary.
+    const bgParts = [];
+    if (prof.freq && FREQ[prof.freq]) bgParts.push(FREQ[prof.freq]);
+    if (prof.exp && EXP[prof.exp]) bgParts.push(EXP[prof.exp]);
+    if (prof.injury && prof.injury !== 'none' && INJ[prof.injury]) bgParts.push(INJ[prof.injury]);
+    if (prof.sleep && SLEEP[prof.sleep]) bgParts.push('Sleep ' + SLEEP[prof.sleep]);
+
+    // Step-5 fitness-markers summary.
+    const fmParts = [];
+    if (fm.runAbility && RUNABLE[fm.runAbility]) fmParts.push('Can run: ' + RUNABLE[fm.runAbility]);
+    if (fm.runRace && fm.runRace.distance && fm.runRace.time) fmParts.push(`${fm.runRace.distance} in ${fm.runRace.time}`);
+    if (fm.restingHr) fmParts.push('RHR ' + fm.restingHr);
+    if (fm.maxHr) fmParts.push('Max HR ' + fm.maxHr);
+    if (fm.ftp) fmParts.push('FTP ' + fm.ftp);
+    if (fm.css) fmParts.push('CSS ' + fm.css);
+
+    const discLabels = { run: 'Run', bike: 'Bike', trainer: 'Trainer', swim: 'Swim', strength: 'Strength' };
+    const discSummary = (Array.isArray(disc) && disc.length)
+      ? disc.map(d => discLabels[d] || d).join(', ')
+      : 'Not set';
+
+    const NOT_SET = '<span style="color:var(--text-soft); font-weight:500;">Not set — tap to add</span>';
+    const rows = [
+      { label: 'Name', value: name ? esc(name.charAt(0).toUpperCase() + name.slice(1)) : NOT_SET, step: 1 },
+      { label: 'Current fitness & background', value: bgParts.length ? esc(bgParts.join(' · ')) : NOT_SET, step: 2 },
+      { label: 'Weekly training hours', value: (Number.isFinite(hoursRaw) && hoursRaw > 0) ? `${hoursRaw} hrs / week` : NOT_SET, step: 4 },
+      { label: 'Training days', value: (Array.isArray(days) && days.length) ? esc(days.join(', ')) : NOT_SET, step: 4 },
+      { label: 'Disciplines you can train', value: esc(discSummary), step: 4 },
+      { label: 'Fitness markers', value: fmParts.length ? esc(fmParts.join(' · ')) : NOT_SET, step: 5 },
+    ];
+
+    slot.innerHTML = rows.map((r, i) => `
+      <button onclick="showScreen('onboard'); onbStep(${r.step});"
+        style="width:100%; text-align:left; background:none; border:0; font-family:inherit; cursor:pointer;
+               display:flex; align-items:center; justify-content:space-between; gap:12px;
+               padding:11px 0; ${i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+        <div style="min-width:0;">
+          <div style="font-size:11px; color:var(--primary); font-weight:700; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:3px;">${r.label}</div>
+          <div style="font-size:14px; font-weight:600; color:var(--text); line-height:1.35;">${r.value}</div>
+        </div>
+        <span style="flex-shrink:0; color:var(--primary); font-weight:600; font-size:13px;">Edit ›</span>
+      </button>`).join('');
   }
 
   function saveScheduleModal() {
@@ -13083,6 +13231,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'tri-limiter',
     'tri-strategy',
     'available-disciplines',
+    'user-profile',
   ];
 
   function _clearUserScopedLocal() {
