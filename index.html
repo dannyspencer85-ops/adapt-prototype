@@ -1796,7 +1796,7 @@
           <div id="hoursVolumeFloor" style="display:block; margin-top:8px; font-size:11.5px; color:var(--text-soft); line-height:1.5;"></div>
         </div>
         <div class="field">
-          <label>Which days work?</label>
+          <label>Which days usually work?</label>
           <div class="chip-row" id="daysChips">
             <button class="chip" onclick="toggleChip(this)">Mon</button>
             <button class="chip" onclick="toggleChip(this)">Tue</button>
@@ -1806,6 +1806,15 @@
             <button class="chip" onclick="toggleChip(this)">Sat</button>
             <button class="chip" onclick="toggleChip(this)">Sun</button>
           </div>
+        </div>
+        <div class="field">
+          <label>Do you have a consistent schedule?</label>
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Same training days most weeks, or does it change week to week?</div>
+          <div class="chip-row" id="scheduleModeChips">
+            <button type="button" class="chip active" data-mode="consistent" onclick="pickScheduleMode(this)">Yes — same most weeks</button>
+            <button type="button" class="chip" data-mode="variable" onclick="pickScheduleMode(this)">No — it changes</button>
+          </div>
+          <div id="scheduleModeHint" style="display:none; margin-top:8px; padding:11px 13px; border-radius:12px; font-size:12.5px; line-height:1.5; background:var(--secondary-soft); color:#7a5a18;">No problem — we'll treat the days above as your typical week. When a week is different, tap any day on the calendar to set that day's exact time and which disciplines work.</div>
         </div>
         <div class="field">
           <label>Disciplines accessible</label>
@@ -3078,6 +3087,49 @@
     </div>
   </div>
 
+  <!-- PER-DAY AVAILABILITY MODAL — set one specific date's time + disciplines,
+       separate from the recurring weekly schedule. For irregular weeks. -->
+  <div class="modal-bg" id="dayAvailModal">
+    <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <h2 style="font-size: 20px; margin: 0;">This day's availability</h2>
+        <button onclick="closeDayAvailModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div class="sub" id="dayAvailWhen">A one-off change just for this date.</div>
+
+      <div class="detail-label" style="margin-top:16px; margin-bottom:8px;">How much time do you have?</div>
+      <div class="chip-row" id="dayAvailTime">
+        <button type="button" class="chip" data-min="0" onclick="pickDayAvailTime(this)">Not available</button>
+        <button type="button" class="chip" data-min="30" onclick="pickDayAvailTime(this)">30 min</button>
+        <button type="button" class="chip" data-min="45" onclick="pickDayAvailTime(this)">45 min</button>
+        <button type="button" class="chip" data-min="60" onclick="pickDayAvailTime(this)">1h</button>
+        <button type="button" class="chip" data-min="90" onclick="pickDayAvailTime(this)">1h 30m</button>
+        <button type="button" class="chip" data-min="120" onclick="pickDayAvailTime(this)">2h</button>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+        <span style="font-size:12px; color:var(--text-soft);">Custom:</span>
+        <input type="number" id="dayAvailCustom" min="0" max="360" oninput="onDayAvailCustom()" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px;">
+        <span style="font-size:12px; color:var(--text-soft);">min</span>
+      </div>
+
+      <div id="dayAvailDiscWrap">
+        <div class="detail-label" style="margin-top:16px; margin-bottom:8px;">Which disciplines work this day?</div>
+        <div class="chip-row" id="dayAvailDiscs">
+          <button type="button" class="chip active" data-disc="run" onclick="toggleDayAvailDisc(this)">🏃 Run</button>
+          <button type="button" class="chip active" data-disc="bike" onclick="toggleDayAvailDisc(this)">🚴 Bike</button>
+          <button type="button" class="chip active" data-disc="swim" onclick="toggleDayAvailDisc(this)">🏊 Swim</button>
+          <button type="button" class="chip active" data-disc="strength" onclick="toggleDayAvailDisc(this)">🏋️ Strength</button>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 18px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeDayAvailModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveDayAvail()">Save this day</button>
+      </div>
+      <button id="dayAvailClearBtn" onclick="resetDayAvail()" style="display:none; width:100%; margin-top:10px; background:none; border:0; color:var(--text-soft); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">Remove this override</button>
+    </div>
+  </div>
+
   <!-- SETTINGS MODAL (accessed via gear icon on every screen) -->
   <div class="modal-bg" id="settingsModal">
     <div class="modal" style="max-height: 90vh; overflow-y: auto;">
@@ -3333,6 +3385,10 @@
              training days so a user with no watch/Strava can enter their HR,
              duration, distance + RPE for the session they just did. -->
         <div id="sdLogAction"></div>
+        <!-- Per-day availability action — set this specific date's time +
+             disciplines (irregular-week override). Populated for editable
+             weeks (this week + next 2). -->
+        <div id="sdAvailAction"></div>
         <div style="display:flex; gap:8px; margin-top: 16px;">
           <button class="btn btn-ghost" style="flex:1;" onclick="closeSessionModal()">Close</button>
           <button class="btn btn-primary" style="flex:1;" onclick="startEditSession()">Edit</button>
@@ -3834,6 +3890,12 @@
       const cmWrap = document.getElementById('complexityChips');
       if (cmWrap) [...cmWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.mode === cm));
     }
+    // Schedule consistency mode + its hint.
+    const sm = getScheduleMode();
+    const smWrap = document.getElementById('scheduleModeChips');
+    if (smWrap) [...smWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.mode === sm));
+    const smHint = document.getElementById('scheduleModeHint');
+    if (smHint) smHint.style.display = sm === 'variable' ? 'block' : 'none';
   }
   // Restore the step-2 chips when a returning user re-enters this step from
   // the You tab "Edit" links, so they see their saved answers, not defaults.
@@ -4346,6 +4408,10 @@
     localStorage.setItem('race-date', eventDate);
     localStorage.setItem('hours-per-week', hours);
     localStorage.setItem('training-days', JSON.stringify(activeDays));
+    // Schedule consistency — drives whether per-day calendar overrides are
+    // surfaced as the primary way to manage an irregular week.
+    const scheduleMode = document.querySelector('#scheduleModeChips .chip.active')?.dataset.mode || 'consistent';
+    localStorage.setItem('schedule-mode', scheduleMode);
     planState.raceEvent = event;
     planState.raceDate = eventDate;
 
@@ -4898,6 +4964,14 @@
     [...el.parentElement.children].forEach(c => c.classList.remove('active'));
     el.classList.add('active');
   }
+  // Onboarding step-4 schedule-consistency picker. Toggles the "you can set
+  // days on the calendar" hint when the user says their schedule varies.
+  function pickScheduleMode(el) {
+    [...el.parentElement.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    const hint = document.getElementById('scheduleModeHint');
+    if (hint) hint.style.display = el.dataset.mode === 'variable' ? 'block' : 'none';
+  }
   // Same as singleChip but used by the course-detail chips that carry data-val
   function singleChipVal(el) {
     [...el.parentElement.children].forEach(c => c.classList.remove('active'));
@@ -4946,6 +5020,60 @@
   function setSchedulePrefs(prefs) {
     localStorage.setItem('schedule-prefs', JSON.stringify(prefs));
     saveUserData();
+  }
+  // ── Schedule mode + per-day availability overrides ──
+  // 'consistent' = same training days week to week (recurring schedule).
+  // 'variable'   = schedule changes; the athlete sets availability per-day
+  //                on the calendar. Set during onboarding ("Do you have a
+  //                consistent schedule?") and editable later.
+  function getScheduleMode() {
+    const m = localStorage.getItem('schedule-mode');
+    return m === 'variable' ? 'variable' : 'consistent';
+  }
+  function setScheduleMode(mode) {
+    localStorage.setItem('schedule-mode', mode === 'variable' ? 'variable' : 'consistent');
+    saveUserData();
+  }
+  // Per-DATE overrides (keyed 'YYYY-MM-DD'): { availableMin, disciplines }.
+  // availableMin === 0 means "not available that day" (forced rest).
+  function getDayOverrides() {
+    try { return JSON.parse(localStorage.getItem('day-overrides') || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function getDayOverride(dateStr) {
+    if (!dateStr) return null;
+    const all = getDayOverrides();
+    return all[dateStr] || null;
+  }
+  function setDayOverride(dateStr, override) {
+    if (!dateStr) return;
+    const all = getDayOverrides();
+    all[dateStr] = override;
+    localStorage.setItem('day-overrides', JSON.stringify(all));
+    saveUserData();
+  }
+  function clearDayOverride(dateStr) {
+    if (!dateStr) return;
+    const all = getDayOverrides();
+    if (all[dateStr]) { delete all[dateStr]; localStorage.setItem('day-overrides', JSON.stringify(all)); saveUserData(); }
+  }
+  // The absolute date (YYYY-MM-DD) for a weekday + week offset, where offset
+  // 0 = the current Mon-anchored week. Mirrors the date math in
+  // openSessionModal so overrides key off the same calendar dates.
+  function _dateForDayOffset(day, weekOffset) {
+    try {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const backToMon = (today.getDay() + 6) % 7;
+      const mon = new Date(today); mon.setDate(today.getDate() - backToMon);
+      const idx = DAYS.indexOf(day);
+      if (idx < 0) return null;
+      const target = new Date(mon);
+      target.setDate(mon.getDate() + (Number(weekOffset) || 0) * 7 + idx);
+      const yyyy = target.getFullYear();
+      const mm = String(target.getMonth() + 1).padStart(2, '0');
+      const dd = String(target.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) { return null; }
   }
   // Render the schedule editor grid into #scheduleGrid
   function renderScheduleGrid() {
@@ -9839,6 +9967,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">No watch or Strava? Enter your heart rate and session data by hand.</div>`;
       }
     }
+    // Per-day availability — editable for this week + next 2 (the tool range).
+    // Lets irregular-schedule athletes set a specific date's time + disciplines.
+    const availSlot = document.getElementById('sdAvailAction');
+    if (availSlot) {
+      availSlot.innerHTML = '';
+      if (weekOffset >= 0 && weekOffset <= 2) {
+        const dateStr = _dateForDayOffset(day, weekOffset);
+        const hasOverride = dateStr && !!getDayOverride(dateStr);
+        availSlot.innerHTML = `<button onclick="openDayAvail('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--bg-soft); color:var(--text); border:1px solid var(--border); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">📅 ${hasOverride ? "Edit this day's availability" : "Set my availability this day"}</button>
+        <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Week different than usual? Set the time + disciplines you actually have ${day}.</div>`;
+      }
+    }
     document.getElementById('sdView').style.display = 'block';
     document.getElementById('sdEdit').style.display = 'none';
     document.getElementById('sessionModal').classList.add('show');
@@ -9893,6 +10033,157 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function closeSessionModal() {
     document.getElementById('sessionModal').classList.remove('show');
     currentEditDay = null;
+  }
+
+  // ── PER-DAY AVAILABILITY OVERRIDE ──
+  // Context for the day-availability modal: which day + week is being edited.
+  let _dayAvailCtx = null;
+  function openDayAvail(day, weekOffset) {
+    weekOffset = Number(weekOffset) || 0;
+    _dayAvailCtx = { day, weekOffset };
+    const dateStr = _dateForDayOffset(day, weekOffset);
+    const existing = dateStr ? getDayOverride(dateStr) : null;
+    // Seed from an existing override, else from the current session shape.
+    const slot = _weekSessionsForOffset(weekOffset);
+    const s = (slot && slot[day]) || null;
+    let mins = existing ? (existing.availableMin || 0)
+             : (s && s.type !== 'rest' ? (s.duration || 0) : 0);
+    let discs = existing && Array.isArray(existing.disciplines) ? existing.disciplines.slice()
+             : (() => {
+                 // Default to the user's recurring availability for this weekday.
+                 try {
+                   const prefs = getSchedulePrefs();
+                   const p = prefs[day];
+                   if (p && Array.isArray(p.disciplines) && p.disciplines.length) return p.disciplines.slice();
+                 } catch (e) {}
+                 return ['run', 'bike', 'swim', 'strength'];
+               })();
+    // When label.
+    const whenEl = document.getElementById('dayAvailWhen');
+    if (whenEl) {
+      const lbl = weekOffset === 0 ? 'this week' : weekOffset === 1 ? 'next week' : 'in 2 weeks';
+      whenEl.textContent = `${DAY_FULL[day] || day} · ${lbl} — a one-off change just for this date.`;
+    }
+    // Time chips.
+    const timeWrap = document.getElementById('dayAvailTime');
+    let matchedChip = false;
+    if (timeWrap) [...timeWrap.children].forEach(ch => {
+      const on = parseInt(ch.dataset.min, 10) === mins;
+      ch.classList.toggle('active', on);
+      if (on) matchedChip = true;
+    });
+    const customEl = document.getElementById('dayAvailCustom');
+    if (customEl) customEl.value = (!matchedChip && mins > 0) ? mins : '';
+    // Discipline chips.
+    const discWrap = document.getElementById('dayAvailDiscs');
+    if (discWrap) [...discWrap.children].forEach(ch => ch.classList.toggle('active', discs.includes(ch.dataset.disc)));
+    _syncDayAvailDiscVisibility(mins);
+    // Show "remove override" only if one exists.
+    const clearBtn = document.getElementById('dayAvailClearBtn');
+    if (clearBtn) clearBtn.style.display = existing ? 'block' : 'none';
+    closeSessionModal();
+    document.getElementById('dayAvailModal').classList.add('show');
+  }
+  function closeDayAvailModal() {
+    document.getElementById('dayAvailModal').classList.remove('show');
+    _dayAvailCtx = null;
+  }
+  function _syncDayAvailDiscVisibility(mins) {
+    // Hide the discipline picker when "Not available" (0 min) is selected.
+    const wrap = document.getElementById('dayAvailDiscWrap');
+    if (wrap) wrap.style.display = (mins > 0) ? 'block' : 'none';
+  }
+  function _dayAvailSelectedMins() {
+    const active = document.querySelector('#dayAvailTime .chip.active');
+    if (active) return parseInt(active.dataset.min, 10) || 0;
+    const custom = parseInt(document.getElementById('dayAvailCustom')?.value || '', 10);
+    if (Number.isFinite(custom) && custom > 0) return Math.min(360, custom);
+    return 0;
+  }
+  function pickDayAvailTime(el) {
+    [...el.parentElement.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    const customEl = document.getElementById('dayAvailCustom');
+    if (customEl) customEl.value = '';
+    _syncDayAvailDiscVisibility(parseInt(el.dataset.min, 10) || 0);
+  }
+  function onDayAvailCustom() {
+    // Typing a custom value clears the chip selection.
+    document.querySelectorAll('#dayAvailTime .chip').forEach(c => c.classList.remove('active'));
+    _syncDayAvailDiscVisibility(parseInt(document.getElementById('dayAvailCustom')?.value || '0', 10) || 0);
+  }
+  function toggleDayAvailDisc(el) {
+    el.classList.toggle('active');
+  }
+  function _dayAvailSelectedDiscs() {
+    return [...document.querySelectorAll('#dayAvailDiscs .chip.active')].map(c => c.dataset.disc);
+  }
+  function saveDayAvail() {
+    if (!_dayAvailCtx) { closeDayAvailModal(); return; }
+    const { day, weekOffset } = _dayAvailCtx;
+    const mins = _dayAvailSelectedMins();
+    const discs = mins > 0 ? _dayAvailSelectedDiscs() : [];
+    if (mins > 0 && discs.length === 0) {
+      alert('Pick at least one discipline you can do this day (or choose "Not available").');
+      return;
+    }
+    _applyDayAvailability(day, weekOffset, mins, discs);
+    closeDayAvailModal();
+  }
+  function resetDayAvail() {
+    if (!_dayAvailCtx) { closeDayAvailModal(); return; }
+    const { day, weekOffset } = _dayAvailCtx;
+    const dateStr = _dateForDayOffset(day, weekOffset);
+    if (dateStr) clearDayOverride(dateStr);
+    closeDayAvailModal();
+    if (typeof renderAll === 'function') renderAll();
+  }
+  // Reshape a single day's session to fit the chosen time + disciplines, and
+  // persist the override by date. availableMin 0 = mark the day off (rest).
+  function _applyDayAvailability(day, weekOffset, availableMin, disciplines) {
+    const slot = _resolveWeekSessions(weekOffset);
+    if (!slot) return false;
+    const s = slot.sessions[day];
+    if (!s) return false;
+    lastSnapshot = JSON.parse(JSON.stringify(planState));
+    if (!availableMin || availableMin <= 0) {
+      slot.sessions[day] = { name: 'Rest day', meta: 'Unavailable — you marked this day off', duration: 0, type: 'rest' };
+    } else {
+      const allowed = Array.isArray(disciplines) ? disciplines : [];
+      const curType = s.type;
+      // Is the current session's discipline still allowed? Quality/brick map
+      // onto run/bike for this check.
+      const curDiscOk = allowed.length > 0 && (
+        allowed.includes(curType) ||
+        (curType === 'quality' && allowed.includes('run')) ||
+        (curType === 'brick' && (allowed.includes('bike') || allowed.includes('run')))
+      );
+      if (curType !== 'rest' && curDiscOk) {
+        // Keep the session's shape, just cap its time to what's available.
+        const newMeta = /\d+\s*min/.test(s.meta || '')
+          ? s.meta.replace(/\d+\s*min/, `${availableMin} min`)
+          : `${availableMin} min · ${s.meta || (s.intensity || 'Zone 2')}`;
+        slot.sessions[day] = { ...s, duration: availableMin, meta: newMeta };
+      } else {
+        // Build a fresh easy session in an allowed discipline (priority order).
+        const pick = ['run', 'bike', 'swim', 'strength'].find(x => allowed.includes(x)) || 'mobility';
+        let name, meta, type = pick;
+        if (pick === 'strength') { name = 'Strength session'; meta = `${availableMin} min · full-body, controlled tempo`; }
+        else if (pick === 'mobility') { name = 'Mobility + core'; meta = `${availableMin} min · easy`; type = 'mobility'; }
+        else {
+          const verb = pick === 'run' ? 'run' : pick === 'bike' ? 'ride' : 'swim';
+          name = `Easy ${verb}`; meta = `${availableMin} min · Zone 2`;
+        }
+        slot.sessions[day] = { name, meta, duration: availableMin, type, intensity: type === 'strength' ? 'mixed' : 'Z2' };
+      }
+    }
+    if (slot.isCurrent) _mirrorCurrentWeekToFullPlan(day);
+    const dateStr = _dateForDayOffset(day, weekOffset);
+    if (dateStr) setDayOverride(dateStr, { availableMin: availableMin || 0, disciplines: disciplines || [] });
+    setChange(`Set ${DAY_FULL[day] || day} availability: ${availableMin > 0 ? availableMin + ' min' : 'off'}.`);
+    saveUserData();
+    if (typeof renderAll === 'function') renderAll();
+    return true;
   }
 
   let currentEditDay = null;
@@ -13370,6 +13661,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'tri-strategy',
     'available-disciplines',
     'user-profile',
+    'schedule-prefs',
+    'schedule-mode',
+    'day-overrides',
   ];
 
   function _clearUserScopedLocal() {
