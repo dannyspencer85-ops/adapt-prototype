@@ -14,12 +14,17 @@
 export const config = { runtime: 'edge' };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
-const PLAN_MODEL = 'mistral-large-latest'; // quality > speed for plan generation
+// Cost-effective tier: Medium (not Large) for plan generation. The output is
+// structured JSON guided by a very detailed prompt and then run through
+// validatePlan (which coerces caps, distribution, run-dominance, etc.), so we
+// don't need Large's extra reasoning — Medium is ~3-5× cheaper for
+// comparable plan quality, and the free rule engine is the ultimate fallback.
+const PLAN_MODEL = 'mistral-medium-latest';
 const MAX_TOKENS = 4500;                    // 6 weeks of detail fits in ~3000-4000 tokens
 const REQUEST_TIMEOUT_MS = 45000;
 
-// Plan generation is the most expensive call in this app (~$0.025-0.04 per
-// invocation with Mistral Large). Cap per-IP attempts hard. The map is
+// Plan generation is the most expensive call in this app (~$0.006-0.012 per
+// invocation with Mistral Medium). Cap per-IP attempts hard. The map is
 // in-memory and Edge functions are stateless across instances/cold starts —
 // this is best-effort, NOT a real spend ceiling. The real backstop is the
 // monthly budget set in console.mistral.ai/billing.

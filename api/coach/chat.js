@@ -10,8 +10,11 @@ export const config = {
 };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
+// Cost-effective tiers: Small for plain Q&A chat, Medium (not Large) when the
+// turn may call plan-modification tools — Medium handles function-calling
+// reliably at a fraction of Large's cost.
 const DEFAULT_MODEL = 'mistral-small-latest';
-const TOOL_MODEL = 'mistral-large-latest';
+const TOOL_MODEL = 'mistral-medium-latest';
 // Bumped from 800 to 1500: the new acknowledge-impact-cascade-warning
 // 4-part response pattern + multi-tool calls in one turn need more headroom.
 const MAX_OUTPUT_TOKENS = 1500;
@@ -22,7 +25,7 @@ const MAX_OUTPUT_TOKENS = 1500;
 // Also enforces a per-instance global cap as a runaway-loop guard.
 const _rate = new Map(); // key: ip|date, value: count
 const _globalRate = new Map(); // key: date, value: count
-const DAILY_CAP = 200;
+const DAILY_CAP = 50;          // matches the in-app "50 messages/day" promise + bounds per-user cost
 const GLOBAL_DAILY_CAP = 1500; // hard ceiling per-instance to prevent runaway costs
 
 function rateLimitOk(ip) {
