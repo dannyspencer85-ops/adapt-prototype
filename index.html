@@ -3116,7 +3116,7 @@
 
       <div style="display: flex; gap: 8px; margin-top: 18px;">
         <button class="btn btn-ghost" style="flex:1;" onclick="closeScheduleModal()">Cancel</button>
-        <button class="btn btn-primary" style="flex:1;" onclick="saveScheduleModal()">Save</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="saveScheduleModal()">Save &amp; recalculate plan</button>
       </div>
     </div>
   </div>
@@ -5048,10 +5048,29 @@
     { id: 'swim', label: 'Swim', icon: '🏊' },
     { id: 'strength', label: 'Strength', icon: '🏋️' },
   ];
+  // Default schedule = the user's ACTUAL onboarding selections, derived from
+  // 'training-days' + 'available-disciplines'. Previously this returned
+  // all-7-days / any-discipline, so the You-tab schedule card never reflected
+  // what the user picked. Days not in training-days are off; available days
+  // carry the selected disciplines (trainer maps onto bike). Falls back to
+  // all-available only when no selections exist yet (pre-onboarding).
   function defaultSchedulePrefs() {
+    let days = [];
+    try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
+    let disc = [];
+    try { disc = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
+    const mapped = new Set();
+    (Array.isArray(disc) ? disc : []).forEach(d => {
+      if (d === 'trainer') mapped.add('bike');
+      else if (['run', 'bike', 'swim', 'strength'].includes(d)) mapped.add(d);
+    });
+    const discList = mapped.size ? [...mapped] : SCHEDULE_DISCIPLINES.map(x => x.id);
+    const haveDays = Array.isArray(days) && days.length > 0;
+    const daySet = new Set(days);
     const out = {};
     DAYS.forEach(d => {
-      out[d] = { available: true, disciplines: SCHEDULE_DISCIPLINES.map(x => x.id) };
+      const available = haveDays ? daySet.has(d) : true;
+      out[d] = { available, disciplines: discList.slice() };
     });
     return out;
   }
@@ -5315,13 +5334,20 @@
   function saveScheduleModal() {
     if (_scheduleModalDraft) {
       setSchedulePrefs(_scheduleModalDraft);
-      // Update legacy training-days list so plan-generation logic stays in sync
+      // Keep the plan-engine inputs in sync so the schedule actually drives
+      // the plan: training-days = the available days; available-disciplines =
+      // the union of disciplines enabled across those days.
       const availableDayNames = DAYS.filter(d => _scheduleModalDraft[d].available);
       localStorage.setItem('training-days', JSON.stringify(availableDayNames));
+      const discUnion = new Set();
+      availableDayNames.forEach(d => (_scheduleModalDraft[d].disciplines || []).forEach(x => discUnion.add(x)));
+      if (discUnion.size > 0) localStorage.setItem('available-disciplines', JSON.stringify([...discUnion]));
     }
     closeScheduleModal();
+    // Recalculate the plan against the new schedule (auto-save → auto-recalc).
     if (typeof generatePlanFromInputs === 'function') generatePlanFromInputs();
     renderAll();
+    if (typeof setChange === 'function') setChange('Schedule updated — plan recalculated to match your days + disciplines.');
     if (typeof trackEvent === 'function') trackEvent('schedule_updated');
   }
 
