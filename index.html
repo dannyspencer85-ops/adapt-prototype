@@ -2769,8 +2769,17 @@
 
       <!-- Integrations + Suggest-an-integration card removed by request. -->
 
-      <!-- STRAVA CONNECTION — full UI restored. -->
-      <div class="card">
+      <!-- DEVICE SYNC — paused. Strava is dormant; Apple Health is next.
+           Re-enable Strava by flipping STRAVA_ENABLED back to true. -->
+      <div class="card" id="healthSyncCard">
+        <div class="card-title">Device &amp; health sync</div>
+        <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px;">
+          Automatic sync is paused while we build <strong>Apple Health</strong> integration. For now, log your workouts by hand on the Log tab — heart rate, time, distance, and effort all feed your plan.
+        </div>
+      </div>
+
+      <!-- STRAVA CONNECTION — hidden while paused (STRAVA_ENABLED=false). -->
+      <div class="card" id="stravaCard" style="display:none;">
         <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>Strava</span>
           <span id="stravaStatusPill" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg); color:var(--text-soft);">Not connected</span>
@@ -9231,7 +9240,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       bodyColor = pulse.valueColor;
       bodyClick = `showScreen('data')`;
     } else if ((planState.stravaActivities || []).length < 4) {
-      bodyLine = 'Sync more workouts to see fitness trends';
+      bodyLine = STRAVA_ENABLED ? 'Sync more workouts to see fitness trends' : 'Log a few sessions to see fitness trends';
       bodyColor = 'var(--text-soft)';
       bodyClick = `showScreen('data')`;
     } else {
@@ -14234,9 +14243,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // STRAVA INTEGRATION — credentials live in localStorage only, never in source
+  // STRAVA INTEGRATION — PAUSED. Set STRAVA_ENABLED=true to revive. While
+  // false: no connect UI, no OAuth, no background sync, Pulse shows an
+  // "Apple Health coming soon" placeholder. The plumbing below stays defined
+  // (dormant) so it's a one-flag flip — or a clean template for Apple Health.
+  // credentials live in localStorage only, never in source
   // ──────────────────────────────────────────────────────────────────────
+  const STRAVA_ENABLED = false;
   function getStravaConfig() {
+    if (!STRAVA_ENABLED) return null;
     try { return JSON.parse(localStorage.getItem('strava-config') || 'null'); }
     catch (e) { return null; }
   }
@@ -14516,6 +14531,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   // Called on app boot — if URL has ?code= we just came back from Strava
   function checkStravaOAuthCallback() {
+    if (!STRAVA_ENABLED) return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const grantedScope = params.get('scope') || '';
@@ -15668,10 +15684,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return { buckets, bucketSize, bucketLabel };
   }
   function renderPerformanceTab() {
-    // Toggle the top-of-tab connect-Strava banner.
+    // Toggle the top-of-tab connect-Strava banner. Hidden while Strava is
+    // paused — Pulse fills from manually-logged sessions instead.
     const connectBanner = document.getElementById('pulseConnectBanner');
     if (connectBanner) {
-      connectBanner.style.display = (typeof getStravaConfig === 'function' && getStravaConfig()) ? 'none' : 'block';
+      connectBanner.style.display = (STRAVA_ENABLED && !(typeof getStravaConfig === 'function' && getStravaConfig())) ? 'block' : 'none';
     }
     // Sync the range chips with the saved selection
     const savedRange = getPerfRange();
@@ -15698,7 +15715,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     if (acts.length === 0) {
       const stravaConnected = !!getStravaConfig();
-      const cta = stravaConnected
+      const cta = !STRAVA_ENABLED
+        ? 'Log your workouts on the <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">Log tab</a> and your trends fill in here. Apple Health sync is coming soon.'
+        : stravaConnected
         ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
       [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
@@ -15833,7 +15852,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const stravaConnected = !!getStravaConfig();
 
     if (acts.length === 0) {
-      const cta = stravaConnected
+      const cta = !STRAVA_ENABLED
+        ? 'Log your workouts on the <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">Log tab</a> to build your history. Apple Health sync is coming soon.'
+        : stravaConnected
         ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your real numbers here.';
       sumCard.innerHTML = `<div class="card-title">7-day summary</div>
