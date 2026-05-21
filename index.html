@@ -1606,10 +1606,7 @@
         <h1>Your goal.</h1>
         <p class="sub">Pick an event or just say "get fitter." We'll show you an honest timeline either way.</p>
         <div class="field">
-          <label style="display:flex; justify-content:space-between; align-items:center;">
-            <span>What are you training for?</span>
-            <button type="button" onclick="openRaceHelper()" style="background:var(--primary-soft); border:0; color:var(--primary-dark); font-weight:700; font-size:12px; padding:4px 10px; border-radius:100px; cursor:pointer; font-family:inherit;">Not sure? Ask the race helper</button>
-          </label>
+          <label>What distance are you training for?</label>
           <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent();">
             <option>Half Ironman</option>
             <option>Full Ironman</option>
@@ -3267,11 +3264,6 @@
       <div class="sub">Tell us about your course. We'll adjust your training to match.</div>
 
       <div class="field" style="margin-top: 14px;">
-        <label>Pick from popular races</label>
-        <select id="cieRaceSelect" onchange="onCieRacePick()"></select>
-      </div>
-
-      <div class="field">
         <label>Terrain</label>
         <div class="chip-row" id="cieTerrainChips">
           <button type="button" class="chip" data-val="flat" onclick="singleChipVal(this)">Flat</button>
@@ -4043,7 +4035,7 @@
       tagline: '70.3 · 14 weeks out · 5 hrs/wk · veteran of two IMs',
       firstName: 'Danny', age: 40, weight: 175, sex: 'Male',
       hours: 5, days: ['Wed','Sat','Sun'],
-      event: 'Half Ironman', raceId: 'im703-boulder', weeksToRace: 14,
+      event: 'Half Ironman', raceId: null, weeksToRace: 14,
       location: 'Boulder, CO',
       profile: { exp: 'veteran', freq: 'high', injury: 'none', sleep: '7to8' },
       complexity: 'detailed',
@@ -4057,7 +4049,7 @@
       tagline: 'IM · 24 weeks out · 7 hrs/wk · last did one 5 yrs ago',
       firstName: 'Sam', age: 45, weight: 180, sex: 'Male',
       hours: 7, days: ['Tue','Wed','Fri','Sat','Sun'],
-      event: 'Full Ironman', raceId: 'im-coeur-dalene', weeksToRace: 24,
+      event: 'Full Ironman', raceId: null, weeksToRace: 24,
       location: 'Coeur d\'Alene, ID',
       profile: { exp: 'some', freq: 'mid', injury: 'none', sleep: '6to7' },
       complexity: 'detailed',
@@ -11797,10 +11789,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return;
     }
     const emphasis = deriveCourseEmphasis(intel);
-    const race = intel.raceId ? getRaceById(intel.raceId) : null;
-    const sourceLabel = intel.source === 'curated' && race
-      ? `From ${escapeHtml(race.name)}`
-      : 'Your details';
+    const sourceLabel = 'Your details';
     const attrs = [
       { label: 'Terrain', val: intel.terrain },
       { label: 'Surface', val: intel.surface },
@@ -11842,15 +11831,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Course intel editor modal — lets users update course details after onboarding
   function openCourseIntelEditor() {
     const intel = planState.courseIntel || { terrain:'rolling', surface:'road', swim:'none', climate:'temperate', altitude:'sea', notes:'', raceId:null, source:'manual' };
-    const eventName = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
-    const matches = filterRacesByEvent(eventName);
     const modal = document.getElementById('courseIntelModal');
     if (!modal) return;
-    const sel = document.getElementById('cieRaceSelect');
-    if (sel) {
-      sel.innerHTML = '<option value="">— Manual entry —</option>' +
-        matches.map(r => `<option value="${r.id}" ${r.id === intel.raceId ? 'selected' : ''}>${r.name} · ${r.location}</option>`).join('');
-    }
     setActiveChipVal('cieTerrainChips', intel.terrain);
     setActiveChipVal('cieSurfaceChips', intel.surface);
     setActiveChipVal('cieSwimChips', intel.swim);
@@ -11864,36 +11846,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const modal = document.getElementById('courseIntelModal');
     if (modal) modal.classList.remove('show');
   }
-  function onCieRacePick() {
-    const id = document.getElementById('cieRaceSelect')?.value || '';
-    const race = getRaceById(id);
-    if (!race) return;
-    setActiveChipVal('cieTerrainChips', race.terrain);
-    setActiveChipVal('cieSurfaceChips', race.surface);
-    setActiveChipVal('cieSwimChips', race.swim);
-    setActiveChipVal('cieClimateChips', race.climate);
-    setActiveChipVal('cieAltitudeChips', race.altitude);
-    const n = document.getElementById('cieNotes');
-    if (n && !n.value.trim()) n.value = race.notes || '';
-  }
   function saveCourseIntelEdit() {
-    const raceId = document.getElementById('cieRaceSelect')?.value || '';
     const intel = {
-      raceId: raceId || null,
+      raceId: null,
       terrain: getActiveChipVal('cieTerrainChips') || 'rolling',
       surface: getActiveChipVal('cieSurfaceChips') || 'road',
       swim: getActiveChipVal('cieSwimChips') || 'none',
       climate: getActiveChipVal('cieClimateChips') || 'temperate',
       altitude: getActiveChipVal('cieAltitudeChips') || 'sea',
       notes: document.getElementById('cieNotes')?.value.trim() || '',
-      source: raceId ? 'curated' : 'manual'
+      source: 'manual'
     };
     planState.courseIntel = intel;
     localStorage.setItem('course-intel', JSON.stringify(intel));
     saveUserData();
     closeCourseIntelEditor();
     renderAll();
-    if (typeof trackEvent === 'function') trackEvent('course_intel_updated', { source: intel.source, raceId: intel.raceId });
+    if (typeof trackEvent === 'function') trackEvent('course_intel_updated', { source: intel.source });
   }
 
   function renderTodayGreetingAndRace() {
