@@ -219,7 +219,6 @@ function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, cours
   const isRun = isMarathon || isHalfMar || isShortRun;
   const isBike = /Gravel|Road/i.test(event);
   const isGravel = /Gravel/i.test(event);
-  const isGeneral = /General fitness/i.test(event);
   const limiter = (triFocus && triFocus.limiter) || 'balanced';
   const strategy = (triFocus && triFocus.strategy) || 'balanced';
 
@@ -379,15 +378,6 @@ ${isGravel
 • Taper: 1-2 weeks, volume drops ~40-60%, keep a little intensity (short threshold openers) so legs stay sharp. ${/200\s*mi/i.test(event) ? 'For the 200-mile ultra, the long ride is about TIME ON BIKE and fueling tolerance, not intensity — prioritize back-to-back weekend volume blocks over hard intervals.' : ''}
 
 Pace/intensity anchor: FTP-based % power (and HR zones if no power meter). Use the athlete's FTP if provided.`;
-  } else if (isGeneral) {
-    disciplineNote = `General fitness — no race target. Goal is consistency + variety + injury-free year-round training.
-
-Weekly structure:
-• Mix run + bike (or trainer) + ${hasStrength ? 'strength' : 'mobility'} on rotating days.
-• 80/20 polarized still applies — most sessions easy, ~20% time at quality.
-• No taper. No peaks. Build a 4-week microcycle (3 build + 1 deload at -25%) and repeat.
-• Allow holiday/vacation flexibility — the goal is showing up consistently, not hitting peaks.
-• Each session has clear intent (aerobic / quality / strength / recovery), not "go run for 45 min".`;
   } else {
     disciplineNote = `Event: ${event}. Apply standard endurance principles: long-effort keystone, 1-2 quality sessions per week, easy aerobic volume, deload every 3-4 weeks.`;
   }
