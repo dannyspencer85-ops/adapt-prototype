@@ -274,7 +274,12 @@ Pace anchor: T-pace (threshold) is the most important number for HM athletes.`;
   } else if (isShortRun) {
     const expLevel = profile && profile.exp;
     const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
-    const isBeginner = expLevel === 'new' || runAbility === 'walk-run' || runAbility === 'under-15';
+    const is5K = /\b5K\b/i.test(event);
+    const hasRunRaceMarker = !!(fitnessMarkers && fitnessMarkers.runRace && fitnessMarkers.runRace.distance && fitnessMarkers.runRace.time);
+    const hasRunFitness = runAbility === '30-60' || runAbility === '60-plus' || hasRunRaceMarker;
+    // A 5K assumes couch-to-5K (start easy) unless the athlete has shown real
+    // run fitness — prevents prescribing a long continuous run as session 1.
+    const isBeginner = expLevel === 'new' || runAbility === 'walk-run' || runAbility === 'under-15' || (is5K && !hasRunFitness);
     if (isBeginner) {
       disciplineNote = `Short-distance run event (${event}) — BEGINNER PATH. The user's experience or current run ability is limited (exp=${expLevel || 'unknown'}, runAbility=${runAbility || 'unknown'}).
 
@@ -648,9 +653,14 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
   // here so the user gets a coherent run plan even if the AI slipped up.
   const isRunOnly = /Marathon|10K|5K|Half Marathon/i.test(event) && !/Triathlon|Ironman/i.test(event);
   const isShortRun = /\b(5K|10K)\b/i.test(event);
+  const is5K = /\b5K\b/i.test(event);
   const exp = profile && profile.exp;
   const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
-  const isBeginnerRunner = isShortRun && (exp === 'new' || runAbility === 'walk-run' || runAbility === 'under-15');
+  const _hasRunRaceMarker = !!(fitnessMarkers && fitnessMarkers.runRace && fitnessMarkers.runRace.distance && fitnessMarkers.runRace.time);
+  const _hasRunFitness = runAbility === '30-60' || runAbility === '60-plus' || _hasRunRaceMarker;
+  // 5K defaults to the beginner cap schedule unless run fitness is shown, so
+  // the AI can't fill week 1 with a long continuous run.
+  const isBeginnerRunner = isShortRun && (exp === 'new' || runAbility === 'walk-run' || runAbility === 'under-15' || (is5K && !_hasRunFitness));
   // Hard session-duration cap for beginners on a 5K plan. The AI sometimes
   // fills the user's stated weekly hours with too-long sessions; cap each
   // session here regardless of what the AI prescribed.

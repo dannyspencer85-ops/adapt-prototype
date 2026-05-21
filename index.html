@@ -12053,13 +12053,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     })();
     const runAbility = fm && fm.runAbility ? fm.runAbility : null;
     const profileExp = (planState && planState.profile && planState.profile.exp) || null;
+    const is5K = /\b5K\b/i.test(event);
+    // A 5K should ASSUME couch-to-5K and start easy unless the athlete shows
+    // real run fitness. "Fitness shown" = can already run 30+ min continuously
+    // OR logged a recent run race. Without that signal we default to the
+    // gentle progression (an experienced runner can opt out by setting their
+    // run ability or a race time). This stops a brand-new 5K trainee getting
+    // a 44-min run as their first session.
+    const hasRunRaceMarker = !!(fm && fm.runRace && fm.runRace.distance && fm.runRace.time);
+    const hasRunFitness = runAbility === '30-60' || runAbility === '60-plus' || hasRunRaceMarker;
     // Beginner runner detection — fires for ANY run event when ability is
-    // walk-run / under-15 OR experience is 'new'. Drops the lossy
-    // (!exp && hours<=4) heuristic that caught experienced low-volume athletes.
+    // walk-run / under-15 OR experience is 'new', AND defaults true for a 5K
+    // unless the athlete has demonstrated run fitness.
     const isBeginnerRunner = isRun && (
       runAbility === 'walk-run' ||
       runAbility === 'under-15' ||
-      profileExp === 'new'
+      profileExp === 'new' ||
+      (is5K && !hasRunFitness)
     );
 
     const blank = { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' };
@@ -12790,8 +12800,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const hasStrengthAccess = Array.isArray(inputs.availableDisciplines) && inputs.availableDisciplines.includes('strength');
     const hasSwimAccess = Array.isArray(inputs.availableDisciplines) && inputs.availableDisciplines.includes('swim');
     const hasBikeAccess = Array.isArray(inputs.availableDisciplines) && (inputs.availableDisciplines.includes('bike') || inputs.availableDisciplines.includes('trainer'));
+    const _is5K = /\b5K\b/i.test(event);
+    const _fmAbility = (inputs.fitnessMarkers && inputs.fitnessMarkers.runAbility) || '';
+    const _hasRunRace = !!(inputs.fitnessMarkers && inputs.fitnessMarkers.runRace && inputs.fitnessMarkers.runRace.distance && inputs.fitnessMarkers.runRace.time);
+    const _hasRunFit = /30-60|60-plus/.test(_fmAbility) || _hasRunRace;
     const isBeginner = (inputs.profile && inputs.profile.exp === 'new') ||
-      (inputs.fitnessMarkers && /walk-run|under-15/.test(inputs.fitnessMarkers.runAbility || ''));
+      /walk-run|under-15/.test(_fmAbility) ||
+      (_is5K && !_hasRunFit);
     const targetWeeklyMin = hours * 60;
     const trainingDaySet = new Set(days);
 
@@ -13767,12 +13782,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // (NOT a pre-built demo persona). Password == username for simplicity
   // during testing; tester picks their own race goal during onboarding.
   // ──────────────────────────────────────────────────────────────────────
-  const TESTER_USERNAMES = ['bridget', 'jane', 'connor', 'luke', 'gabe'];
+  const TESTER_USERNAMES = ['bridget', 'jane', 'connor', 'luke', 'gabe', 'wb'];
+  // Per-account password overrides. Login lowercases the username (so "WB"
+  // becomes the "wb" key) but compares the password verbatim — so WB's
+  // password is stored uppercase to match what's typed.
+  const TESTER_PASSWORDS = { wb: 'WB' };
   function ensureTesterAccounts() {
     const accts = getAccounts();
     let dirty = false;
     TESTER_USERNAMES.forEach(u => {
-      const pwd = u; // simple credentials: username == password
+      const pwd = TESTER_PASSWORDS[u] || u; // default: username == password
       if (!accts[u]) {
         accts[u] = {
           password: pwd,
