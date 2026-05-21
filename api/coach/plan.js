@@ -217,6 +217,8 @@ function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, cours
   const isHalfMar = /Half Marathon/i.test(event);
   const isShortRun = /\b(5K|10K)\b/i.test(event);
   const isRun = isMarathon || isHalfMar || isShortRun;
+  const isBike = /Gravel|Road/i.test(event);
+  const isGravel = /Gravel/i.test(event);
   const isGeneral = /General fitness/i.test(event);
   const limiter = (triFocus && triFocus.limiter) || 'balanced';
   const strategy = (triFocus && triFocus.strategy) || 'balanced';
@@ -349,6 +351,29 @@ Weekly structure (typical):
 
 Pace anchor: I-pace and R-pace (Daniels), derived from VDOT.`;
     }
+  } else if (isBike) {
+    const dist = /200\s*mi/i.test(event) ? '200-mile ultra' : /100\s*mi/i.test(event) ? '100-mile (century)' : /100K/i.test(event) ? '100K' : /50K/i.test(event) ? '50K' : /40K/i.test(event) ? '40K' : 'mass-start';
+    disciplineNote = `${isGravel ? 'GRAVEL' : 'ROAD'} cycling race — ${event} (${dist}). This is a BIKE event: cycling is the primary discipline. Running is NOT required and should only appear if the user explicitly has it available (and even then only as light no-impact aerobic cross-training). NEVER prescribe swims or bricks.
+
+═══ WEEKLY STRUCTURE (bike-dominant, FTP-anchored) ═══
+• LONG RIDE — THE keystone session, ~40-50% of weekly volume. Steady Z2 (65-75% FTP, HR 130-145, cadence 80-95), progressively lengthening toward a meaningful fraction of race duration. This is where ${isGravel ? 'gravel durability + mixed-surface handling' : 'aerobic endurance + sustained position'} is built. Bake in race-day fueling: 60-90g carb/hr.
+• 1 QUALITY RIDE/wk in Base, up to 2 in Build. Use FTP zones explicitly:
+  - Sweet spot: 88-93% FTP (the bread-and-butter of time-crunched cyclists — most aerobic adaptation per minute)
+  - Threshold: 95-105% FTP, 8-20 min reps (raises sustainable power / race pace)
+  - VO2max: 110-120% FTP, 3-5 min reps (tops out the engine; use sparingly in Build/Peak)
+${isGravel
+  ? '  - GRAVEL specificity: within sweet-spot/threshold reps, add 10-20s standing surges to mimic rollers, loose pitches, and re-accelerations after rough sections. Practice fueling + handling on real terrain in the long ride.'
+  : '  - ROAD specificity: longer sustained threshold blocks (15-20 min) and over-unders (alternating 95% / 105% FTP) to simulate pack surges and sustained efforts. Tempo blocks in the long ride.'}
+• EASY SPINS — recovery / aerobic volume at Z1-Z2 (<70% FTP). Most of the week is easy (80/20 polarized).
+• ${hasStrength ? 'STRENGTH 1-2×/wk' : 'MOBILITY'} — cyclists benefit hugely from posterior-chain + single-leg strength for power and durability on long days (Rønnestad research). Drop strength in the taper.
+
+═══ PERIODIZATION ═══
+• Base: build aerobic volume + sweet spot. Long ride grows ~10%/wk (ACWR-safe).
+• Build: add threshold + (later) VO2max; long ride approaches race-specific duration with race-pace blocks.
+• Peak: highest volume + most race-specific (long ride with sustained race-effort segments, fueling rehearsal).
+• Taper: 1-2 weeks, volume drops ~40-60%, keep a little intensity (short threshold openers) so legs stay sharp. ${/200\s*mi/i.test(event) ? 'For the 200-mile ultra, the long ride is about TIME ON BIKE and fueling tolerance, not intensity — prioritize back-to-back weekend volume blocks over hard intervals.' : ''}
+
+Pace/intensity anchor: FTP-based % power (and HR zones if no power meter). Use the athlete's FTP if provided.`;
   } else if (isGeneral) {
     disciplineNote = `General fitness — no race target. Goal is consistency + variety + injury-free year-round training.
 
@@ -540,6 +565,13 @@ const RACE_MIN_HOURS_SERVER = {
   'Olympic Triathlon': { floorMin: 5,   recMin: 7 },
   'Half Ironman':      { floorMin: 7,   recMin: 9 },
   'Full Ironman':      { floorMin: 10,  recMin: 12 },
+  'Gravel 50K':        { floorMin: 3,   recMin: 5 },
+  'Gravel 100K':       { floorMin: 4,   recMin: 6 },
+  'Gravel 100mi':      { floorMin: 6,   recMin: 9 },
+  'Gravel 200mi':      { floorMin: 8,   recMin: 11 },
+  'Road 40K':          { floorMin: 3,   recMin: 5 },
+  'Road 100K':         { floorMin: 4,   recMin: 6 },
+  'Road 100mi':        { floorMin: 6,   recMin: 8 },
 };
 
 function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location }) {
@@ -643,6 +675,11 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
     if (/Half Marathon/i.test(event)) return { run: 110, bike: 75, swim: 45, quality: 70, strength: 45 };
     if (/10K/i.test(event)) return { run: 80, bike: 60, swim: 45, quality: 50, strength: 45 };
     if (/5K/i.test(event)) return { run: 60, bike: 50, swim: 40, quality: 45, strength: 40 };
+    // Bike races — the long RIDE is the keystone, so bike gets a high cap.
+    if (/Gravel\s*200\s*mi/i.test(event)) return { bike: 360, run: 75, quality: 120, strength: 60 };
+    if (/(Gravel|Road)\s*100\s*mi/i.test(event)) return { bike: 330, run: 60, quality: 110, strength: 50 };
+    if (/(Gravel|Road)\s*100K/i.test(event)) return { bike: 240, run: 50, quality: 90, strength: 50 };
+    if (/Gravel\s*50K|Road\s*40K/i.test(event)) return { bike: 180, run: 45, quality: 75, strength: 45 };
     return { run: 120, bike: 180, swim: 75, brick: 240, quality: 90, strength: 60 };
   })();
   // Easy (non-long, non-quality) sessions cap much lower — an "easy run"

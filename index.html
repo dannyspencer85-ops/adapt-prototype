@@ -1607,20 +1607,33 @@
         <p class="sub">Pick an event or just say "get fitter." We'll show you an honest timeline either way.</p>
         <div class="field">
           <label>What distance are you training for?</label>
-          <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent();">
-            <option>Half Ironman</option>
-            <option>Full Ironman</option>
-            <option>Marathon</option>
-            <option>Half Marathon</option>
-            <option>Olympic Triathlon</option>
-            <option>Sprint Triathlon</option>
-            <option>10K</option>
-            <option>5K</option>
-            <!-- "General fitness (no event)" was here. Removed — that flow
-                 didn't fit the prototype's race-targeted shape (race date,
-                 race countdown, taper, etc. all assumed an event). The
-                 plan-engine general-fitness branches stay in place as dead
-                 code in case we revisit it later. -->
+          <select id="eventSelect" onchange="updateTriFocusVisibility(); refreshRacePicker(); adjustCourseDetailsForEvent(); adjustFmAdvancedVisibility();">
+            <optgroup label="Run">
+              <option>5K</option>
+              <option>10K</option>
+              <option>Half Marathon</option>
+              <option>Marathon</option>
+            </optgroup>
+            <optgroup label="Triathlon">
+              <option>Sprint Triathlon</option>
+              <option>Olympic Triathlon</option>
+              <option>Half Ironman</option>
+              <option>Full Ironman</option>
+            </optgroup>
+            <optgroup label="Gravel cycling">
+              <option>Gravel 50K</option>
+              <option>Gravel 100K</option>
+              <option>Gravel 100mi</option>
+              <option>Gravel 200mi</option>
+            </optgroup>
+            <optgroup label="Road cycling">
+              <option>Road 40K</option>
+              <option>Road 100K</option>
+              <option>Road 100mi</option>
+            </optgroup>
+            <!-- "General fitness (no event)" was removed — the prototype is
+                 race-targeted. The plan-engine general-fitness branches stay
+                 as a fallback for unmatched events. -->
           </select>
         </div>
         <div class="field">
@@ -1933,11 +1946,11 @@
           <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">FTP (bike) and CSS (swim) — only if you've tested them. Skip if you haven't.</div>
         </div>
         <div id="fmAdvancedFields" style="display:none;">
-          <div class="field">
+          <div class="field" id="fmFtpField">
             <label style="font-size:12px;">🚴 Bike FTP (watts) — 1-hour sustainable power</label>
             <input type="number" id="fmFtp" min="80" max="500" placeholder="e.g. 245" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
           </div>
-          <div class="field">
+          <div class="field" id="fmCssField">
             <label style="font-size:12px;">🏊 Swim CSS — threshold pace per 100m</label>
             <input type="text" id="fmCss" placeholder="e.g. 1:38" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
           </div>
@@ -3663,6 +3676,13 @@
     'Olympic Triathlon': { floorMin: 5,   recMin: 7,   recMax: 11, label: 'Olympic Triathlon' },
     'Half Ironman':      { floorMin: 7,   recMin: 9,   recMax: 14, label: 'Half Ironman (70.3)' },
     'Full Ironman':      { floorMin: 10,  recMin: 12,  recMax: 18, label: 'Full Ironman (140.6)' },
+    'Gravel 50K':        { floorMin: 3,   recMin: 5,   recMax: 9,  label: 'Gravel 50K' },
+    'Gravel 100K':       { floorMin: 4,   recMin: 6,   recMax: 11, label: 'Gravel 100K' },
+    'Gravel 100mi':      { floorMin: 6,   recMin: 9,   recMax: 15, label: 'Gravel 100mi' },
+    'Gravel 200mi':      { floorMin: 8,   recMin: 11,  recMax: 18, label: 'Gravel 200mi' },
+    'Road 40K':          { floorMin: 3,   recMin: 5,   recMax: 9,  label: 'Road 40K' },
+    'Road 100K':         { floorMin: 4,   recMin: 6,   recMax: 11, label: 'Road 100K' },
+    'Road 100mi':        { floorMin: 6,   recMin: 8,   recMax: 14, label: 'Road 100mi' },
     'General fitness (no event)': { floorMin: 1.5, recMin: 3, recMax: 8, label: 'General fitness' },
   };
 
@@ -3800,11 +3820,22 @@
   function adjustFmAdvancedVisibility() {
     const event = document.getElementById('eventSelect')?.value || '';
     const isTri = /Ironman|Triathlon/i.test(event);
+    const isBike = /Gravel|Road/i.test(event);
     const header = document.getElementById('fmAdvancedHeader');
     const fields = document.getElementById('fmAdvancedFields');
-    if (header) header.style.display = isTri ? 'block' : 'none';
-    if (fields && !isTri) {
-      // Collapse + clear values for non-tri so they aren't accidentally saved.
+    const ftpField = document.getElementById('fmFtpField');
+    const cssField = document.getElementById('fmCssField');
+    const headerLabel = header ? header.querySelector('span') : null;
+    // FTP matters for tri AND bike races; CSS (swim) only for tri.
+    const show = isTri || isBike;
+    if (header) header.style.display = show ? 'block' : 'none';
+    // Bike races: FTP is the key marker — show it, hide swim CSS, and
+    // auto-expand since most cyclists know their FTP.
+    if (ftpField) ftpField.style.display = 'block';
+    if (cssField) cssField.style.display = isTri ? 'block' : 'none';
+    if (headerLabel) headerLabel.textContent = isBike ? '🚴 Bike FTP' : '🚴 🏊 Advanced markers';
+    if (fields && !show) {
+      // Collapse + clear values when neither tri nor bike.
       fields.style.display = 'none';
       const ftp = document.getElementById('fmFtp');
       const css = document.getElementById('fmCss');
@@ -3812,6 +3843,13 @@
       if (css) css.value = '';
       const toggle = document.getElementById('fmAdvancedToggle');
       if (toggle) toggle.textContent = 'Show';
+    } else if (fields && isBike) {
+      // Auto-expand for bike so FTP is visible without an extra tap.
+      fields.style.display = 'block';
+      const css = document.getElementById('fmCss');
+      if (css) css.value = '';
+      const toggle = document.getElementById('fmAdvancedToggle');
+      if (toggle) toggle.textContent = 'Hide';
     }
   }
 
@@ -4367,9 +4405,19 @@
     const event = document.getElementById('eventSelect').value;
     const isTri = /Ironman|Triathlon/.test(event);
     const isRun = /Marathon|10K|5K/.test(event);
+    const isBike = /Gravel|Road/.test(event);
     const isGeneral = /General fitness/.test(event);
     let set;
-    if (isTri) {
+    if (isBike) {
+      // Bike race — bike-dominant. Bike + trainer + strength on by default;
+      // running is an optional cross-train (off); no swim.
+      set = [
+        { disc: 'bike', label: 'Bike', active: true },
+        { disc: 'trainer', label: 'Indoor trainer', active: true },
+        { disc: 'strength', label: 'Strength / gym', active: true },
+        { disc: 'run', label: 'Run (cross-train)', active: false }
+      ];
+    } else if (isTri) {
       set = [
         { disc: 'run', label: 'Run', active: true },
         { disc: 'bike', label: 'Bike', active: true },
@@ -4401,6 +4449,8 @@
     if (hint) {
       hint.textContent = isTri
         ? 'Triathlon needs swim + bike + run. Strength training reduces injury risk. Deselect any you don\'t have access to.'
+        : isBike
+        ? 'Bike races are built on riding (outdoor + indoor trainer) plus strength for power and durability. Running is an optional cross-train. Deselect any you don\'t have.'
         : isRun
         ? 'Running events benefit from bike or trainer for no-impact cross-training, plus strength for injury prevention.'
         : 'Typical cross-training disciplines. Deselect any you don\'t have.';
@@ -4876,13 +4926,20 @@
     const dayNames = [...activeDays].map(d => d.textContent).join('/');
     const isTri = /Ironman|Triathlon/.test(event);
     const isRun = /Marathon|10K|5K/.test(event);
+    const isBike = /Gravel|Road/.test(event);
     const activeDisc = new Set([...document.querySelectorAll('#discChips .chip.active')].map(c => c.dataset.disc));
+    // Bike events need a bike (or indoor trainer); run events need run; tri all three.
+    const hasBikeAccess = activeDisc.has('bike') || activeDisc.has('trainer');
     const required = isTri ? ['swim','bike','run'] : isRun ? ['run'] : [];
-    const missing = required.filter(d => !activeDisc.has(d));
+    let missing = required.filter(d => !activeDisc.has(d));
+    if (isBike && !hasBikeAccess) missing = ['bike'];
     const minHours = {
       'Full Ironman': 5, 'Half Ironman': 4, 'Olympic Triathlon': 3,
       'Sprint Triathlon': 2.5, 'Marathon': 3, 'Half Marathon': 2,
-      '10K': 2, '5K': 1.5, 'General fitness (no event)': 1
+      '10K': 2, '5K': 1.5,
+      'Gravel 50K': 3, 'Gravel 100K': 4, 'Gravel 100mi': 6, 'Gravel 200mi': 8,
+      'Road 40K': 3, 'Road 100K': 4, 'Road 100mi': 6,
+      'General fitness (no event)': 1
     };
     const flags = [];
     missing.forEach(d => {
@@ -5600,6 +5657,7 @@
     const event = document.getElementById('eventSelect')?.value || '';
     const isTri = /Ironman|Triathlon/i.test(event);
     const isRun = /Marathon|10K|5K|Half Marathon/i.test(event) && !isTri;
+    const isBike = /Gravel|Road/i.test(event);
     const isGeneral = /General fitness/i.test(event);
     const swimField = document.getElementById('courseSwimField');
     const bikeField = document.getElementById('courseBikeField');
@@ -5610,7 +5668,18 @@
     const header = document.getElementById('courseDetailsHeader');
     const hint = document.getElementById('courseDetailsHint');
     if (!swimField || !bikeField || !terrainField) return;
-    if (isTri) {
+    if (isBike) {
+      // Bike race — terrain (climbing) + surface (gravel/road/mixed) matter
+      // most; no swim, no separate run-leg field.
+      bikeField.style.display = 'none';
+      swimField.style.display = 'none';
+      surfaceField.style.display = 'block';
+      terrainField.style.display = 'block';
+      if (terrainLabel) terrainLabel.textContent = 'Course profile (climbing)';
+      if (surfaceLabel) surfaceLabel.textContent = /Gravel/i.test(event) ? 'Surface (gravel type)' : 'Surface';
+      if (header) header.textContent = 'Tell us about the course';
+      if (hint) hint.textContent = 'The plan adapts: climby courses get sustained-power + climbing work, rough/loose surfaces get durability + handling emphasis, hot races get heat prep.';
+    } else if (isTri) {
       // Triathlons — show bike profile + swim type. Run leg labeled clearly.
       bikeField.style.display = 'block';
       swimField.style.display = 'block';
@@ -11951,7 +12020,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const isMarathon = /Marathon/i.test(event) && !/Half/i.test(event);
     const isHalfMar = /Half Marathon/i.test(event);
     const isRun = isShortRun || isMarathon || isHalfMar;
-    const isGeneral = /General fitness/i.test(event) || (!isTri && !isRun);
+    const isBike = /Gravel|Road/i.test(event);
+    const isGeneral = /General fitness/i.test(event) || (!isTri && !isRun && !isBike);
     // Read course intel so the fallback can shape sessions to terrain.
     let intel = null;
     try { intel = JSON.parse(localStorage.getItem('course-intel') || 'null'); } catch (e) {}
@@ -12212,6 +12282,59 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
             intensity: 'Z2',
           };
         });
+      }
+    } else if (isBike) {
+      // Bike race (gravel or road) — bike-dominant endurance plan. The long
+      // ride is the keystone; one threshold/sweet-spot quality day; the rest
+      // easy Z2 spins. Gravel adds mixed-surface durability + fueling;
+      // road leans on sustained tempo. FTP-based zones throughout.
+      const isGravel = /Gravel/i.test(event);
+      const bikeLongCap = /200\s*mi/i.test(event) ? 360
+        : /100\s*mi/i.test(event) ? 300
+        : /100K/i.test(event) ? 210
+        : 150; // 50K / 40K
+      const longMins = Math.min(bikeLongCap, Math.max(60, hours * 60 * 0.45));
+      const qualityMins = Math.min(90, Math.max(40, hours * 60 * 0.22));
+      const ride = hasBike;
+      const fmtHM = (m) => `${Math.floor(m / 60)}:${String(Math.round(m) % 60).padStart(2, '0')}`;
+      if (longDay) {
+        if (ride) {
+          newSessions[longDay] = {
+            name: isGravel ? 'Long gravel ride' : 'Long endurance ride',
+            meta: `${fmtHM(longMins)} · ${isClimbingBike ? 'Climbing Z2' : 'Zone 2 endurance'}`,
+            duration: Math.round(longMins),
+            type: 'bike',
+            prescription: isGravel
+              ? `The keystone session. Mostly Z2 (HR 130-145, ~65-75% FTP), cadence 80-90.${isClimbingBike ? ' Settle into climbs at threshold, recover on descents.' : ''} Ride race-relevant gravel/terrain where you can — practice handling, line choice, and short standing efforts over rough sections. Dial in race fueling: 60-90g carb/hr + steady fluids. Builds the durability the distance demands.`
+              : `The keystone session. Hold steady Z2 (HR 130-145, ~65-75% FTP), smooth stroke, cadence 85-95.${isClimbingBike ? ' Take climbs at controlled Z3, recover after.' : ''} In the final third add 2-3×10 min at sweet spot (88-93% FTP) to rehearse sustained race effort. Practice fueling: 60-90g carb/hr.`,
+            targets: 'HR Z2 base · 60-90g carb/hr · cadence 80-95',
+            intensity: 'Z2',
+          };
+        } else {
+          newSessions[longDay] = { name: 'Long aerobic session', meta: `${Math.round(longMins)} min · Zone 2`, duration: Math.round(longMins), type: hasRun ? 'run' : 'strength', intensity: 'Z2' };
+        }
+      }
+      if (qualityDay && ride) {
+        newSessions[qualityDay] = {
+          name: isGravel ? 'Sweet-spot + surges' : 'Threshold intervals',
+          meta: isGravel ? `${Math.round(qualityMins)} min · sweet spot w/ surges` : `${Math.round(qualityMins)} min · 3-4×8-10 min threshold`,
+          duration: Math.round(qualityMins),
+          type: 'quality',
+          prescription: isGravel
+            ? `WU 15 min building to Z3 + main set: 3-4×10 min at sweet spot (88-93% FTP), and within each rep throw in 3-4×15s standing surges (mimics gravel rollers + loose sections) + 5 min easy between + 10 min CD. Trains the variable, punchy power gravel demands.`
+            : `WU 15 min building + main set: 3-4×8-10 min at threshold (95-100% FTP, RPE 8) with 5 min easy spin between + 10 min CD. Builds the sustained power that holds race pace. Seated, smooth, cadence 85-95.`,
+          targets: isGravel ? 'Sweet spot 88-93% FTP · surges all-out 15s · recover fully' : 'Threshold 95-100% FTP · RPE 8 · steady cadence',
+          intensity: 'Z4',
+        };
+      } else if (qualityDay && hasStrength) {
+        newSessions[qualityDay] = { name: 'Strength + mobility', meta: `${Math.round(qualityMins)} min · full-body, controlled tempo`, duration: Math.round(qualityMins), type: 'strength' };
+      }
+      // Easy days — easy Z2 spins, capped at the bike easy ceiling.
+      const totalEasy = hours * 60 - longMins - qualityMins;
+      if (ride) {
+        Object.assign(newSessions, _spreadEasy(easyDays, totalEasy, 'bike', 'Easy spin'));
+      } else if (hasRun) {
+        Object.assign(newSessions, _spreadEasy(easyDays, totalEasy, 'run', 'Easy aerobic'));
       }
     } else {
       // General fitness (no event) — discipline-aware variety week.
