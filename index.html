@@ -2325,6 +2325,28 @@
             <button type="button" class="chip" data-type="mobility" onclick="pickLogType(this)">🧘 Mobility</button>
           </div>
         </div>
+        <!-- Brick detail — only shown when "Brick" is the selected type. Lets
+             the athlete record what KIND of brick they did: the bike + run
+             split and whether it was steady or intervals. -->
+        <div id="logBrickDetails" style="display:none; margin-bottom:12px; padding:12px; background:var(--bg-soft); border-radius:10px;">
+          <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Brick detail</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;">
+            <div>
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">🚴 Bike (min)</div>
+              <input type="number" id="logBrickBike" min="0" max="360" placeholder="e.g. 50" style="width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">🏃 Run (min)</div>
+              <input type="number" id="logBrickRun" min="0" max="360" placeholder="e.g. 20" style="width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+            </div>
+          </div>
+          <div style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px; margin-top:10px; margin-bottom:6px;">Structure</div>
+          <div class="chip-row" id="logBrickStructure" style="flex-wrap:wrap;">
+            <button type="button" class="chip active" data-struct="steady" onclick="pickLogBrickStructure(this)">Steady</button>
+            <button type="button" class="chip" data-struct="intervals" onclick="pickLogBrickStructure(this)">Intervals</button>
+            <button type="button" class="chip" data-struct="race-pace" onclick="pickLogBrickStructure(this)">Race-pace</button>
+          </div>
+        </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div>
             <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Duration (min)</label>
@@ -4980,6 +5002,16 @@
   function pickLogType(el) {
     [...el.parentElement.children].forEach(c => c.classList.remove('active'));
     el.classList.add('active');
+    _syncLogBrickDetails(el.dataset.type);
+  }
+  // Show the brick-detail block (bike/run split + structure) only for bricks.
+  function _syncLogBrickDetails(type) {
+    const block = document.getElementById('logBrickDetails');
+    if (block) block.style.display = type === 'brick' ? 'block' : 'none';
+  }
+  function pickLogBrickStructure(el) {
+    [...el.parentElement.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
   }
   // Onboarding step-4 schedule-consistency picker. Toggles the "you can set
   // days on the calendar" hint when the user says their schedule varies.
@@ -5650,6 +5682,30 @@
         s.actualType = actualType;
         if (actualType !== s.type) s.type = actualType;
       }
+      // Brick detail — capture the kind of brick done (bike/run split +
+      // structure) and reflect it into the session meta so the card +
+      // session report show what was actually performed.
+      if (actualType === 'brick') {
+        const bikeMin = parseInt(document.getElementById('logBrickBike')?.value || '', 10);
+        const runMin = parseInt(document.getElementById('logBrickRun')?.value || '', 10);
+        const structure = document.querySelector('#logBrickStructure .chip.active')?.dataset.struct || 'steady';
+        const ab = { structure };
+        if (Number.isFinite(bikeMin) && bikeMin >= 0) ab.bikeMin = bikeMin;
+        if (Number.isFinite(runMin) && runMin >= 0) ab.runMin = runMin;
+        s.actualBrick = ab;
+        // Build a human meta if we have at least one leg.
+        if (ab.bikeMin != null || ab.runMin != null) {
+          const fmt = (m) => `${Math.floor((m || 0) / 60)}:${String((m || 0) % 60).padStart(2, '0')}`;
+          const structLabel = structure === 'intervals' ? ' · intervals' : structure === 'race-pace' ? ' · race-pace' : '';
+          s.meta = `Bike ${fmt(ab.bikeMin || 0)} + Run ${fmt(ab.runMin || 0)}${structLabel}`;
+          // If no separate duration was given, total the legs.
+          if (!(actualMins && actualMins > 0)) {
+            const tot = (ab.bikeMin || 0) + (ab.runMin || 0);
+            if (tot > 0) s.actualMins = tot;
+          }
+        }
+        s.loggedManually = true;
+      }
       // Mark the data source so the UI can show "logged manually" vs Strava.
       if (actualMins || actualHr || actualDist || actualType) s.loggedManually = true;
     }
@@ -5657,7 +5713,7 @@
     analyzeLoggedSession(today, rpe);
     setChange(`Logged ${todayFull} session (RPE ${rpe || '—'}${actualMins ? `, ${actualMins} min` : ''}). Engine reassessing week.`);
     // Clear the manual inputs so the next log starts fresh.
-    ['logActualMins', 'logActualHr', 'logActualDist', 'logActualFeel'].forEach(id => {
+    ['logActualMins', 'logActualHr', 'logActualDist', 'logActualFeel', 'logBrickBike', 'logBrickRun'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     // Reset the log target back to today for the next time.
@@ -11477,11 +11533,29 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Workout-type chips — default to what was actually logged, else the
     // planned type. Maps unknown types onto the closest available chip.
     const typeWrap = document.getElementById('logActualType');
+    let activeType = 'run';
     if (typeWrap) {
       const known = ['run', 'bike', 'swim', 'strength', 'brick', 'quality', 'mobility'];
       let t = s.actualType || s.type || 'run';
       if (!known.includes(t)) t = t === 'walk' ? 'run' : 'run';
+      activeType = t;
       [...typeWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.type === t));
+    }
+    // Brick detail — show + prefill when the (actual or planned) type is a
+    // brick. Seed legs from a saved actualBrick, else parse the planned meta
+    // ("Bike 2:00 + Run 0:30"); structure from actualBrick or default steady.
+    _syncLogBrickDetails(activeType);
+    if (activeType === 'brick') {
+      const ab = s.actualBrick || null;
+      const parsed = (typeof _parseBrickMeta === 'function') ? _parseBrickMeta(s.meta) : null;
+      const bike = ab && ab.bikeMin != null ? ab.bikeMin : (parsed ? parsed.bike : '');
+      const run = ab && ab.runMin != null ? ab.runMin : (parsed ? parsed.run : '');
+      const bikeEl = document.getElementById('logBrickBike');
+      const runEl = document.getElementById('logBrickRun');
+      if (bikeEl) bikeEl.value = (bike !== '' && bike != null) ? bike : '';
+      if (runEl) runEl.value = (run !== '' && run != null) ? run : '';
+      const struct = (ab && ab.structure) || 'steady';
+      document.querySelectorAll('#logBrickStructure .chip').forEach(c => c.classList.toggle('active', c.dataset.struct === struct));
     }
   }
 
