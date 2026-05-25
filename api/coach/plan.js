@@ -14,12 +14,12 @@
 export const config = { runtime: 'edge' };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
-// Cost-effective tier: Medium (not Large) for plan generation. The output is
-// structured JSON guided by a very detailed prompt and then run through
-// validatePlan (which coerces caps, distribution, run-dominance, etc.), so we
-// don't need Large's extra reasoning — Medium is ~3-5× cheaper for
-// comparable plan quality, and the free rule engine is the ultimate fallback.
-const PLAN_MODEL = 'mistral-medium-latest';
+// Free-tier workhorse: open-mistral-nemo has sufficient reasoning for the
+// structured JSON plan output and avoids the 429 rate-limits that
+// mistral-medium-latest hits on the free tier. The heavy system prompt +
+// validatePlan coercions compensate for the smaller model; the rule engine
+// is the ultimate fallback if even this model is overloaded.
+const PLAN_MODEL = 'open-mistral-nemo';
 const MAX_TOKENS = 4500;                    // 6 weeks of detail fits in ~3000-4000 tokens
 const REQUEST_TIMEOUT_MS = 45000;
 

@@ -16,8 +16,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Adapt">
-<link rel="apple-touch-icon" href="/icon.svg">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<!-- Supabase JS SDK — loaded before the app script so _sb is available at
+     init time. Safe to leave even when SUPABASE_URL is not yet configured;
+     the app falls back to localStorage auth in that case. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --bg: #F6F4EC;
@@ -483,6 +487,7 @@
   }
   .chip {
     padding: 9px 14px;
+    min-height: 44px;
     border: 1px solid var(--border);
     border-radius: 100px;
     font-size: 13px;
@@ -490,6 +495,9 @@
     cursor: pointer;
     font-family: inherit;
     color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
   }
   .chip.active {
     background: var(--primary);
@@ -584,6 +592,8 @@
   }
   .rpe-btn {
     aspect-ratio: 1;
+    min-height: 44px;
+    min-width: 44px;
     border: 1px solid var(--border);
     background: #fff;
     border-radius: 8px;
@@ -1129,6 +1139,8 @@
   .impact-arrow { color: var(--text-soft); font-size: 18px; }
   .disc-day-chip {
     padding: 6px 10px;
+    min-height: 44px;
+    min-width: 44px;
     border-radius: 100px;
     font-size: 11px;
     font-weight: 600;
@@ -1136,17 +1148,24 @@
     background: #fff;
     cursor: pointer;
     font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
   .disc-day-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
   .chat-input-wrap {
-    /* Add iOS safe-area inset so the input sits above the home-indicator and
-       doesn't get covered by the on-screen keyboard. */
+    /* sticky keeps the bar anchored when iOS keyboard appears, avoiding the
+       fixed-element overlap bug common in Mobile Safari. */
+    position: sticky;
+    bottom: 0;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
     background: #fff;
     border-top: 1px solid var(--border);
     display: flex;
     gap: 8px;
     align-items: center;
+    z-index: 10;
   }
   .chat-input {
     flex: 1;
@@ -1606,18 +1625,14 @@
               <option>Sprint Triathlon</option>
               <option>Olympic Triathlon</option>
               <option>Half Ironman</option>
-              <option>Full Ironman</option>
             </optgroup>
             <optgroup label="Gravel cycling">
               <option>Gravel 50K</option>
               <option>Gravel 100K</option>
-              <option>Gravel 100mi</option>
-              <option>Gravel 200mi</option>
             </optgroup>
             <optgroup label="Road cycling">
               <option>Road 40K</option>
               <option>Road 100K</option>
-              <option>Road 100mi</option>
             </optgroup>
             <!-- "General fitness (no event)" was removed — the prototype is
                  race-targeted. The plan-engine general-fitness branches stay
@@ -2187,9 +2202,6 @@
       </div>
     </div>
     <div class="screen-inner">
-      <!-- Strava auth-failure banner — only renders when the last sync hit
-           a terminal auth error. Cleared on successful sync. -->
-      <div id="planStravaAuthBanner" style="display:none;"></div>
       <!-- Single priority-ranked banner. Was previously 5 stacked strips
            (source/summary/injury/change/peak) all competing for attention.
            renderPlanPriorityBanner() now picks the most relevant of the
@@ -2222,10 +2234,7 @@
            what you actually train). Tap any cell to see session details. -->
       <div id="upcomingCalendar" style="margin-top: 18px;"></div>
 
-      <!-- 3. ACTUAL recent workouts from Strava -->
-      <div id="recentStravaSessions"></div>
-
-      <!-- 4. COACH INSIGHTS — categorized, collapsed -->
+      <!-- 3. COACH INSIGHTS — categorized, collapsed -->
       <div id="planInsights"></div>
 
       <!-- 5. EXPANDERS at the bottom for less-frequent info -->
@@ -2309,9 +2318,7 @@
         </div>
       </div>
 
-      <!-- Manual data entry — for users without a connected watch/Strava.
-           Optional; leave blank if Strava will fill it in. -->
-      <div class="section-label plain">What you actually did <span style="font-weight:500; text-transform:none; color:var(--text-soft); font-size:11px;">(optional — leave blank if syncing from Strava)</span></div>
+      <div class="section-label plain">What you actually did <span style="font-weight:500; text-transform:none; color:var(--text-soft); font-size:11px;">(optional)</span></div>
       <div class="card">
         <div style="margin-bottom:12px;">
           <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Workout type <span style="font-weight:500; text-transform:none;">— change it if you did something different than planned</span></label>
@@ -2401,16 +2408,6 @@
       </div>
     </div>
     <div class="screen-inner">
-      <!-- Strava auth-failure banner — terminal auth error from sync. -->
-      <div id="pulseStravaAuthBanner" style="display:none;"></div>
-      <!-- Connect-Strava banner — surfaces only when Strava isn't connected,
-           so users land on the Pulse tab and see the one action that
-           unlocks every chart below it. Hidden once Strava is connected. -->
-      <div id="pulseConnectBanner" style="display:none; background:#FBF0D3; border:1px solid #D9A94A; color:#7a5a18; padding:14px 16px; border-radius:14px; margin-bottom:14px;">
-        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Connect Strava to fill these charts</div>
-        <div style="font-size:12.5px; line-height:1.5; margin-bottom:10px;">All Pulse charts pull from your Strava history. Without it, you're seeing empty placeholders.</div>
-        <button onclick="showScreen('profile')" style="background:#D9A94A; color:#fff; border:0; padding:8px 14px; border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">Open Profile to connect</button>
-      </div>
       <!-- Time range selector -->
       <div style="display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto;">
         <button class="chip" data-perf-range="7" onclick="setPerfRange(7)">Last 7 days</button>
@@ -2755,8 +2752,6 @@
 
       <!-- Integrations + Suggest-an-integration card removed by request. -->
 
-      <!-- DEVICE SYNC — paused. Strava is dormant; Apple Health is next.
-           Re-enable Strava by flipping STRAVA_ENABLED back to true. -->
       <div class="card" id="healthSyncCard">
         <div class="card-title">Device &amp; health sync</div>
         <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px;">
@@ -2764,124 +2759,6 @@
         </div>
       </div>
 
-      <!-- STRAVA CONNECTION — hidden while paused (STRAVA_ENABLED=false). -->
-      <div class="card" id="stravaCard" style="display:none;">
-        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Strava</span>
-          <span id="stravaStatusPill" style="font-size:11px; font-weight:600; padding:3px 10px; border-radius:100px; background:var(--bg); color:var(--text-soft);">Not connected</span>
-        </div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 12px; line-height: 1.5;">
-          Pulls in your activities so the coach can read your real training. Credentials live only in this browser.
-        </div>
-        <div id="stravaConnected" style="display:none;">
-          <div style="font-size:13px; padding:10px 12px; background:var(--primary-soft); border-radius:8px; margin-bottom:10px;">
-            ✅ Connected as <strong id="stravaAthleteName">—</strong>
-            <div id="stravaSyncStatus" style="font-size:12px; color:var(--text-soft); margin-top:4px;"></div>
-          </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="syncStravaFromProfile()" style="margin-bottom:6px;">Sync activities</button>
-          <div style="display:flex; gap:14px; justify-content:space-between; font-size:12px; padding:4px 2px;">
-            <button onclick="syncStravaAllTime()" style="background:none; border:0; color:var(--primary); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Pull full history</button>
-            <button onclick="disconnectStrava()" style="background:none; border:0; color:var(--warn); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Disconnect</button>
-          </div>
-          <details style="margin-top:10px;">
-            <summary style="cursor:pointer; font-size:12px; color:var(--text-soft); font-weight:600; padding:6px 0;">Troubleshoot ▾</summary>
-            <div style="padding-top:8px;">
-              <div style="font-size:11px; color:var(--text-soft); margin-bottom:8px; line-height:1.45;">
-                If sync isn't working, run Diagnose. The most common fix is to Re-authorize and tick the "View data about your private activities" checkbox on the Strava consent screen.
-              </div>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
-                <button class="btn btn-ghost btn-sm" onclick="diagnoseStrava()">Diagnose</button>
-                <button class="btn btn-ghost btn-sm" onclick="testStravaConnection()">Test connection</button>
-                <button class="btn btn-ghost btn-sm" onclick="refreshStravaToken()">Refresh token</button>
-                <button class="btn btn-ghost btn-sm" onclick="startStravaAuth()">Re-authorize</button>
-                <button class="btn btn-ghost btn-sm" onclick="showStravaAuthUrl()" style="grid-column: span 2;">Show OAuth URL (desktop fallback)</button>
-              </div>
-            </div>
-          </details>
-        </div>
-        <div id="stravaDisconnected">
-          <!-- Step-by-step setup instructions for testers who haven't connected
-               Strava before. Collapsible because experienced users don't need
-               them; opening defaults to closed. -->
-          <details style="margin-bottom:12px; padding:10px 12px; background:var(--bg); border-radius:10px;">
-            <summary style="cursor:pointer; font-size:13px; color:var(--primary-dark); font-weight:700; padding:2px 0;">📋 First-time setup — show me how (3 minutes)</summary>
-            <div style="padding-top:10px; font-size:12px; line-height:1.6; color:var(--text);">
-              <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">You'll need a free Strava account. The "API app" you're about to create is a one-time thing that lets Adapt read your training history.</div>
-
-              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span>
-                <div>Open <a href="https://www.strava.com/settings/api" target="_blank" style="color:var(--primary); font-weight:600;">strava.com/settings/api</a> in a new tab and sign in.</div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span>
-                <div>If it's your first time, you'll need to create an API app. Fill in any name (e.g. "Adapt"), any website (your Strava profile is fine), and for <strong>Authorization Callback Domain</strong> enter exactly:<br><code style="background:#fff; padding:3px 8px; border-radius:6px; font-size:11px; display:inline-block; margin-top:4px; user-select:all;">adapt-prototype-aiu3.vercel.app</code><br>That last one is critical — getting it wrong is the most common reason setup fails.</div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</span>
-                <div>Strava shows you a <strong>Client ID</strong> (a number) and <strong>Client Secret</strong> (a long string — you may need to tap "Show" to reveal it). Copy both into the fields below.</div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">4</span>
-                <div>Tap <strong>Authorize via Strava</strong> below. Strava will open a consent screen.</div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-bottom:10px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--alert); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">5</span>
-                <div><strong style="color:var(--alert);">CRITICAL:</strong> on the consent screen, scroll through the permissions list and <strong>tick the box for "View data about your private activities and segment efforts."</strong> If you skip this, sync silently fails — Strava will return only public data, which most users don't have. Then tap the orange Authorize button.</div>
-              </div>
-
-              <div style="display:flex; gap:10px; margin-bottom:0; align-items:flex-start;">
-                <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">6</span>
-                <div>Strava redirects you back to Adapt and starts pulling your activity history. First sync takes ~10-30 seconds depending on how much you've logged.</div>
-              </div>
-
-              <div style="margin-top:14px; padding:8px 12px; background:var(--secondary-soft); border-radius:8px; font-size:11px; color:var(--text-soft); line-height:1.5;">
-                <strong style="color:var(--text);">Stuck?</strong> Tap the "Diagnose" button (visible after you connect) — it'll tell you whether your token has the right scope, or open <a href="https://www.strava.com/settings/apps" target="_blank" style="color:var(--primary); font-weight:600;">strava.com/settings/apps</a> and revoke "Adapt", then retry from step 4.
-              </div>
-            </div>
-          </details>
-
-          <div class="field" style="margin-bottom:8px;">
-            <label style="font-size:12px;">Client ID</label>
-            <input type="text" id="stravaClientId" placeholder="e.g. 123456" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
-          </div>
-          <div class="field" style="margin-bottom:8px;">
-            <label style="font-size:12px;">Client Secret</label>
-            <input type="password" id="stravaClientSecret" placeholder="paste secret" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
-          </div>
-          <button class="btn btn-primary btn-full btn-sm" onclick="startStravaAuth()" style="margin-bottom:8px;">Authorize via Strava (recommended)</button>
-          <div style="font-size: 11px; color: var(--text-soft); margin-bottom:14px; line-height: 1.5;">
-            New here? Tap <strong>📋 First-time setup</strong> above for a 3-minute walkthrough.
-          </div>
-
-          <!-- Manual token fallback for users where the OAuth redirect won't
-               complete (corporate networks, deep-link issues, etc.). Hidden
-               behind an expander because pasting the static read-only tokens
-               from Strava's API page is a known footgun — they always have
-               scope:read only and can't list activities. -->
-          <details style="margin-bottom:8px;">
-            <summary style="cursor:pointer; font-size:12px; color:var(--text-soft); font-weight:600; padding:6px 0;">Authorize button not working? Paste tokens manually ▾</summary>
-            <div style="padding:10px 12px; background:var(--bg); border-radius:8px; margin-top:6px;">
-              <div style="font-size:11px; color:var(--alert); font-weight:700; margin-bottom:6px; line-height:1.5;">
-                ⚠ The Access + Refresh tokens shown on Strava's API page are <strong>read-only</strong> — they can't list activities. Use this only if you have <strong>OAuth-issued</strong> tokens (scope <code>activity:read_all</code>) from Postman or your own OAuth call.
-              </div>
-              <div class="field" style="margin-bottom:8px;">
-                <label style="font-size:12px;">Access Token</label>
-                <input type="password" id="stravaAccessToken" placeholder="paste access token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
-              </div>
-              <div class="field" style="margin-bottom:10px;">
-                <label style="font-size:12px;">Refresh Token</label>
-                <input type="password" id="stravaRefreshToken" placeholder="paste refresh token" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff;">
-              </div>
-              <button class="btn btn-ghost btn-full btn-sm" onclick="saveStravaConfig()">Save tokens manually</button>
-            </div>
-          </details>
-        </div>
-        <div id="stravaMsg" style="margin-top:10px; font-size:12px;"></div>
-      </div>
 
       <!-- Analytics moved into Settings modal (gear icon) -->
 
@@ -3040,7 +2917,7 @@
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 scale. 85+ is on track. 65-84 means small things to tighten up. Below 65 means real risks. Tap the pill anywhere to see the full breakdown.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What if I'm injured?</strong><br>Say "my [area] hurts" in chat, or log it at morning check-in. Engine auto-adjusts. See a doctor or PT for actual medical advice — the app flags, it doesn't diagnose.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>Can't run today — what do I do?</strong><br>Tap "Adjust today" on the workout card. Deselect the disciplines you can't do. Workout adapts automatically.</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>My watch data isn't showing up</strong><br>Connect Strava in Profile → tap "Connect Strava" → authorize Adapt. Activities sync from your Strava account (recorded by any connected watch — Garmin, Apple Watch, etc.). Apple HealthKit and Garmin Connect direct integration are coming later.</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Tap any session on Today or Plan, then tap "Log this." Enter your actual time, distance, heart rate, and effort — this feeds your plan and readiness score. Apple Health integration is coming later.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do notifications work?</strong><br>When your logged workout data suggests an adjustment, a notification appears on the bell. Tap Accept to apply, Reject to dismiss.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How does the chat work?</strong><br>Coach Chat uses an AI model to answer your training questions and adjust your plan via tools (move sessions, shorten, flag injury, etc.). Structural changes show an Apply / Cancel card — you confirm before they take effect. Free during the prototype, capped at 50 messages/day.</div>
         <div style="padding: 10px 0;"><strong>I want to start over</strong><br>Profile tab → "Start over with a new plan." Your current plan resets, you go through onboarding again.</div>
@@ -3084,7 +2961,7 @@
         <h2 style="font-size: 20px; margin: 0;">Hide this workout?</h2>
         <button onclick="closeHideConfirm()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
       </div>
-      <div class="sub">It stays on Strava — we just won't show it here.</div>
+      <div class="sub">It won't appear in your plan view. You can restore it anytime.</div>
 
       <div id="hideConfirmDetails" style="margin-top: 14px; padding: 12px 14px; background: var(--bg-soft); border-radius: 12px;">
         <!-- populated by openHideConfirm -->
@@ -3173,7 +3050,7 @@
         <h2 style="font-size: 20px; margin: 0;">Settings</h2>
         <button onclick="closeSettings()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
       </div>
-      <div class="sub">App preferences — your goal, race details, and Strava live in <strong>You</strong>.</div>
+      <div class="sub">App preferences — your goal and race details live in <strong>You</strong>.</div>
 
       <div class="card" style="margin-top: 14px;">
         <div class="card-title">Coaching detail level</div>
@@ -3308,16 +3185,6 @@
       <div class="field">
         <label>Notable challenges <span style="color: var(--text-soft); font-weight: 500;">(optional)</span></label>
         <input type="text" id="cieNotes" placeholder="e.g. river current, technical descents">
-      </div>
-
-      <div style="margin-top:10px; padding:12px; background:var(--primary-soft); border-radius:10px; margin-bottom:14px;">
-        <div style="font-size:12px; font-weight:700; color:var(--primary-dark); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">⚡ Auto-detect from Strava</div>
-        <div style="font-size:12px; color:var(--text-soft); line-height:1.5; margin-bottom:8px;">
-          Paste a Strava activity or segment URL. We'll fetch elevation + distance and auto-set terrain/altitude.
-        </div>
-        <input type="text" id="cieStravaUrl" placeholder="https://www.strava.com/segments/12345" style="width:100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
-        <button class="btn btn-primary btn-sm btn-full" onclick="autoDetectFromStravaUrl()">Fetch course data</button>
-        <div id="cieStravaMsg" style="margin-top:8px; font-size:12px; line-height:1.5;"></div>
       </div>
 
       <div style="display: flex; gap: 8px; margin-top: 16px;">
@@ -3532,7 +3399,7 @@
 
       <div style="font-size: 14px; line-height: 1.7; color: var(--text); margin-top: 14px;">
         <p style="margin-bottom: 12px;"><strong>What it does.</strong> Ask the coach anything about your training — why a session is structured the way it is, how to adapt when life interferes, what to expect on race day. It can also <em>execute</em> changes: move a session, shorten a day, flag an injury, scale a build week.</p>
-        <p style="margin-bottom: 12px;"><strong>What it sees.</strong> Each time you send a message, Adapt sends your current plan, recent Strava activities, and check-in data to Mistral (the AI). Your name and login don't go.</p>
+        <p style="margin-bottom: 12px;"><strong>What it sees.</strong> Each time you send a message, Adapt sends your current plan, recent logged workouts, and check-in data to Mistral (the AI). Your name and login don't go.</p>
         <p style="margin-bottom: 12px;"><strong>What it doesn't do.</strong> No medical diagnosis, no nutrition prescriptions, no gear advice. It will redirect those.</p>
         <p style="margin-bottom: 12px;"><strong>Daily cap.</strong> 50 messages per day per device, to keep API costs sane during the prototype.</p>
         <p style="margin-bottom: 0;"><strong>Reset.</strong> You can clear the conversation and turn off Coach Chat anytime in your Account screen.</p>
@@ -3588,6 +3455,55 @@
 </div>
 
 <script>
+  // ── Supabase configuration ─────────────────────────────────────────────────
+  // 1. Go to https://supabase.com → New project (free tier).
+  // 2. Settings → API → copy "Project URL" and "anon public" key below.
+  // 3. In Supabase → Auth → Settings: disable "Confirm email" for demo accounts.
+  // 4. Run this SQL in Supabase → SQL Editor:
+  //
+  //   create table user_data (
+  //     user_id uuid references auth.users(id) on delete cascade primary key,
+  //     username text unique,
+  //     plan_state jsonb default '{}',
+  //     user_scoped jsonb default '{}',
+  //     updated_at timestamptz default now()
+  //   );
+  //   alter table user_data enable row level security;
+  //   create policy "own data" on user_data
+  //     using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  //
+  // Leave the placeholders below to keep using localStorage prototype auth.
+  const SUPABASE_URL      = 'https://lykorfkapbxufkjcqtnl.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
+
+  // Internal Supabase client — null when not configured (localStorage fallback).
+  const _sb = (() => {
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return null;
+    if (typeof supabase === 'undefined') { console.warn('Supabase SDK not loaded'); return null; }
+    return supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  })();
+  function _isSupabase() { return !!_sb; }
+  function _sbEmail(u) { return `${u}@adapt-proto.app`; }
+
+  // Cached username so currentUser() stays synchronous everywhere.
+  let _sbUsername = null;
+  function _sbUserFromMeta(user) {
+    return (user?.user_metadata?.username) || null;
+  }
+
+  // Called once in DOMContentLoaded to hydrate _sbUsername from any existing session.
+  async function initSupabaseSession() {
+    if (!_sb) return;
+    const { data } = await _sb.auth.getSession();
+    if (data.session) _sbUsername = _sbUserFromMeta(data.session.user);
+    _sb.auth.onAuthStateChange((_evt, session) => {
+      _sbUsername = session ? _sbUserFromMeta(session.user) : null;
+    });
+    // Hide the "prototype authentication" notice when real auth is active.
+    const notice = document.querySelector('.auth-notice');
+    if (notice) notice.style.display = 'none';
+  }
+
   // ──────────────────────────────────────────────────────────────────────
   // PWA — register the service worker on first load. Cached app shell lets
   // the user open Adapt offline (the workout they already loaded stays
@@ -3597,7 +3513,7 @@
   // ──────────────────────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
+      navigator.serviceWorker.register('./sw.js').catch((err) => {
         console.warn('Service worker registration failed:', err);
       });
     });
@@ -3658,14 +3574,10 @@
     'Sprint Triathlon':  { floorMin: 3,   recMin: 5,   recMax: 8,  label: 'Sprint Triathlon' },
     'Olympic Triathlon': { floorMin: 5,   recMin: 7,   recMax: 11, label: 'Olympic Triathlon' },
     'Half Ironman':      { floorMin: 7,   recMin: 9,   recMax: 14, label: 'Half Ironman (70.3)' },
-    'Full Ironman':      { floorMin: 10,  recMin: 12,  recMax: 18, label: 'Full Ironman (140.6)' },
     'Gravel 50K':        { floorMin: 3,   recMin: 5,   recMax: 9,  label: 'Gravel 50K' },
     'Gravel 100K':       { floorMin: 4,   recMin: 6,   recMax: 11, label: 'Gravel 100K' },
-    'Gravel 100mi':      { floorMin: 6,   recMin: 9,   recMax: 15, label: 'Gravel 100mi' },
-    'Gravel 200mi':      { floorMin: 8,   recMin: 11,  recMax: 18, label: 'Gravel 200mi' },
     'Road 40K':          { floorMin: 3,   recMin: 5,   recMax: 9,  label: 'Road 40K' },
     'Road 100K':         { floorMin: 4,   recMin: 6,   recMax: 11, label: 'Road 100K' },
-    'Road 100mi':        { floorMin: 6,   recMin: 8,   recMax: 14, label: 'Road 100mi' },
     'General fitness (no event)': { floorMin: 1.5, recMin: 3, recMax: 8, label: 'General fitness' },
   };
 
@@ -3752,7 +3664,6 @@
     'Half Marathon': { minLevel: '15-30', label: 'Half Marathon', minDescription: '15-30 min continuous running' },
     'Marathon':      { minLevel: '30-plus', label: 'Marathon', minDescription: '30+ min continuous running' },
     'Half Ironman':  { minLevel: '30-plus', label: 'Half Ironman (70.3)', minDescription: '30+ min continuous running' },
-    'Full Ironman':  { minLevel: '30-plus', label: 'Full Ironman (140.6)', minDescription: '30+ min continuous running' },
   };
   // Ordered by capability (lowest → highest) for comparison.
   const _RUN_ABILITY_RANK = { 'walk-run': 0, 'under-15': 1, '15-30': 2, '30-plus': 3, '30-60': 3, '60-plus': 4 };
@@ -4307,6 +4218,9 @@
           generatePlanFromInputs();
           planState.planSource = 'fallback';
         }
+        // Mark onboarding done here (not in goHome) so Supabase users
+        // don't get looped back to onboarding on every app reload.
+        markOnboardingComplete();
         stopStagedPlanStatus();
         computeReadinessFlags();
         renderAll();
@@ -4323,6 +4237,8 @@
         planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
         planState.planSource = 'fallback';
         generatePlanFromInputs();
+        // Mark onboarding done even on AI failure — rule engine produced a plan.
+        markOnboardingComplete();
         stopStagedPlanStatus();
         computeReadinessFlags();
         renderAll();
@@ -4706,11 +4622,11 @@
     let missing = required.filter(d => !activeDisc.has(d));
     if (isBike && !hasBikeAccess) missing = ['bike'];
     const minHours = {
-      'Full Ironman': 5, 'Half Ironman': 4, 'Olympic Triathlon': 3,
+      'Half Ironman': 4, 'Olympic Triathlon': 3,
       'Sprint Triathlon': 2.5, 'Marathon': 3, 'Half Marathon': 2,
       '10K': 2, '5K': 1.5,
-      'Gravel 50K': 3, 'Gravel 100K': 4, 'Gravel 100mi': 6, 'Gravel 200mi': 8,
-      'Road 40K': 3, 'Road 100K': 4, 'Road 100mi': 6,
+      'Gravel 50K': 3, 'Gravel 100K': 4,
+      'Road 40K': 3, 'Road 100K': 4,
       'General fitness (no event)': 1
     };
     const flags = [];
@@ -5289,7 +5205,7 @@
       return;
     }
     card.style.display = 'block';
-    if (count) count.textContent = `${hiddenIds.length} workout${hiddenIds.length === 1 ? '' : 's'} hidden — pick which to restore. They\'re still on Strava.`;
+    if (count) count.textContent = `${hiddenIds.length} workout${hiddenIds.length === 1 ? '' : 's'} hidden — pick which to restore.`;
     // Build the list — match each ID against the synced activities
     const allActs = planState.stravaActivities || [];
     const rows = hiddenIds.map(id => {
@@ -5865,13 +5781,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   const planState = {
     sessions: {
-      Mon: { name: 'Full rest', meta: 'Recovery', duration: 0, type: 'rest' },
+      Mon: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
-      Wed: { name: 'Swim + Bike intervals', meta: '60 min · Quality', duration: 60, type: 'quality' },
+      Wed: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Thu: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Fri: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
-      Sat: { name: 'Long brick', meta: 'Bike 2:00 + Run 0:30', duration: 150, type: 'brick' },
-      Sun: { name: 'Long easy run', meta: '1:15 · Zone 2', duration: 75, type: 'run' }
+      Sat: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Sun: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' }
     },
     // Computed from today on first render — these are placeholder strings that get overwritten
     dates: buildWeekDateLabels(),
@@ -6664,6 +6580,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       let result;
       try {
         result = _runToolDirect(pc.tool, pc.input);
+        if (result && result.success && typeof hapticConfirm === 'function') hapticConfirm();
       } catch (err) {
         result = { success: false, message: 'Apply failed: ' + err.message };
       }
@@ -7907,7 +7824,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'ACWR': { full: 'Acute:Chronic Workload Ratio', def: 'How much you\'re training this week (acute) compared to your average over the last 4 weeks (chronic). 0.8–1.3 is the sweet spot. Above 1.5 — you\'re ramping up too fast and injury risk jumps 4–5×. Below 0.7 — you\'re losing fitness.' },
     'RPE': { full: 'Rate of Perceived Exertion', def: 'How hard a workout felt on a 1–10 scale, in your own judgment. 1 = easy walk, 5 = conversational, 7 = solid, 10 = max effort. Useful because it captures fatigue, sleep, and stress that HR can\'t see.' },
     'HRV': { full: 'Heart Rate Variability', def: 'The natural variation in time between heartbeats. High = recovered & ready. Low = stressed/fatigued. Tracked overnight by most watches.' },
-    'HR': { full: 'Heart Rate', def: 'Beats per minute. In Pulse + insights, "HR" almost always means your AVG HR DURING A WORKOUT (also called "exercise HR") — pulled from Strava\'s recorded average. This is different from RESTING HR (your morning baseline). Lower workout HR at the same effort = fitter. Lower resting HR = more recovered.' },
+    'HR': { full: 'Heart Rate', def: 'Beats per minute. In Pulse + insights, "HR" almost always means your AVG HR DURING A WORKOUT (also called "exercise HR") — logged manually or pulled from a synced device. This is different from RESTING HR (your morning baseline). Lower workout HR at the same effort = fitter. Lower resting HR = more recovered.' },
     'BPM': { full: 'Beats Per Minute', def: 'Unit for heart rate. Resting BPM goes down as you get fitter; max BPM is roughly 220 minus your age (give or take 10–15).' },
     'RHR': { full: 'Resting Heart Rate', def: 'Your heart rate when fully at rest, usually measured first thing in the morning. Goes down as you get fitter; spikes 5+ bpm above your norm can signal illness, overtraining, or poor sleep.' },
     'Z1': { full: 'Zone 1 — Recovery', def: 'Very easy effort, ~50–60% max HR. Conversation flows, you could go all day. Used for recovery rides/jogs.' },
@@ -7929,8 +7846,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'DOMS': { full: 'Delayed Onset Muscle Soreness', def: 'The soreness that hits 24–48h after a hard workout. Caused by microscopic muscle damage. Normal; resolves with easy movement and time.' },
     'Brick': { full: 'Brick session', def: 'A workout combining two disciplines back-to-back — usually bike then run. Trains your body to run on tired legs (race-specific for triathlon).' },
     'Threshold': { full: 'Lactate Threshold', def: 'The highest effort you can sustain for ~1 hour. Above it, lactate accumulates faster than you can clear it. The classic "comfortably hard" feeling.' },
-    'Effort': { full: 'Relative Effort (Strava)', def: 'Strava\'s name for cardiovascular load — calculated from heart rate over time. Formerly called "Suffer Score". Higher number = more cumulative HR stress in the workout.' },
-    'Suffer': { full: 'Suffer Score / Relative Effort', def: 'Strava\'s metric for cardiovascular load — same as "Effort". Higher = more time at high HR.' },
+    'Effort': { full: 'Relative Effort', def: 'A measure of cardiovascular load — calculated from heart rate over time. Higher number = more cumulative HR stress in the workout.' },
+    'Suffer': { full: 'Suffer Score / Relative Effort', def: 'A metric for cardiovascular load — same as "Effort". Higher = more time at high HR.' },
     'Taper': { full: 'Taper', def: 'The 1–3 weeks before a race when training volume drops 30–60% (intensity stays sharp). Lets accumulated fatigue clear so you arrive fresh on race day.' },
     'Z2 base': { full: 'Aerobic Base / Zone 2', def: 'Easy aerobic training — the foundation of endurance fitness. 70–80% of weekly time should be at this intensity.' },
     'WU': { full: 'Warm-up', def: 'The first 5–15 minutes of a workout — easy effort that gradually raises heart rate, opens up blood flow to working muscles, and prepares joints. Skipping it is the fastest way to get hurt or have a flat session.' },
@@ -8148,7 +8065,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // 2. Weekly volume vs target (plan-structure — gated)
     const totalMins = activeSessions.reduce((a, x) => a + x.s.duration, 0);
-    const currentArc = planState.weekArc.find(w => w.current) || planState.weekArc[0];
+    const currentArc = (planState.weekArc?.length > 0)
+      ? (planState.weekArc.find(w => w.current) || planState.weekArc[0])
+      : null;
+    if (!currentArc) return insights;
     const targetMins = parseWeekHours(currentArc.hours) * 60;
     if (!aiPlanProtected && targetMins > 0) {
       const ratio = totalMins / targetMins;
@@ -9715,7 +9635,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (weekOffset === 0 && s && s.type !== 'rest' && (s.duration || 0) > 0) {
         const logged = s.loggedManually || s.completed;
         logSlot.innerHTML = `<button onclick="openLogForDay('${day}')" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">${logged ? '✎ Edit what I did' : '✓ Log what I did (HR, time, distance)'}</button>
-        <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">No watch or Strava? Enter your heart rate and session data by hand.</div>`;
+        <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Enter your heart rate, distance, and effort by hand.</div>`;
       }
     }
     // Per-day availability — editable for this week + next 2 (the tool range).
@@ -10332,13 +10252,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const BASELINE_BY_EVENT = {
       '5K': 6, '10K': 8, 'Half Marathon': 14, 'Marathon': 22,
       'Sprint Triathlon': 12, 'Olympic Triathlon': 22,
-      'Half Ironman': 28, 'Full Ironman': 50,
+      'Half Ironman': 28,
       'General fitness (no event)': 0, // no baseline — consistency matters, not block volume
     };
     const baseline = BASELINE_BY_EVENT[event] != null ? BASELINE_BY_EVENT[event] : 14;
     if (baseline > 0 && totalArcHrs < baseline * 0.85) {
       score -= 20;
-      const eventShort = event === 'Half Ironman' ? 'Half IM' : event === 'Full Ironman' ? 'Full IM' : event || 'this race';
+      const eventShort = event || 'this race';
       issues.push(`Block total ${totalArcHrs.toFixed(1)}h below ${baseline}h baseline for ${eventShort}`);
     }
 
@@ -12317,7 +12237,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       'Sprint Triathlon': 120,
       'Olympic Triathlon': 180,
       'Half Ironman': 300,
-      'Full Ironman': 420,
     };
     const sessionCeiling = EVENT_SESSION_CEILING_MIN[event] || 180;
 
@@ -12506,7 +12425,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // restores the user's real state. Output goes to console + a chat-style
   // bubble in the page so testers can see it.
   function runAllSanityScenarios() {
-    const events = ['5K', '10K', 'Half Marathon', 'Marathon', 'Sprint Triathlon', 'Olympic Triathlon', 'Half Ironman', 'Full Ironman'];
+    const events = ['5K', '10K', 'Half Marathon', 'Marathon', 'Sprint Triathlon', 'Olympic Triathlon', 'Half Ironman'];
     const hoursOpts = [2.5, 4, 5, 7, 10];
     const dayOpts = [
       ['Wed', 'Sat', 'Sun'],
@@ -12690,7 +12609,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Header text
     if (label) label.textContent = completed
-      ? `${todayFull} · Logged via Strava`
+      ? `${todayFull} · Logged`
       : `${todayFull} · ${s.type === 'rest' ? 'Rest day' : s.type === 'quality' || s.type === 'brick' ? 'Quality day' : s.type === 'strength' ? 'Strength' : 'Easy'}`;
 
     // Name + duration: show actual workout when completed, prescribed when not
@@ -13229,96 +13148,150 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     else text.textContent = labels.balanced;
   }
 
-  // ── Auth (prototype only — do NOT use in production) ──
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  // localStorage helpers (always available as fallback)
   function getAccounts() {
     try { return JSON.parse(localStorage.getItem('adapt-accounts') || '{}'); }
     catch (e) { return {}; }
   }
   function saveAccounts(a) { localStorage.setItem('adapt-accounts', JSON.stringify(a)); }
-  function currentUser() { return localStorage.getItem('adapt-session'); }
 
+  // currentUser() stays synchronous everywhere — reads cached _sbUsername
+  // when Supabase is active, localStorage session when not.
+  function currentUser() {
+    if (_isSupabase()) return _sbUsername;
+    return localStorage.getItem('adapt-session');
+  }
+
+  // planState fields persisted per-user (Supabase and localStorage).
+  const _PLAN_FIELDS = [
+    'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
+    'fullPlan', 'aiPlanSummary', 'aiPlanNotes', 'planSource',
+    'raceEvent', 'raceDate', 'raceLocation',
+    'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
+    'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
+    'stravaAuthError', 'lastCheckin', 'notifications',
+    'aiPlanError', 'profile', 'onboardingComplete',
+  ];
+
+  // Keys that are user-specific (scoped to account, not device).
+  const USER_SCOPED_LOCAL_KEYS = [
+    'first-name', 'adapt-coach-history', 'adapt-coach-accepted',
+    'strava-config', 'strava-activities', 'strava-synced-at', 'strava-sync-days',
+    'complexity-mode', 'race-event', 'race-date', 'race-location',
+    'hours-per-week', 'training-days', 'course-intel',
+    'perf-range', 'trend-disc', 'integrations', 'fitness-markers',
+    'tri-limiter', 'tri-strategy', 'available-disciplines',
+    'user-profile', 'schedule-prefs', 'schedule-mode',
+    'day-overrides', 'plan-difficulty-adjust',
+  ];
+
+  function _clearUserScopedLocal() {
+    USER_SCOPED_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
+  }
+
+  function _restorePlanState(saved) {
+    if (!saved || !Object.keys(saved).length) return;
+    _PLAN_FIELDS.forEach(f => { if (saved[f] !== undefined) planState[f] = saved[f]; });
+    planState.lastChange = null;
+  }
+
+  // ── Supabase load / save ───────────────────────────────────────────────────
+  async function _sbLoad() {
+    const { data: s } = await _sb.auth.getSession();
+    if (!s.session) return;
+    const { data } = await _sb.from('user_data')
+      .select('plan_state, user_scoped')
+      .eq('user_id', s.session.user.id)
+      .single();
+    if (!data) return;
+    _restorePlanState(data.plan_state);
+    if (data.user_scoped) {
+      Object.entries(data.user_scoped).forEach(([k, v]) => { if (v != null) localStorage.setItem(k, v); });
+    }
+  }
+
+  async function _sbSave() {
+    const { data: s } = await _sb.auth.getSession();
+    if (!s.session) return;
+    const userScoped = {};
+    USER_SCOPED_LOCAL_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) userScoped[k] = v; });
+    const planSnapshot = {};
+    _PLAN_FIELDS.forEach(f => { if (planState[f] !== undefined) planSnapshot[f] = planState[f]; });
+    const { error } = await _sb.from('user_data').upsert({
+      user_id: s.session.user.id,
+      username: _sbUsername,
+      plan_state: planSnapshot,
+      user_scoped: userScoped,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+    if (error) console.warn('saveUserData (Supabase):', error.message);
+  }
+
+  // Known demo / tester accounts — auto-created in Supabase on first login.
+  const _KNOWN_ACCOUNTS = {
+    alex: 'alex', jordan: 'jordan', danny: 'danny',
+    sam: 'sam', riley: 'riley', morgan: 'morgan', demo: 'demo',
+    bridget: 'bridget', jane: 'jane', connor: 'connor',
+    luke: 'luke', gabe: 'gabe', wb: 'WB',
+  };
+
+  // Supabase enforces 6-char minimum; pad short passwords transparently.
+  function _sbPw(pw) { return pw.length >= 6 ? pw : pw.padEnd(6, '1'); }
+
+  async function _sbAutoCreate(username, password) {
+    const { data, error } = await _sb.auth.signUp({
+      email: _sbEmail(username),
+      password: _sbPw(password),
+      options: { data: { username } }
+    });
+    if (error) { showError('loginError', 'Could not create account: ' + error.message); return false; }
+    if (data.user) {
+      await _sb.from('user_data').upsert({
+        user_id: data.user.id, username, plan_state: {}, user_scoped: {}
+      }, { onConflict: 'user_id' });
+    }
+    return true;
+  }
+
+  // ── Public auth functions ──────────────────────────────────────────────────
   function ensureDemoAccount() {
+    if (_isSupabase()) return; // Supabase handles accounts server-side
     const accounts = getAccounts();
     let dirty = false;
-    // Create demo account if missing
     if (!accounts.demo) {
-      accounts.demo = {
-        password: 'demo',
-        createdAt: new Date().toISOString(),
-        data: {
-          planState: JSON.parse(JSON.stringify(planState)),
-          chatMode: 'rule',
-          apiKey: null,
-          onboardingComplete: true
-        }
-      };
+      accounts.demo = { password: 'demo', createdAt: new Date().toISOString(),
+        data: { planState: JSON.parse(JSON.stringify(planState)), chatMode: 'rule', apiKey: null, onboardingComplete: true } };
       dirty = true;
     }
-    // Self-heal: always reset the demo password to 'demo' (in case corruption happened)
-    if (accounts.demo.password !== 'demo') {
-      accounts.demo.password = 'demo';
-      dirty = true;
-    }
-    // Self-heal: ensure required data fields exist
+    if (accounts.demo.password !== 'demo') { accounts.demo.password = 'demo'; dirty = true; }
     if (!accounts.demo.data) {
-      accounts.demo.data = {
-        planState: JSON.parse(JSON.stringify(planState)),
-        chatMode: 'rule',
-        apiKey: null,
-        onboardingComplete: true
-      };
+      accounts.demo.data = { planState: JSON.parse(JSON.stringify(planState)), chatMode: 'rule', apiKey: null, onboardingComplete: true };
       dirty = true;
     }
     if (dirty) saveAccounts(accounts);
     ensureTesterAccounts();
   }
 
-  // ──────────────────────────────────────────────────────────────────────
-  // TESTER ACCOUNTS — auto-provisioned on every device on first app load.
-  // Each tester gets a clean account that routes them through onboarding
-  // (NOT a pre-built demo persona). Password == username for simplicity
-  // during testing; tester picks their own race goal during onboarding.
-  // ──────────────────────────────────────────────────────────────────────
   const TESTER_USERNAMES = ['bridget', 'jane', 'connor', 'luke', 'gabe', 'wb'];
-  // Per-account password overrides. Login lowercases the username (so "WB"
-  // becomes the "wb" key) but compares the password verbatim — so WB's
-  // password is stored uppercase to match what's typed.
   const TESTER_PASSWORDS = { wb: 'WB' };
   function ensureTesterAccounts() {
+    if (_isSupabase()) return;
     const accts = getAccounts();
     let dirty = false;
     TESTER_USERNAMES.forEach(u => {
-      const pwd = TESTER_PASSWORDS[u] || u; // default: username == password
+      const pwd = TESTER_PASSWORDS[u] || u;
       if (!accts[u]) {
-        accts[u] = {
-          password: pwd,
-          createdAt: new Date().toISOString(),
-          isTester: true,
-          data: {
-            // Clean slate — no demoPersonaId, no planState — forces full
-            // onboarding on first login.
-            planState: null,
-            chatMode: 'rule',
-            apiKey: null,
-            onboardingComplete: false,
-          },
-        };
+        accts[u] = { password: pwd, createdAt: new Date().toISOString(), isTester: true,
+          data: { planState: null, chatMode: 'rule', apiKey: null, onboardingComplete: false } };
         dirty = true;
       } else {
-        // Self-heal password if it drifted. Don't touch data if the
-        // tester has already started onboarding — preserve their work.
         if (accts[u].password !== pwd) { accts[u].password = pwd; dirty = true; }
         if (!accts[u].isTester) { accts[u].isTester = true; dirty = true; }
       }
     });
     if (dirty) saveAccounts(accts);
   }
-
-  // Pre-creates one named account per demo persona so testers can log in with
-  // simple credentials (alex/alex, danny/danny, etc.) and land in their
-  // persona's populated app. The first time they log in, hydrateDemoPersona
-  // runs the same setup loadDemoPersona uses (sets first-name + plan inputs,
-  // triggers AI plan generation) and flips onboardingComplete to true.
 
   function switchAuthTab(which) {
     document.getElementById('tabLogin').classList.toggle('active', which === 'login');
@@ -13331,147 +13304,128 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   function showError(id, msg) {
     const el = document.getElementById(id);
+    if (!el) return;
     el.textContent = msg;
     el.style.display = 'block';
   }
 
-  function doLogin() {
+  async function doLogin() {
     const username = document.getElementById('loginUsername').value.trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
     if (!username || !password) { showError('loginError', 'Username and password required.'); return; }
+
+    if (_isSupabase()) {
+      const btn = document.querySelector('#authLogin .btn-primary');
+      if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+      try {
+        let { data, error } = await _sb.auth.signInWithPassword({ email: _sbEmail(username), password: _sbPw(password) });
+        if (error) {
+          // Auto-create known demo / tester accounts on first device login.
+          if (error.message.includes('Invalid login credentials') && _KNOWN_ACCOUNTS[username] !== undefined) {
+            const expectedPwd = _KNOWN_ACCOUNTS[username];
+            if (password !== expectedPwd) { showError('loginError', 'Incorrect password.'); return; }
+            const created = await _sbAutoCreate(username, password);
+            if (!created) return;
+            ({ data, error } = await _sb.auth.signInWithPassword({ email: _sbEmail(username), password: _sbPw(password) }));
+            if (error) { showError('loginError', error.message); return; }
+          } else {
+            showError('loginError', error.message.includes('Invalid') ? 'Incorrect username or password.' : error.message);
+            return;
+          }
+        }
+        _sbUsername = _sbUserFromMeta(data.user) || username;
+        _clearUserScopedLocal();
+        await _sbLoad();
+        trackEvent('login', { username, method: 'supabase' });
+        enterApp();
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
+      }
+      return;
+    }
+
+    // localStorage fallback
     const accounts = getAccounts();
     if (!accounts[username]) { showError('loginError', 'No account with that username.'); return; }
     if (accounts[username].password !== password) { showError('loginError', 'Incorrect password.'); return; }
     localStorage.setItem('adapt-session', username);
     loadUserData(username);
     trackEvent('login', { username });
-    // Demo persona accounts: if this is a fresh login for one (no plan yet),
-    // hydrate the persona's inputs + run plan generation before entering.
-    const acct = accounts[username];
     enterApp();
   }
 
-  function doSignup() {
+  async function doSignup() {
     const username = document.getElementById('signupUsername').value.trim().toLowerCase();
     const password = document.getElementById('signupPassword').value;
-    const confirm = document.getElementById('signupConfirm').value;
+    const confirm  = document.getElementById('signupConfirm').value;
     if (!username || username.length < 2) { showError('signupError', 'Username must be at least 2 characters.'); return; }
-    if (!password || password.length < 4) { showError('signupError', 'Password must be at least 4 characters.'); return; }
+    if (!password || password.length < 6) { showError('signupError', 'Password must be at least 6 characters.'); return; }
     if (password !== confirm) { showError('signupError', 'Passwords don\'t match.'); return; }
+
+    if (_isSupabase()) {
+      const { data, error } = await _sb.auth.signUp({
+        email: _sbEmail(username), password, options: { data: { username } }
+      });
+      if (error) { showError('signupError', error.message.includes('already') ? 'Username already taken.' : error.message); return; }
+      if (data.user) {
+        await _sb.from('user_data').upsert(
+          { user_id: data.user.id, username, plan_state: {}, user_scoped: {} },
+          { onConflict: 'user_id' }
+        );
+        _sbUsername = username;
+        trackEvent('signup', { username, method: 'supabase' });
+        enterApp();
+      }
+      return;
+    }
+
+    // localStorage fallback
     const accounts = getAccounts();
     if (accounts[username]) { showError('signupError', 'That username is taken.'); return; }
-    accounts[username] = {
-      password,
-      createdAt: new Date().toISOString(),
-      data: {
-        planState: null,
-        chatMode: 'rule',
-        apiKey: null,
-        onboardingComplete: false
-      }
-    };
+    accounts[username] = { password, createdAt: new Date().toISOString(),
+      data: { planState: null, chatMode: 'rule', apiKey: null, onboardingComplete: false } };
     saveAccounts(accounts);
     localStorage.setItem('adapt-session', username);
     trackEvent('signup', { username });
     enterApp();
   }
 
-  function doLogout() {
+  async function doLogout() {
     if (!confirm('Log out? Your data will stay saved — log back in anytime.')) return;
-    saveUserData();
-    localStorage.removeItem('adapt-session');
-    // Wipe every user-scoped key from live localStorage so the next login
-    // starts from a clean slate. Saved account data was just snapshotted above.
-    if (typeof _clearUserScopedLocal === 'function') _clearUserScopedLocal();
+    await saveUserData();
+    if (_isSupabase()) {
+      await _sb.auth.signOut();
+      _sbUsername = null;
+    } else {
+      localStorage.removeItem('adapt-session');
+    }
+    _clearUserScopedLocal();
     chatMessages.length = 0;
     location.reload();
   }
 
-  // Keys that are user-specific and should be loaded/saved on the account record
-  // so two testers on the same browser don't see each other's chat history,
-  // Strava tokens, first name, etc. Theme stays device-global on purpose.
-  const USER_SCOPED_LOCAL_KEYS = [
-    'first-name',
-    'adapt-coach-history',
-    'adapt-coach-accepted',
-    'strava-config',
-    'strava-activities',
-    'strava-synced-at',
-    'strava-sync-days',
-    'complexity-mode',
-    'race-event',
-    'race-date',
-    'race-location',
-    'hours-per-week',
-    'training-days',
-    'course-intel',
-    'perf-range',
-    'trend-disc',
-    'integrations',
-    'fitness-markers',
-    'tri-limiter',
-    'tri-strategy',
-    'available-disciplines',
-    'user-profile',
-    'schedule-prefs',
-    'schedule-mode',
-    'day-overrides',
-    'plan-difficulty-adjust',
-  ];
-
-  function _clearUserScopedLocal() {
-    USER_SCOPED_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
-  }
-
-  function loadUserData(username) {
+  async function loadUserData(username) {
+    _clearUserScopedLocal();
+    if (_isSupabase()) { await _sbLoad(); return; }
+    // localStorage fallback
     const accounts = getAccounts();
     const acct = accounts[username];
-    // ALWAYS clear the live keys first — even if the account has no saved data —
-    // so we never bleed the previous user's state into a fresh login.
-    _clearUserScopedLocal();
     if (!acct || !acct.data) return;
-    if (acct.data.planState) {
-      // Restore EVERYTHING that was saved, not just five hand-picked fields.
-      // The old narrow restore dropped fullPlan, lastCheckin, planSource,
-      // aiPlanSummary, raceEvent/raceDate, triFocus, raceWeek/postRace,
-      // stravaActivities, activeWeekIdx. Result: a user who logged out + in
-      // saw the rule-fallback shape even if their account had a multi-week
-      // AI plan saved, and Coach Chat lost its full plan context. Same
-      // class as the raceEvent bug — multiple sources of truth diverging.
-      const saved = acct.data.planState;
-      const RESTORE_FIELDS = [
-        'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
-        'fullPlan', 'aiPlanSummary', 'aiPlanNotes', 'planSource',
-        'raceEvent', 'raceDate', 'raceLocation',
-        'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
-        'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
-        'stravaAuthError', 'lastCheckin', 'notifications',
-        'aiPlanError', 'profile',
-      ];
-      RESTORE_FIELDS.forEach(f => {
-        if (saved[f] !== undefined) planState[f] = saved[f];
-      });
-      planState.lastChange = null;
-    }
-    // Restore every user-scoped localStorage key from the account record.
+    _restorePlanState(acct.data.planState);
     if (acct.data.userScoped) {
-      Object.entries(acct.data.userScoped).forEach(([k, v]) => {
-        if (v != null) localStorage.setItem(k, v);
-      });
+      Object.entries(acct.data.userScoped).forEach(([k, v]) => { if (v != null) localStorage.setItem(k, v); });
     }
   }
 
-  function saveUserData() {
+  async function saveUserData() {
     const username = currentUser();
     if (!username) return;
+    if (_isSupabase()) { _sbSave(); return; } // fire-and-forget upsert
+    // localStorage fallback
     const accounts = getAccounts();
     if (!accounts[username]) return;
-    // Snapshot every user-scoped localStorage key so it travels with the account.
     const userScoped = {};
-    USER_SCOPED_LOCAL_KEYS.forEach(k => {
-      const v = localStorage.getItem(k);
-      if (v != null) userScoped[k] = v;
-    });
+    USER_SCOPED_LOCAL_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) userScoped[k] = v; });
     accounts[username].data = {
       planState: JSON.parse(JSON.stringify(planState)),
       userScoped,
@@ -15338,10 +15292,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function markOnboardingComplete() {
     const username = currentUser();
     if (!username) return;
-    const accounts = getAccounts();
-    if (!accounts[username]) return;
-    accounts[username].data.onboardingComplete = true;
-    saveAccounts(accounts);
+    planState.onboardingComplete = true;
+    if (!_isSupabase()) {
+      const accounts = getAccounts();
+      if (accounts[username]) { accounts[username].data.onboardingComplete = true; saveAccounts(accounts); }
+    }
+    saveUserData();
   }
 
   // Detects "marked-complete-but-empty-plan" state: a user who was flagged
@@ -15362,8 +15318,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // their saved inputs; if those inputs are missing, sends them back to
   // onboarding step 0.
   async function _attemptStaleStatePlanRecovery() {
-    const event = localStorage.getItem('race-event') || '';
-    const eventDate = localStorage.getItem('race-date') || '';
+    // Supabase users store race inputs in planState (synced to cloud).
+    // localStorage users store them in localStorage. Check planState first.
+    const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const eventDate = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
     const hours = parseFloat(localStorage.getItem('hours-per-week') || '0');
     let days = [];
     try { days = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
@@ -15373,7 +15331,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       onbStep(0);
       return;
     }
-    const eventLocation = localStorage.getItem('race-location') || '';
+    const eventLocation = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
     const complexity = localStorage.getItem('complexity-mode') || 'simple';
     showScreen('onboard');
     onbStep(6);
@@ -15403,7 +15361,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const display = firstName ? (firstName.charAt(0).toUpperCase() + firstName.slice(1)) : username;
       greet.textContent = 'Logged in as ' + display;
     }
-    if (!acct || !acct.data.onboardingComplete) {
+    const onboardingComplete = _isSupabase() ? !!planState.onboardingComplete : !!(acct?.data?.onboardingComplete);
+    if (!onboardingComplete) {
       showScreen('onboard');
       // Post-login: skip step 0 (welcome panel) — the user already saw it
       // before tapping "Get started." Jump straight to step 1 (name +
@@ -15440,29 +15399,43 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
-    ensureDemoAccount();
     initAnalytics();
-    const session = currentUser();
-    if (session && getAccounts()[session]) {
-      loadUserData(session);
+
+    // Initialize Supabase session (no-op when not configured).
+    await initSupabaseSession();
+
+    let returning = false;
+    if (_isSupabase()) {
+      // Supabase path: check for active cloud session.
+      if (_sbUsername) {
+        _clearUserScopedLocal();
+        await _sbLoad();
+        returning = true;
+      }
+    } else {
+      // localStorage fallback: provision demo / tester accounts, then check session.
+      ensureDemoAccount();
+      const session = localStorage.getItem('adapt-session');
+      if (session && getAccounts()[session]) {
+        await loadUserData(session);
+        returning = true;
+      }
+    }
+
+    if (returning) {
       trackEvent('app_open', { returning: true });
       enterApp();
     } else {
       trackEvent('app_open', { returning: false });
-      // First-time visitors land on the welcome panel (onbStep 0). The
-      // "Let's build your plan" button then routes them to the auth screen.
-      // Was previously: showScreen('auth') — login came before any context.
       showScreen('onboard');
       if (typeof onbStep === 'function') onbStep(0);
     }
+
     renderAll();
-    // Hydrate Coach Chat history from localStorage so prior conversations persist.
     if (typeof loadCoachHistory === 'function') loadCoachHistory();
-    // If we just came back from a Strava OAuth redirect, finish the handshake
     if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
-    // Auto-launch a demo if the URL has ?demo=<persona-id>
   });
 
   // Coach Chat (Mistral via Adapt's backend) — gated on an explicit one-time
@@ -16520,6 +16493,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const s = slot.sessions[day];
     if (!s) return { success: false, message: `No session on ${day} (${slot.label}).` };
     s.completed = true;
+    if (typeof hapticComplete === 'function') hapticComplete();
     if (slot.isCurrent) renderWeekSessions();
     const msg = `Marked ${day}'s ${s.name} as completed (${slot.label}).`;
     setChange(msg);
@@ -16966,6 +16940,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       if (status) recordInjuryStatus(status, notes);
     }
 
+    if (typeof hapticComplete === 'function') hapticComplete();
     renderCheckinSummary(body, sleep, stress, notes);
     saveUserData();
     renderNotifBadge();
@@ -17428,6 +17403,60 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     document.querySelectorAll('#timeOpts .time-opt').forEach(b => b.classList.remove('active'));
     updateCrunchUI(mins);
   }
+
+  // ── iOS keyboard: scroll active input into view on focus ──────────────────
+  // On Mobile Safari the virtual keyboard resizes the viewport and can cover
+  // the focused field. scrollIntoView with block:'center' pushes it above the
+  // keyboard. The 300 ms delay lets the keyboard finish animating first.
+  document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, { passive: true });
+
+  // ── Haptic feedback helpers ────────────────────────────────────────────────
+  function haptic(pattern) {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  }
+  // Call these at key moments in the app:
+  //   hapticComplete()  — workout logged / check-in saved
+  //   hapticConfirm()   — plan change applied
+  //   hapticLight()     — chip toggle / minor interaction
+  function hapticComplete() { haptic(200); }
+  function hapticConfirm()  { haptic([100, 50, 100]); }
+  function hapticLight()    { haptic(50); }
+
+  // ── Offline / online banner ────────────────────────────────────────────────
+  (function () {
+    const BANNER_ID = 'adapt-offline-banner';
+
+    function createBanner() {
+      if (document.getElementById(BANNER_ID)) return;
+      const b = document.createElement('div');
+      b.id = BANNER_ID;
+      b.textContent = "You're offline — showing last synced data";
+      b.style.cssText = [
+        'position:fixed', 'top:0', 'left:0', 'right:0',
+        'background:#f59e0b', 'color:#fff',
+        'text-align:center', 'font-size:13px', 'font-weight:600',
+        'padding:8px 16px', 'z-index:9999',
+        'padding-top:calc(8px + env(safe-area-inset-top, 0px))',
+      ].join(';');
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+
+    function removeBanner() {
+      const b = document.getElementById(BANNER_ID);
+      if (b) b.remove();
+    }
+
+    if (!navigator.onLine) createBanner();
+    window.addEventListener('offline', createBanner);
+    window.addEventListener('online', removeBanner);
+  })();
 </script>
 
 </body>
