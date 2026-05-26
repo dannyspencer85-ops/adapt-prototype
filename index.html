@@ -9,7 +9,7 @@
      sets the background that shows during PWA splash on Android. -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#3B8968">
-<meta name="background-color" content="#F6F4EC">
+<meta name="background-color" content="#FFFFFF">
 <!-- iOS Safari PWA tags. iOS uses these instead of the manifest for the
      home-screen install. apple-mobile-web-app-capable triggers standalone
      mode (no Safari chrome). status-bar-style controls the top bar. -->
@@ -22,10 +22,13 @@
      init time. Safe to leave even when SUPABASE_URL is not yet configured;
      the app falls back to localStorage auth in that case. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #F6F4EC;
-    --bg-soft: #ECE5D2;  /* Warm cream — sits between page bg and white cards. Used for nested surfaces. */
+    --bg: #FFFFFF;
+    --bg-soft: #F5F5F7;  /* Light grey — used for nested surfaces and secondary areas. */
     --card: #FFFFFF;
     --primary: #3B8968;
     --primary-soft: #DCEADF;
@@ -51,38 +54,28 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     color: var(--text);
-    background: #E8DFD0;
+    background: var(--bg);
     -webkit-font-smoothing: antialiased;
   }
   body {
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 20px;
+    align-items: flex-start;
+    padding: 0;
   }
   .phone {
     width: 100%;
-    max-width: 420px;
-    height: 90vh;
-    max-height: 900px;
-    min-height: 700px;
+    max-width: 100%;
+    height: 100vh;
     background: var(--bg);
-    border-radius: 36px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    border-radius: 0;
+    box-shadow: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     position: relative;
-  }
-  .status-bar {
-    display: flex;
-    justify-content: space-between;
-    padding: 12px 24px 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
   }
   .screen {
     flex: 1;
@@ -1385,11 +1378,6 @@
 <body>
 
 <div class="phone">
-  <div class="status-bar">
-    <span>9:41</span>
-    <span>100%</span>
-  </div>
-
   <!-- AUTH (login / signup) — shown AFTER the welcome panel's "Let's
        build your plan" button. The welcome screen is the new active
        default for non-logged-in users. -->
@@ -1400,10 +1388,6 @@
         <div class="logo-name">Adapt</div>
       </div>
 
-      <div class="auth-notice">
-        <strong>Prototype authentication.</strong> Accounts are stored in your browser only (not secure, not synced across devices). Never use a real password here — this is for demo only. In production Adapt would use a proper auth provider.
-      </div>
-
       <div class="auth-tabs">
         <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log in</button>
         <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign up</button>
@@ -1412,26 +1396,14 @@
       <div id="authLogin">
         <h1 style="font-size: 26px; margin-bottom: 18px;">Welcome back.</h1>
         <div class="field">
-          <label>Username</label>
-          <input type="text" id="loginUsername" autocomplete="username" placeholder="demo">
+          <label>Email</label>
+          <input type="email" id="loginEmail" autocomplete="email" placeholder="you@example.com">
         </div>
         <div class="field">
           <label>Password</label>
-          <input type="password" id="loginPassword" autocomplete="current-password" placeholder="demo">
+          <input type="password" id="loginPassword" autocomplete="current-password">
         </div>
         <div class="auth-error" id="loginError" style="display:none;"></div>
-        <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 16px; padding: 10px 12px; background: var(--primary-soft); border-radius: 10px; line-height: 1.6;">
-          <strong style="display:block; color:var(--text); margin-bottom:6px;">Demo accounts (username = password):</strong>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;">
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">alex</code> first-time tri</span>
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">jordan</code> marathon</span>
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">danny</code> 70.3 vet</span>
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">sam</code> Full IM</span>
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">riley</code> first 5K</span>
-            <span><code style="background:#fff; padding:1px 6px; border-radius:4px; font-size:11px;">morgan</code> injury</span>
-          </div>
-          <div style="margin-top:8px; font-size:11px; color:var(--text-soft);">First login takes 15-30s while we build your plan.</div>
-        </div>
         <div class="onboard-actions" style="padding-top: 0;">
           <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">Log in</button>
         </div>
@@ -1440,8 +1412,12 @@
       <div id="authSignup" style="display:none;">
         <h1 style="font-size: 26px; margin-bottom: 18px;">Create your account.</h1>
         <div class="field">
-          <label>Username</label>
-          <input type="text" id="signupUsername" autocomplete="username">
+          <label>First name</label>
+          <input type="text" id="signupName" autocomplete="given-name" placeholder="Danny">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="signupEmail" autocomplete="email" placeholder="you@example.com">
         </div>
         <div class="field">
           <label>Password</label>
@@ -1453,7 +1429,7 @@
         </div>
         <div class="auth-error" id="signupError" style="display:none;"></div>
         <div class="onboard-actions" style="padding-top: 0;">
-          <button class="btn btn-primary btn-full btn-lg" onclick="doSignup()">Sign up</button>
+          <button class="btn btn-primary btn-full btn-lg" onclick="doSignup()">Create account</button>
         </div>
       </div>
 
@@ -2755,7 +2731,7 @@
       <div class="card" id="healthSyncCard">
         <div class="card-title">Device &amp; health sync</div>
         <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px;">
-          Automatic sync is paused while we build <strong>Apple Health</strong> integration. For now, log your workouts by hand on the Log tab — heart rate, time, distance, and effort all feed your plan.
+          Workouts, sleep, heart rate, and HRV sync automatically from <strong>Apple Health</strong> on the native app. On first open you'll be asked to grant access — approve all to get the full experience.
         </div>
       </div>
 
@@ -2917,7 +2893,7 @@
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 scale. 85+ is on track. 65-84 means small things to tighten up. Below 65 means real risks. Tap the pill anywhere to see the full breakdown.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What if I'm injured?</strong><br>Say "my [area] hurts" in chat, or log it at morning check-in. Engine auto-adjusts. See a doctor or PT for actual medical advice — the app flags, it doesn't diagnose.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>Can't run today — what do I do?</strong><br>Tap "Adjust today" on the workout card. Deselect the disciplines you can't do. Workout adapts automatically.</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Tap any session on Today or Plan, then tap "Log this." Enter your actual time, distance, heart rate, and effort — this feeds your plan and readiness score. Apple Health integration is coming later.</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Workouts sync automatically from Apple Health on the native app. You can also tap any session on Today or Plan, then tap "Log this" to add manually — useful for sessions not recorded on a watch.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do notifications work?</strong><br>When your logged workout data suggests an adjustment, a notification appears on the bell. Tap Accept to apply, Reject to dismiss.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How does the chat work?</strong><br>Coach Chat uses an AI model to answer your training questions and adjust your plan via tools (move sessions, shorten, flag injury, etc.). Structural changes show an Apply / Cancel card — you confirm before they take effect. Free during the prototype, capped at 50 messages/day.</div>
         <div style="padding: 10px 0;"><strong>I want to start over</strong><br>Profile tab → "Start over with a new plan." Your current plan resets, you go through onboarding again.</div>
@@ -3488,7 +3464,10 @@
   // Cached username so currentUser() stays synchronous everywhere.
   let _sbUsername = null;
   function _sbUserFromMeta(user) {
-    return (user?.user_metadata?.username) || null;
+    // Prefer stored display name, fall back to the part before @ in their email.
+    return (user?.user_metadata?.display_name)
+        || (user?.user_metadata?.username)
+        || (user?.email ? user.email.split('@')[0] : null);
   }
 
   // Called once in DOMContentLoaded to hydrate _sbUsername from any existing session.
@@ -3499,9 +3478,6 @@
     _sb.auth.onAuthStateChange((_evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
     });
-    // Hide the "prototype authentication" notice when real auth is active.
-    const notice = document.querySelector('.auth-notice');
-    if (notice) notice.style.display = 'none';
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -3525,6 +3501,10 @@
   // window.navigator.standalone === true).
   function maybeShowIOSInstallHint() {
     if (localStorage.getItem('ios-install-hint-dismissed') === '1') return;
+    // Never show inside the native iOS app shell — already installed.
+    // Detected two ways: injected flag OR the custom UA set in App.js.
+    if (window.__ADAPT_NATIVE__) return;
+    if (/Adapt\//.test(navigator.userAgent || '')) return;
     const ua = navigator.userAgent || '';
     const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
     const isInStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
@@ -4025,6 +4005,22 @@
     if (lastChild) lastChild.style.borderBottom = '0';
   }
 
+  // Map HealthKit sleep bucket strings to the check-in chip text labels.
+  const _HK_SLEEP_CHIP_MAP = {
+    'Under 5h': 'Under 5h',
+    '5-6h': '5-6h',
+    '6-7h': '6-7h',
+    '7-8h': '7-8h',
+    '8h+':  '8h+',
+  };
+  // Map HealthKit body-feel strings to the check-in chip text labels.
+  const _HK_BODY_CHIP_MAP = {
+    'Good':      'Great',
+    'Solid':     'OK',
+    'Tired':     'Tired',
+    'Exhausted': 'Exhausted',
+  };
+
   function autofillCheckin() {
     const connected = getConnectedIntegrations();
     const banner = document.getElementById('watchAutofilledBanner');
@@ -4034,13 +4030,26 @@
         banner.style.display = 'none';
         sleepLabel.style.display = 'none';
       } else {
-        const sleepChip = document.querySelector('#ciSleep .chip:nth-child(4)');
-        if (sleepChip) {
-          document.querySelectorAll('#ciSleep .chip').forEach(c => c.classList.remove('active'));
-          sleepChip.classList.add('active');
+        // Pre-select sleep chip from HealthKit prefill data.
+        const pf = planState.lastCheckinPrefill || {};
+        const targetSleepLabel = _HK_SLEEP_CHIP_MAP[pf.sleep] || null;
+        const targetBodyLabel  = _HK_BODY_CHIP_MAP[pf.body]   || null;
+
+        if (targetSleepLabel) {
+          document.querySelectorAll('#ciSleep .chip').forEach(c => {
+            c.classList.toggle('active', c.textContent.trim() === targetSleepLabel);
+          });
+        }
+        if (targetBodyLabel) {
+          document.querySelectorAll('#ciBody .chip').forEach(c => {
+            c.classList.toggle('active', c.textContent.trim() === targetBodyLabel);
+          });
         }
         banner.style.display = 'block';
-        banner.innerHTML = `<strong>✓ Synced from Apple Health</strong><br>Last night: 7h 48m sleep, HRV 62ms, morning HR 45. Values pre-filled — adjust if anything feels off.`;
+        const sleepStr = pf.sleep ? `sleep ${pf.sleep}` : '';
+        const hrvStr   = pf.hrv   ? `, HRV ${pf.hrv}ms` : '';
+        const rhrStr   = pf.rhr   ? `, HR ${pf.rhr}bpm`  : '';
+        banner.innerHTML = `<strong>✓ Synced from Apple Health</strong><br>${[sleepStr, (hrvStr + rhrStr).replace(/^,\s*/, '')].filter(Boolean).join(' · ') || 'Values pre-filled'} — adjust if anything feels off.`;
         sleepLabel.style.display = 'inline';
         sleepLabel.textContent = 'auto from Apple Health';
       }
@@ -11089,7 +11098,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       <div id="weeklyReadinessInline"></div>
       <div style="font-size: 13px; line-height: 1.6; margin-top: 14px;">
         <strong>Next-week recommendation:</strong> ${r.score >= 85
-          ? 'Keep doing what you\'re doing. Hit Saturday\'s long brick, prioritize sleep, and maintain this rhythm.'
+          ? `Keep doing what you're doing. Hit ${(() => { const ss = (planState.sessions || {})['Sat']; return ss && ss.type !== 'rest' ? ss.name || "Saturday's key session" : 'the long session'; })()}, prioritize sleep, and maintain this rhythm.`
           : r.score >= 65
           ? 'Address the 1-2 gaps flagged above. Small corrections now compound into real readiness by race day.'
           : 'Major adjustments needed. Review the flagged issues, apply the suggested fixes, and consider if the race date or goal needs to shift.'}
@@ -13116,7 +13125,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     planState.stravaActivities = [];
     planState.stravaSyncedAt = null;
     document.querySelectorAll('#onb-1 .chip, #onb-2 .chip, #onb-3 .chip, #onb-4 .chip, #hoursChips .chip, #daysChips .chip, #discChips .chip, #complexityChips .chip, #themeChips .chip, #ciBody .chip, #ciSleep .chip, #ciStress .chip').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginUsername','loginPassword','signupUsername','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
+    document.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginEmail','loginPassword','signupName','signupEmail','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
     if (document.getElementById('ciNotes')) document.getElementById('ciNotes').value = '';
     // Mark onboarding as not-complete so we don't accidentally route past it.
     const username = currentUser();
@@ -13310,33 +13319,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   async function doLogin() {
-    const username = document.getElementById('loginUsername').value.trim().toLowerCase();
+    const email = (document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
-    if (!username || !password) { showError('loginError', 'Username and password required.'); return; }
+    if (!email || !password) { showError('loginError', 'Email and password required.'); return; }
 
     if (_isSupabase()) {
       const btn = document.querySelector('#authLogin .btn-primary');
       if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
       try {
-        let { data, error } = await _sb.auth.signInWithPassword({ email: _sbEmail(username), password: _sbPw(password) });
+        const { data, error } = await _sb.auth.signInWithPassword({ email, password });
         if (error) {
-          // Auto-create known demo / tester accounts on first device login.
-          if (error.message.includes('Invalid login credentials') && _KNOWN_ACCOUNTS[username] !== undefined) {
-            const expectedPwd = _KNOWN_ACCOUNTS[username];
-            if (password !== expectedPwd) { showError('loginError', 'Incorrect password.'); return; }
-            const created = await _sbAutoCreate(username, password);
-            if (!created) return;
-            ({ data, error } = await _sb.auth.signInWithPassword({ email: _sbEmail(username), password: _sbPw(password) }));
-            if (error) { showError('loginError', error.message); return; }
-          } else {
-            showError('loginError', error.message.includes('Invalid') ? 'Incorrect username or password.' : error.message);
-            return;
-          }
+          showError('loginError', error.message.includes('Invalid') ? 'Incorrect email or password.' : error.message);
+          return;
         }
-        _sbUsername = _sbUserFromMeta(data.user) || username;
+        _sbUsername = _sbUserFromMeta(data.user);
         _clearUserScopedLocal();
         await _sbLoad();
-        trackEvent('login', { username, method: 'supabase' });
+        trackEvent('login', { method: 'supabase' });
         enterApp();
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
@@ -13344,49 +13343,57 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return;
     }
 
-    // localStorage fallback
+    // localStorage fallback (dev only)
     const accounts = getAccounts();
-    if (!accounts[username]) { showError('loginError', 'No account with that username.'); return; }
-    if (accounts[username].password !== password) { showError('loginError', 'Incorrect password.'); return; }
-    localStorage.setItem('adapt-session', username);
-    loadUserData(username);
-    trackEvent('login', { username });
+    if (!accounts[email]) { showError('loginError', 'No account with that email.'); return; }
+    if (accounts[email].password !== password) { showError('loginError', 'Incorrect password.'); return; }
+    localStorage.setItem('adapt-session', email);
+    loadUserData(email);
+    trackEvent('login', {});
     enterApp();
   }
 
   async function doSignup() {
-    const username = document.getElementById('signupUsername').value.trim().toLowerCase();
+    const name     = (document.getElementById('signupName')?.value || '').trim();
+    const email    = (document.getElementById('signupEmail')?.value || '').trim().toLowerCase();
     const password = document.getElementById('signupPassword').value;
     const confirm  = document.getElementById('signupConfirm').value;
-    if (!username || username.length < 2) { showError('signupError', 'Username must be at least 2 characters.'); return; }
+    if (!email || !email.includes('@')) { showError('signupError', 'Please enter a valid email address.'); return; }
     if (!password || password.length < 6) { showError('signupError', 'Password must be at least 6 characters.'); return; }
     if (password !== confirm) { showError('signupError', 'Passwords don\'t match.'); return; }
 
     if (_isSupabase()) {
-      const { data, error } = await _sb.auth.signUp({
-        email: _sbEmail(username), password, options: { data: { username } }
-      });
-      if (error) { showError('signupError', error.message.includes('already') ? 'Username already taken.' : error.message); return; }
-      if (data.user) {
-        await _sb.from('user_data').upsert(
-          { user_id: data.user.id, username, plan_state: {}, user_scoped: {} },
-          { onConflict: 'user_id' }
-        );
-        _sbUsername = username;
-        trackEvent('signup', { username, method: 'supabase' });
-        enterApp();
+      const btn = document.querySelector('#authSignup .btn-primary');
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
+      try {
+        const displayName = name || email.split('@')[0];
+        const { data, error } = await _sb.auth.signUp({
+          email, password, options: { data: { display_name: displayName } }
+        });
+        if (error) { showError('signupError', error.message.includes('already') ? 'An account with that email already exists.' : error.message); return; }
+        if (data.user) {
+          await _sb.from('user_data').upsert(
+            { user_id: data.user.id, username: displayName, plan_state: {}, user_scoped: {} },
+            { onConflict: 'user_id' }
+          );
+          _sbUsername = displayName;
+          trackEvent('signup', { method: 'supabase' });
+          enterApp();
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Create account'; }
       }
       return;
     }
 
-    // localStorage fallback
+    // localStorage fallback (dev only)
     const accounts = getAccounts();
-    if (accounts[username]) { showError('signupError', 'That username is taken.'); return; }
-    accounts[username] = { password, createdAt: new Date().toISOString(),
+    if (accounts[email]) { showError('signupError', 'An account with that email already exists.'); return; }
+    accounts[email] = { password, createdAt: new Date().toISOString(),
       data: { planState: null, chatMode: 'rule', apiKey: null, onboardingComplete: false } };
     saveAccounts(accounts);
-    localStorage.setItem('adapt-session', username);
-    trackEvent('signup', { username });
+    localStorage.setItem('adapt-session', email);
+    trackEvent('signup', {});
     enterApp();
   }
 
@@ -15399,6 +15406,193 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
+  // ─── Apple HealthKit bridge ────────────────────────────────────────────────
+  // Called by the native iOS shell (App.js) after reading HealthKit.
+  // Receives a structured JSON payload and integrates it into planState.
+  //
+  // Data shape (all arrays, newest-first):
+  //   workouts[]        — activityName, duration (min), distance (m), start, end, calories, averageHeartRate
+  //   restingHeartRate[]— value (bpm), startDate
+  //   hrv[]             — value (ms SDNN), startDate
+  //   sleep[]           — value ('INBED'|'ASLEEP'|'AWAKE'|'CORE'|'DEEP'|'REM'), startDate, endDate
+  //   vo2max[]          — value (ml/kg/min), startDate
+  //   activeEnergy[]    — value (kcal), startDate
+  //   respiratoryRate[] — value (breaths/min), startDate
+  //   spo2[]            — value (fraction 0-1), startDate
+  window.__adaptReceiveHealth = function(data) {
+    if (!data || data.source !== 'apple-health') return;
+
+    // Mark Apple Health as connected so check-in banners and integrations UI update.
+    try {
+      const stored = JSON.parse(localStorage.getItem('integrations') || '[]');
+      if (!stored.includes('apple-health')) {
+        localStorage.setItem('integrations', JSON.stringify([...stored, 'apple-health']));
+      }
+    } catch (e) {}
+
+    // Store the raw payload for the coach context.
+    planState.healthKit = {
+      syncedAt:        data.timestamp,
+      restingHeartRate: data.restingHeartRate || [],
+      hrv:             data.hrv              || [],
+      vo2max:          data.vo2max           || [],
+      activeEnergy:    data.activeEnergy     || [],
+      respiratoryRate: data.respiratoryRate  || [],
+      spo2:            data.spo2             || [],
+    };
+
+    // ── 1. Workouts → merge into stravaActivities-compatible list ────────
+    // HealthKit activity names → Strava-style type strings.
+    const HK_TYPE_MAP = {
+      'Running':                        'Run',
+      'Cycling':                        'Ride',
+      'Swimming':                       'Swim',
+      'TraditionalStrengthTraining':    'WeightTraining',
+      'FunctionalStrengthTraining':     'WeightTraining',
+      'CoreTraining':                   'WeightTraining',
+      'CrossTraining':                  'CrossTraining',
+      'Walking':                        'Walk',
+      'Hiking':                         'Hike',
+      'HighIntensityIntervalTraining':  'Workout',
+      'Yoga':                           'Yoga',
+      'Rowing':                         'Rowing',
+      'Elliptical':                     'Elliptical',
+      'StairClimbing':                  'StairStepper',
+      'Soccer':                         'Soccer',
+    };
+
+    const hkActivities = (data.workouts || []).map(w => {
+      const actType = HK_TYPE_MAP[w.activityName] || 'Workout';
+      const durationMin = typeof w.duration === 'number'
+        ? Math.round(w.duration)        // react-native-health returns minutes
+        : Math.round(((new Date(w.end) - new Date(w.start)) / 60000));
+      const distKm = (w.distance || 0) / 1000; // HealthKit returns metres
+      return {
+        id:              'hk-' + w.start,
+        name:            w.activityName || 'Workout',
+        type:            actType,
+        distance_km:     Math.round(distKm * 10) / 10,
+        moving_min:      durationMin,
+        elapsed_min:     durationMin,
+        elevation_m:     0,
+        avg_hr:          w.averageHeartRate || null,
+        max_hr:          null,
+        avg_watts:       null,
+        kilojoules:      w.calories ? Math.round(w.calories * 4.184) : null,
+        suffer:          null,
+        avg_temp_c:      null,
+        start_date:      w.start,
+        start_date_local: w.start,
+        source:          'apple-health',
+      };
+    });
+
+    // Merge: keep existing non-HK activities, replace all HK ones with fresh data.
+    const existing = (planState.stravaActivities || []).filter(a => !String(a.id).startsWith('hk-'));
+    planState.stravaActivities = [...hkActivities, ...existing]
+      .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    planState.stravaSyncedAt = Date.now();
+    try {
+      localStorage.setItem('strava-activities', JSON.stringify(planState.stravaActivities));
+      localStorage.setItem('strava-synced-at', String(planState.stravaSyncedAt));
+    } catch (e) {}
+
+    // ── 2. Sleep → derive last-night duration ──────────────────────────
+    // Sum ASLEEP / CORE / DEEP / REM segments from the previous ~36 hours.
+    // Ignore INBED (includes time awake) and AWAKE samples.
+    const SLEEP_STAGES = new Set(['ASLEEP', 'CORE', 'DEEP', 'REM']);
+    const cutoff = Date.now() - 36 * 3600000; // 36h back
+    let sleepMs = 0;
+    (data.sleep || []).forEach(s => {
+      if (!SLEEP_STAGES.has(s.value)) return;
+      const st = new Date(s.startDate || s.start).getTime();
+      const en = new Date(s.endDate   || s.end  ).getTime();
+      if (en > cutoff && en > st) sleepMs += (en - st);
+    });
+    const sleepHours = sleepMs / 3600000;
+
+    // Map to check-in sleep buckets.
+    let sleepBucket = null;
+    if (sleepHours > 0) {
+      if      (sleepHours < 5)  sleepBucket = 'Under 5h';
+      else if (sleepHours < 6)  sleepBucket = '5-6h';
+      else if (sleepHours < 7)  sleepBucket = '6-7h';
+      else if (sleepHours < 8)  sleepBucket = '7-8h';
+      else                      sleepBucket = '8h+';
+    }
+
+    // ── 3. Resting HR → body feel heuristic ───────────────────────────
+    // Use the baseline from fitnessMarkers or the 7-day median from HealthKit.
+    const rhrSamples = (data.restingHeartRate || []).filter(r => r && r.value > 20);
+    const latestRhr  = rhrSamples.length ? rhrSamples[0].value : null;
+    let baselineRhr  = planState.fitnessMarkers?.restingHr || null;
+    if (!baselineRhr && rhrSamples.length >= 3) {
+      // Derive baseline from the week's readings (use median of oldest half).
+      const sorted = [...rhrSamples].sort((a, b) => a.value - b.value);
+      baselineRhr  = sorted[Math.floor(sorted.length / 2)].value;
+    }
+    // Update fitnessMarkers baseline if we have a reading and none was set.
+    if (latestRhr && (!planState.fitnessMarkers?.restingHr)) {
+      planState.fitnessMarkers = planState.fitnessMarkers || {};
+      planState.fitnessMarkers.restingHr = latestRhr;
+    }
+
+    let bodyFeel = null; // 'Good' | 'Solid' | 'Tired' | 'Exhausted'
+    if (latestRhr && baselineRhr) {
+      const delta = latestRhr - baselineRhr;
+      if      (delta >= 8)  bodyFeel = 'Exhausted';
+      else if (delta >= 4)  bodyFeel = 'Tired';
+      else if (delta <= -2) bodyFeel = 'Good';      // lower than usual → extra recovered
+      else                  bodyFeel = 'Solid';
+    }
+
+    // ── 4. HRV → store for coach context ───────────────────────────────
+    const latestHrv = (data.hrv || []).filter(h => h && h.value > 0)[0] || null;
+    if (latestHrv) {
+      planState.healthKit.latestHrvMs = Math.round(latestHrv.value);
+    }
+
+    // ── 5. VO2 Max → fitness baseline ──────────────────────────────────
+    const latestVo2 = (data.vo2max || []).filter(v => v && v.value > 10)[0] || null;
+    if (latestVo2 && !planState.fitnessMarkers?.vo2max) {
+      planState.fitnessMarkers = planState.fitnessMarkers || {};
+      planState.fitnessMarkers.vo2max = Math.round(latestVo2.value * 10) / 10;
+    }
+
+    // ── 6. Auto-fill morning check-in (if not already done today) ──────
+    const todayStr = new Date().toDateString();
+    const checkin  = planState.lastCheckin;
+    const checkinAlreadyToday = checkin && new Date(checkin.when).toDateString() === todayStr;
+
+    if (!checkinAlreadyToday && (sleepBucket || bodyFeel)) {
+      // Pre-populate but let the user override — don't mark as fully submitted,
+      // just set the prefill fields so the check-in UI shows them.
+      planState.lastCheckinPrefill = {
+        sleep: sleepBucket || null,
+        body:  bodyFeel    || null,
+        rhr:   latestRhr   || null,
+        hrv:   latestHrv   ? Math.round(latestHrv.value) : null,
+        source: 'apple-health',
+        when:  Date.now(),
+      };
+    }
+
+    // ── 7. Respiratory Rate + SpO2 → store for illness flagging ────────
+    const latestRr   = (data.respiratoryRate || []).filter(r => r && r.value > 5)[0] || null;
+    const latestSpo2 = (data.spo2 || []).filter(s => s && s.value > 0)[0] || null;
+    if (latestRr)   planState.healthKit.latestRrBreaths = Math.round(latestRr.value * 10) / 10;
+    if (latestSpo2) planState.healthKit.latestSpo2Pct   = Math.round(latestSpo2.value * 1000) / 10;
+
+    // ── 8. Persist + re-render ─────────────────────────────────────────
+    try { saveUserData(); } catch (e) {}
+    if (typeof computeReadinessFlags === 'function') computeReadinessFlags();
+    if (typeof renderAll            === 'function') renderAll();
+    if (typeof openCheckinCard      === 'function') {
+      // Refresh the check-in card UI to show the HealthKit prefill banner.
+      openCheckinCard();
+    }
+  };
+
   document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
     initAnalytics();
@@ -15502,9 +15696,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // double-quote escape mess that was silently breaking chip clicks.
     const row = document.getElementById('suggestRow');
     if (row) {
+      // Make the "why" chip reflect the user's actual Saturday session.
+      const _satS = (planState.sessions || {})['Sat'];
+      const _satChipLabel = _satS && _satS.type !== 'rest'
+        ? `Why ${_satS.type === 'brick' ? "Saturday's brick?" : _satS.type === 'run' || _satS.type === 'quality' ? "Saturday's long run?" : `Saturday's ${_satS.type}?`}`
+        : "Why long session?";
+      const _satChipPrompt = _satS && _satS.type !== 'rest'
+        ? `Why is ${_satS.name || "Saturday's session"} so important in my plan?`
+        : "Why is the long session the most important session each week?";
       const chips = [
         ["What's today?", "What's today's session and how should it feel?"],
-        ["Why Saturday's brick?", "Why is Saturday's brick so important?"],
+        [_satChipLabel, _satChipPrompt],
         ['Move Sat → Sun', 'Move Saturday to Sunday'],
         ['Only 30 min Wed', 'I only have 30 minutes on Wednesday'],
         ['Skipped today', "I'm skipping today's session"],
@@ -15730,6 +15932,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // Calibrated fitness markers from onboarding step 5 (race time, HR, FTP,
       // CSS). When present, Coach Chat quotes real paces/HR/power.
       fitnessMarkers: readFitnessMarkers(),
+      // Live HealthKit signals — populated by the native iOS shell after
+      // reading Apple Health. Coach uses these for readiness prescriptions.
+      healthKit: planState.healthKit ? {
+        syncedAt:         planState.healthKit.syncedAt,
+        latestRhrBpm:     (planState.healthKit.restingHeartRate || [])[0]?.value ?? null,
+        latestHrvMs:      planState.healthKit.latestHrvMs      ?? null,
+        latestVo2max:     (planState.healthKit.vo2max          || [])[0]?.value ?? null,
+        latestRrBreaths:  planState.healthKit.latestRrBreaths  ?? null,
+        latestSpo2Pct:    planState.healthKit.latestSpo2Pct    ?? null,
+        // 7-day active energy array so coach can see load trend.
+        activeEnergy7d:   (planState.healthKit.activeEnergy    || []).slice(0, 7).map(e => e.value),
+      } : null,
     };
   }
 
@@ -16027,9 +16241,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // ── WORKOUT TYPES ──
     { patterns: [/\b(brick)\b/],
-      answer: 'A brick is a bike session immediately followed by a run — named because your legs feel like bricks when you start the run. It trains the specific muscular and cardiovascular transition you\'ll face on race day. Saturday\'s brick is your single most important session each week because it simulates 70%+ of the half Ironman demand in one block.' },
+      answer: 'A brick is a bike session immediately followed by a run — named because your legs feel like bricks when you start the run. It trains the specific muscular and cardiovascular transition you\'ll face on triathlon race day. If your plan includes a brick, it\'s typically your single most important session of the week because it simulates the combined bike-to-run demand in one block.' },
     { patterns: [/\b(long\s+(run|ride|bike|session|workout))/, /\b(the\s+long\s+one)/],
-      answer: 'The long session is the single biggest driver of endurance fitness. It builds mitochondrial density, teaches fat oxidation, conditions connective tissue, and rehearses race demands. Protect it above almost everything else — if you can only do one session a week, make it the long session. For you that\'s Saturday\'s brick.' },
+      answer: 'The long session is the single biggest driver of endurance fitness. It builds mitochondrial density, teaches fat oxidation, conditions connective tissue, and rehearses race demands. Protect it above almost everything else — if you can only do one session a week, make it the long one. Check your Saturday or Sunday session to find yours.' },
     { patterns: [/\btempo\s+(run|ride|workout)\b/, /\btempo\b/],
       answer: 'Tempo: sustained effort at roughly threshold pace (RPE 7), held for 20-60 minutes. "Comfortably hard." Teaches your body to clear lactate efficiently and raises your sustainable pace. A staple of half marathon and longer plans. In your plan, Wednesday\'s bike intervals fill this role on non-brick weeks.' },
     { patterns: [/\bintervals?\b|\breps?\b.*(hard|workout|session)/],

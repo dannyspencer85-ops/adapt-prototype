@@ -10,11 +10,10 @@ export const config = {
 };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
-// Cost-effective tiers: Small for plain Q&A chat, Medium (not Large) when the
-// turn may call plan-modification tools — Medium handles function-calling
-// reliably at a fraction of Large's cost.
-const DEFAULT_MODEL = 'mistral-small-latest';
-const TOOL_MODEL = 'mistral-medium-latest';
+// open-mistral-nemo is the free-tier workhorse; mistral-small-latest for tool
+// calls when capacity allows. Both support function calling.
+const DEFAULT_MODEL = 'open-mistral-nemo';
+const TOOL_MODEL = 'mistral-small-latest';
 // Bumped from 800 to 1500: the new acknowledge-impact-cascade-warning
 // 4-part response pattern + multi-tool calls in one turn need more headroom.
 const MAX_OUTPUT_TOKENS = 1500;
@@ -144,31 +143,56 @@ export default async function handler(req) {
   const wantsLarge = isToolFollowup || isPlanChange || mode === 'race-suggest';
   const chosenModel = model || (wantsLarge ? TOOL_MODEL : DEFAULT_MODEL);
 
-  // Forward to Mistral
-  const upstream = await fetch(MISTRAL_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: chosenModel,
-      messages: fullMessages,
-      // Race-suggest mode is conversation-only; never expose plan-modification
-      // tools there (no plan exists yet during onboarding).
-      ...(mode === 'race-suggest'
-        ? { tool_choice: 'none' }
-        : { tools: TOOL_DEFINITIONS, tool_choice: 'auto' }),
-      stream: true,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      temperature: typeof temperature === 'number' ? temperature : 0.4,
-    }),
+  // Forward to Mistral — retry up to 2× on transient server errors (502/503/529).
+  const mistralBody = JSON.stringify({
+    model: chosenModel,
+    messages: fullMessages,
+    // Race-suggest mode is conversation-only; never expose plan-modification
+    // tools there (no plan exists yet during onboarding).
+    ...(mode === 'race-suggest'
+      ? { tool_choice: 'none' }
+      : { tools: TOOL_DEFINITIONS, tool_choice: 'auto' }),
+    stream: true,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    temperature: typeof temperature === 'number' ? temperature : 0.4,
   });
 
+  const TRANSIENT_CODES = new Set([502, 503, 529]);
+  const MAX_ATTEMPTS = 3;
+  let upstream, attempt = 0;
+  while (attempt < MAX_ATTEMPTS) {
+    upstream = await fetch(MISTRAL_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: mistralBody,
+    });
+    if (upstream.ok || !TRANSIENT_CODES.has(upstream.status)) break;
+    attempt++;
+    if (attempt < MAX_ATTEMPTS) {
+      // Brief back-off: 800 ms, then 2 s — edge runtime supports awaiting.
+      await new Promise(r => setTimeout(r, attempt === 1 ? 800 : 2000));
+    }
+  }
+
   if (!upstream.ok) {
-    let errBody = '';
-    try { errBody = await upstream.text(); } catch (e) {}
-    return jsonError(upstream.status, `Mistral ${upstream.status}: ${errBody.slice(0, 250)}`);
+    const status = upstream.status;
+    let friendlyMsg;
+    if (TRANSIENT_CODES.has(status)) {
+      friendlyMsg = "The coach is temporarily unavailable — Mistral's servers are busy. Wait a moment and try again.";
+    } else if (status === 429) {
+      friendlyMsg = "Too many requests to the AI. Wait a minute and try again.";
+    } else if (status === 401) {
+      friendlyMsg = "Server configuration error (API key). Contact support.";
+    } else {
+      let errBody = '';
+      try { errBody = await upstream.text(); } catch (e) {}
+      friendlyMsg = `Something went wrong on the AI side (${status}). Try again in a moment.`;
+      console.error(`Mistral ${status}:`, errBody.slice(0, 300));
+    }
+    return jsonError(status, friendlyMsg);
   }
 
   // Pipe the SSE stream back to the client unchanged.
@@ -340,7 +364,16 @@ Length budget:
 • Confirming a tool action → 1 lead sentence + a bullet list of what changed.
 • Never wall-of-text. If you'd write a 5+ sentence paragraph, convert to bullets.
 
-EXAMPLE — confirming a multi-tool plan change:
+EXAMPLE — confirming a multi-tool plan change (runner):
+"Done. Here's what shifted:
+
+- **Monday** marked as skipped — no make-up needed.
+- **Wednesday** cut to **25 min** easy aerobic.
+- **Thursday** opened to a **2-hour** Z2 run/bike to bank some volume.
+
+**Saturday's long run stays untouched** — it's the keystone of the week."
+
+EXAMPLE — confirming a multi-tool plan change (triathlete):
 "Done. Here's what shifted:
 
 - **Monday** marked as skipped — no make-up needed.
@@ -349,11 +382,20 @@ EXAMPLE — confirming a multi-tool plan change:
 
 **Saturday's brick stays untouched** — it's the keystone of the week."
 
-EXAMPLE — answering "why" cleanly:
+EXAMPLE — answering "why" for a RUNNER (no brick in plan):
+User: "Why is Saturday's long run so important?"
+"**Saturday's long run** is the keystone because:
+
+- It builds the aerobic engine that race pace runs off.
+- Longest stimulus of the week — mitochondrial density, fat oxidation, connective tissue conditioning.
+- Spaces 72 hrs from **Wednesday's** quality work — full recovery between hard days."
+
+EXAMPLE — answering "why" for a TRIATHLETE (brick on Saturday):
+User: "Why is Saturday's brick so important?"
 "**Saturday's brick** is the keystone because:
 
 - It rehearses race-day **bike-to-run** transition under fatigue.
-- Long aerobic stress is highest payoff for **Half Ironman** prep.
+- Long aerobic stress is highest payoff for **triathlon** prep.
 - Spaces 72 hrs from **Wednesday's** quality work — full recovery between hard days."
 
 ═══ OTHER RULES ═══
@@ -443,11 +485,11 @@ Wrong answer: Writing "Tomorrow is a rest day" or any text without tool calls.
 
 Example 2 — single change:
 User: "Only 30 min on Wed."
-Right: shortenSession(day='Wed', newMinutes=30, newName='Easy aerobic', newMeta='30 min · Z2'). Then say "Cut Wednesday to 30 min easy aerobic — keeps the leg turnover without taxing recovery before Saturday's brick."
+Right: shortenSession(day='Wed', newMinutes=30, newName='Easy aerobic', newMeta='30 min · Z2'). Then say "Cut Wednesday to 30 min easy aerobic — keeps the aerobic stimulus without wrecking recovery heading into the rest of the week."
 
 Example 3 — pure question, no tool:
-User: "Why is Saturday's brick so important?"
-Right: Just answer. No tool call.
+User: "Why is Saturday's long run so important?" (for a runner) or "Why is Saturday's brick important?" (for a triathlete)
+Right: Check context.sessions.Sat — answer based on what's ACTUALLY there. No tool call.
 
 Example 4 — discipline emphasis (THIS IS NOT A SCOPE VIOLATION):
 User: "I'm a bad runner — can you reshape the plan for higher running?"
@@ -456,6 +498,16 @@ Wrong: Telling them to "set a new goal" or refusing as out-of-scope. Discipline 
 
 ═══ USER'S CURRENT STATE (live from app) ═══
 ${ctxJson}
+
+🚨 PLAN-GROUNDED ANSWERS — READ THE ACTUAL SESSIONS, NEVER GUESS 🚨
+
+Before answering ANY question about a specific session, look it up in context.sessions[day]:
+
+• If the user asks "why Saturday's brick?" — check context.sessions.Sat.type. If it is NOT 'brick', do NOT describe a brick. Instead say: "You don't have a brick on Saturday — your Saturday session is **[name]** ([meta]). Here's why it's structured that way: …" then explain the actual session.
+• If the user asks about "the long run" — find the actual longest run in context.sessions, don't assume which day it is.
+• If the user asks about a swim session — check context.availableDisciplines. If swim is not listed, they don't have one.
+• NEVER mention Saturday's brick, Half Ironman, 70.3, or triathlon-specific advice unless context.raceEvent confirms a triathlon event AND context.sessions contains a brick session.
+• For run-only events (5K, 10K, Half Marathon, Marathon), the plan has NO brick and NO swim sessions. Treat any question about those as "you don't have that in your plan."
 
 🚨 EVENT IS context.raceEvent — NOT WHAT YOU INFER FROM SESSION DURATIONS 🚨
 The user's target event is the literal string in context.raceEvent (e.g. "Half Ironman", "Marathon", "5K"). DO NOT guess the event from session shapes. A user training for a Half Ironman early in the build may have short Z2 base runs — that is NOT a 5K plan. A user training for a 5K may have a long run as their longest session — that is NOT a marathon plan.
