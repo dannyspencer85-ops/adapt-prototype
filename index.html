@@ -2411,11 +2411,10 @@
             <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfDistance">—</div>
           </div>
           <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;" title="Average heart rate while training (not resting HR).">Avg workout HR</div>
+            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;" title="Average resting heart rate over this period. Lower = better recovery baseline.">Resting HR</div>
             <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfAvgHr">—</div>
           </div>
         </div>
-        <div style="font-size: 11px; color: var(--text-soft); margin-top: 10px; line-height: 1.4;">HR shown is your <strong>average heart rate during workouts</strong> — not resting HR. <span class="glossary-term" onclick="defineTerm('HR')">What's HR?</span></div>
       </div>
 
       <!-- Volume over time -->
@@ -4372,11 +4371,19 @@
         }),
       });
       clearTimeout(timeout);
-      if (!resp.ok) {
-        const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || ('HTTP ' + resp.status));
+      const data = await resp.json().catch(() => ({}));
+
+      // 422 = plan generated OK but failed a statistical guardrail (e.g. week-
+      // over-week jump > 30%). The response body includes `raw` — the already-
+      // coerced plan that just missed the bound. Using it is MUCH better than
+      // the rule-engine fallback: all session-type fixes, duration caps, and
+      // discipline coercions have already been applied.
+      if (resp.status === 422 && data.raw && Array.isArray(data.raw.weeks) && data.raw.weeks.length > 0) {
+        console.warn('[Adapt] Plan passed AI but hit a validation bound:', data.error, '— using coerced plan.');
+        return data.raw;
       }
-      const data = await resp.json();
+
+      if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
       if (!data || !data.ok || !data.plan) throw new Error('Plan response missing plan field');
       return data.plan;
     } catch (e) {
@@ -14512,6 +14519,52 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     </svg>`;
   }
 
+  // Cumulative-distance-over-time chart for running workouts.
+  // distSeries: [{t: secondsFromStart, m: cumulativeMetres}]
+  function renderDistChartSVG(distSeries) {
+    if (!distSeries || distSeries.length < 2) return '';
+    const w = 320, h = 130;
+    const padL = 34, padR = 8, padT = 8, padB = 22;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    const maxM  = distSeries[distSeries.length - 1].m || 1;
+    const totalT = distSeries[distSeries.length - 1].t || 1;
+
+    const yPos = m => padT + (1 - m / maxM) * chartH;
+    const xPos = t => padL + (t / totalT) * chartW;
+
+    // Y-axis: labels every 1 km (or 2/5 km for long runs)
+    const kmMax  = maxM / 1000;
+    const kmStep = kmMax <= 5 ? 1 : kmMax <= 15 ? 2 : 5;
+    const yTicks = [];
+    for (let k = 0; k * 1000 <= maxM; k += kmStep) yTicks.push(k * 1000);
+    const yAxis = yTicks.map(m => {
+      const y = yPos(m).toFixed(1);
+      return `<line x1="${padL}" y1="${y}" x2="${padL + chartW}" y2="${y}" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+        <text x="${padL - 5}" y="${(parseFloat(y) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-soft)" font-weight="600">${(m / 1000).toFixed(0)}k</text>`;
+    }).join('');
+
+    // X-axis: time labels at 0%, 25%, 50%, 75%, 100%
+    const xLabel = sec => {
+      const m = Math.round(sec / 60);
+      if (m >= 60) { const h_ = Math.floor(m / 60), r = m % 60; return r ? `${h_}h${r}` : `${h_}h`; }
+      return `${m}m`;
+    };
+    const xAxis = [0, 0.25, 0.5, 0.75, 1.0].map(frac => {
+      const x = (padL + frac * chartW).toFixed(1);
+      return `<text x="${x}" y="${(padT + chartH + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--text-soft)" font-weight="600">${xLabel(totalT * frac)}</text>`;
+    }).join('');
+
+    const pts = distSeries.map(p => `${xPos(p.t).toFixed(1)},${yPos(p.m).toFixed(1)}`).join(' ');
+
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:130px; display:block;" preserveAspectRatio="xMidYMid meet">
+      ${yAxis}
+      ${xAxis}
+      <polyline points="${pts}" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+  }
+
   // ──────────────────────────────────────────────────────────────────────
   // PERFORMANCE TAB — aggregated history over user-selected range
   // ──────────────────────────────────────────────────────────────────────
@@ -14930,12 +14983,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Summary tiles
     const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
     const totalDistKm = acts.reduce((a, x) => a + (x.distance_km || 0), 0);
-    const hrActs = acts.filter(a => a.avg_hr);
-    const avgHr = hrActs.length > 0 ? Math.round(hrActs.reduce((a, x) => a + x.avg_hr, 0) / hrActs.length) : null;
+    // Resting HR — average of daily readings within the selected period.
+    // Falls back to the most recent reading if nothing lands in the window.
+    const cutoffTs = Date.now() - days * 86400000;
+    const rhrAll = (planState.healthKit && planState.healthKit.restingHeartRate) || [];
+    const rhrInRange = rhrAll.filter(r => r && r.value > 20 && new Date(r.startDate).getTime() >= cutoffTs);
+    const rhrSrc = rhrInRange.length > 0 ? rhrInRange : rhrAll.filter(r => r && r.value > 20).slice(0, 7);
+    const avgRhr = rhrSrc.length > 0 ? Math.round(rhrSrc.reduce((s, r) => s + r.value, 0) / rhrSrc.length) : null;
     if (totalEl) totalEl.textContent = formatHM(totalMins);
     if (sessionsEl) sessionsEl.textContent = acts.length;
     if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : '—';
-    if (avgHrEl) avgHrEl.textContent = avgHr ? avgHr + ' bpm' : '—';
+    if (avgHrEl) avgHrEl.textContent = avgRhr ? avgRhr + ' bpm' : '—';
 
     // Volume buckets
     const { buckets, bucketSize, bucketLabel } = bucketActivities(acts, days);
@@ -15148,17 +15206,33 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // STRAVA-BACKED SESSION REPORT — opens a Strava activity in the report modal
   // Fetches the full activity (for polyline + splits) and streams (HR, elevation)
   // ──────────────────────────────────────────────────────────────────────
+  // Format seconds-per-km as "M:SS /km"
+  function fmtPace(secPerKm) {
+    if (!secPerKm || secPerKm <= 0) return '—';
+    const m = Math.floor(secPerKm / 60);
+    const s = Math.round(secPerKm % 60);
+    return `${m}:${String(s).padStart(2,'0')} /km`;
+  }
+
   async function openStravaSessionReport(activityId) {
     const a = (planState.stravaActivities || []).find(x => String(x.id) === String(activityId));
     if (!a) return;
     document.getElementById('srTitle').textContent = a.name;
     document.getElementById('srWhen').textContent = shortDay(a.start_date_local);
 
+    // Gym-type activities don't meaningfully have distance — show calories instead.
+    const GYM_ACTIVITY_NAMES = new Set(['CrossTraining','FunctionalStrengthTraining','TraditionalStrengthTraining','CoreTraining','HighIntensityIntervalTraining','Yoga']);
+    const isGymActivity = a.source === 'apple-health' && GYM_ACTIVITY_NAMES.has(a.name);
+
     let html = '<div class="stat-grid" style="margin-top: 10px;">';
-    html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">${formatHM(a.moving_min)}</div>${a.distance_km > 0.1 ? `<div class="stat-sub">${a.distance_km.toFixed(2)} km</div>` : ''}</div>`;
+    html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">${formatHM(a.moving_min)}</div>${!isGymActivity && a.distance_km > 0.1 ? `<div class="stat-sub">${a.distance_km.toFixed(2)} km</div>` : ''}</div>`;
     html += `<div class="stat-tile"><div class="stat-label">Avg HR</div><div class="stat-value">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div>${a.max_hr ? `<div class="stat-sub">Max ${Math.round(a.max_hr)}</div>` : ''}</div>`;
-    if (a.avg_watts) {
+    if (isGymActivity && a.calories_kcal) {
+      html += `<div class="stat-tile"><div class="stat-label">Calories</div><div class="stat-value">${Math.round(a.calories_kcal)}</div><div class="stat-sub">kcal</div></div>`;
+    } else if (a.avg_watts) {
       html += `<div class="stat-tile"><div class="stat-label">Avg Watts</div><div class="stat-value">${Math.round(a.avg_watts)}</div>${a.kilojoules ? `<div class="stat-sub">${Math.round(a.kilojoules)} kJ</div>` : ''}</div>`;
+    } else if (a.avg_pace_sec_km) {
+      html += `<div class="stat-tile"><div class="stat-label">Avg Pace</div><div class="stat-value" style="font-size:18px;">${fmtPace(a.avg_pace_sec_km)}</div>${a.elevation_m > 0 ? `<div class="stat-sub">${Math.round(a.elevation_m)} m gain</div>` : ''}</div>`;
     } else if (a.elevation_m) {
       html += `<div class="stat-tile"><div class="stat-label">Elevation</div><div class="stat-value">${Math.round(a.elevation_m * 3.28)} ft</div><div class="stat-sub">${Math.round(a.elevation_m)} m</div></div>`;
     } else {
@@ -15166,13 +15240,120 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     html += '</div>';
 
-    // RPE editor — user-entered, persists per activity (sits up top so it's easy to set)
+    // RPE editor — user-entered, persists per activity
     html += `<div class="detail-section" style="margin-top: 18px;" id="srRpeSlot">
       <div class="detail-label">How hard did it feel? (RPE)</div>
       ${renderRpeEditor(a.id)}
     </div>`;
 
-    // Slots populated below by lazy fetches
+    // ── Apple Health activity — render directly from stored data ────────────
+    if (a.source === 'apple-health') {
+      const isRunActivity = a.name === 'Running';
+
+      // ── Route + elevation: outdoor activities only ────────────────────────
+      if (!isGymActivity) {
+        html += `<div class="detail-section" style="margin-top: 18px;">`;
+        if (a.route && a.route.length > 1) {
+          const latlngs = a.route.map(p => [p.lat, p.lng]);
+          html += `<div class="detail-label">Route</div>
+            ${renderRouteSVG(latlngs)}
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+              <div>○ Start</div>
+              <div>${a.distance_km > 0.1 ? a.distance_km.toFixed(2) + ' km' : ''}</div>
+              <div>● Finish</div>
+            </div>`;
+        } else {
+          html += `<div class="detail-label">Route</div>
+            <div style="font-size:12px; color:var(--text-soft);">No GPS route recorded (workout tracked without GPS, or route not yet enriched — only the 30 most recent workouts carry GPS data).</div>`;
+        }
+        html += `</div>`;
+
+        // Elevation profile
+        if (a.route && a.route.length > 1 && a.route.some(p => p.alt !== 0)) {
+          const altArr = a.route.map(p => p.alt || 0);
+          const minA   = Math.round(Math.min(...altArr) * 3.28);
+          const maxA   = Math.round(Math.max(...altArr) * 3.28);
+          html += `<div class="detail-section" style="margin-top:14px;">
+            <div class="detail-label">Elevation</div>
+            ${renderElevationSVG(altArr, null)}
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+              <div>Low ${minA} ft</div>
+              ${a.elevation_m > 0 ? `<div>${Math.round(a.elevation_m)} m gain</div>` : '<div></div>'}
+              <div>High ${maxA} ft</div>
+            </div>
+          </div>`;
+        }
+      }
+
+      // ── Heart rate — time-series chart (preferred) or avg/max summary ────
+      html += `<div class="detail-section" style="margin-top:14px;">
+        <div class="detail-label">Heart rate</div>`;
+      if (a.hr_series && a.hr_series.length >= 2) {
+        const hrArr  = a.hr_series.map(p => p.bpm);
+        const tArr   = a.hr_series.map(p => p.t);
+        const hrMin  = Math.min(...hrArr);
+        const hrMax  = Math.max(...hrArr);
+        const hrAvg  = a.avg_hr ? Math.round(a.avg_hr) : Math.round(hrArr.reduce((s, v) => s + v, 0) / hrArr.length);
+        html += renderHrChartSVG(hrArr, tArr, { maxHr: a.max_hr || null });
+        html += `<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
+          <div>Min ${hrMin}</div><div>Avg ${hrAvg}</div><div>Max ${hrMax}</div>
+        </div>`;
+      } else if (a.avg_hr) {
+        html += `<div style="display:flex; gap:24px; margin-top:6px;">
+          <div><div style="font-size:24px; font-weight:700;">${Math.round(a.avg_hr)}</div><div style="font-size:11px; color:var(--text-soft);">Avg BPM</div></div>
+          ${a.max_hr ? `<div><div style="font-size:24px; font-weight:700;">${Math.round(a.max_hr)}</div><div style="font-size:11px; color:var(--text-soft);">Max BPM</div></div>` : ''}
+        </div>`;
+      } else {
+        html += `<div style="font-size:12px; color:var(--text-soft); margin-top:4px;">No HR data — workout may not have been recorded with a heart rate sensor, or install the latest build from TestFlight to enable per-workout HR tracking.</div>`;
+      }
+      html += `</div>`;
+
+      // ── Distance over time (running only) ────────────────────────────────
+      if (isRunActivity && a.dist_series && a.dist_series.length >= 2) {
+        html += `<div class="detail-section" style="margin-top:14px;">
+          <div class="detail-label">Distance over time</div>
+          ${renderDistChartSVG(a.dist_series)}
+          <div style="font-size:11px; color:var(--text-soft); margin-top:6px; text-align:right;">${a.distance_km.toFixed(2)} km total</div>
+        </div>`;
+      }
+
+      // ── Running dynamics (Apple Watch Series 6+ / Ultra) ─────────────────
+      const hasDyn = a.stride_len_m || a.ground_contact_ms || a.vert_osc_cm || a.run_power_w;
+      if (hasDyn) {
+        html += `<div class="detail-section" style="margin-top:14px;">
+          <div class="detail-label">Running dynamics</div>
+          <div class="stat-grid" style="margin-top:8px;">`;
+        if (a.stride_len_m)
+          html += `<div class="stat-tile"><div class="stat-label">Stride</div><div class="stat-value">${(a.stride_len_m * 100).toFixed(0)} cm</div></div>`;
+        if (a.ground_contact_ms)
+          html += `<div class="stat-tile"><div class="stat-label">Contact</div><div class="stat-value">${Math.round(a.ground_contact_ms)} ms</div></div>`;
+        if (a.vert_osc_cm)
+          html += `<div class="stat-tile"><div class="stat-label">Vert osc</div><div class="stat-value">${a.vert_osc_cm.toFixed(1)} cm</div></div>`;
+        if (a.run_power_w)
+          html += `<div class="stat-tile"><div class="stat-label">Power</div><div class="stat-value">${Math.round(a.run_power_w)} W</div></div>`;
+        html += `</div>
+          <div style="font-size:11px; color:var(--text-soft); margin-top:6px;">Requires Apple Watch Series 6+ or Ultra with Running Form Metrics enabled.</div>
+        </div>`;
+      }
+
+      // ── Cycling cadence ──────────────────────────────────────────────────
+      if (a.avg_cadence) {
+        html += `<div class="detail-section" style="margin-top:14px;">
+          <div class="detail-label">Cycling cadence</div>
+          <div style="font-size:24px; font-weight:700; margin-top:6px;">${Math.round(a.avg_cadence)} <span style="font-size:14px; font-weight:400; color:var(--text-soft);">rpm avg</span></div>
+        </div>`;
+      }
+
+      html += `<div class="detail-section" style="margin-top:14px; font-size:12px; color:var(--text-soft);">
+        <div>Source: Apple Health · ${new Date(a.start_date).toLocaleString()}</div>
+      </div>`;
+
+      document.getElementById('srBody').innerHTML = html;
+      document.getElementById('sessionReportModal').classList.add('show');
+      return; // skip Strava API calls
+    }
+
+    // ── Strava activity — lazy-fetch polyline + streams ─────────────────────
     html += `<div class="detail-section" style="margin-top: 18px;" id="srRouteSlot">
       <div class="detail-label">Route</div>
       <div style="font-size: 12px; color: var(--text-soft);">Loading map…</div>
@@ -15210,7 +15391,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           latlngs = streams.latlng.data;
         }
         if (latlngs && latlngs.length > 1) {
-          const startPt = latlngs[0];
           routeSlot.innerHTML = `
             <div class="detail-label">Route</div>
             ${renderRouteSVG(latlngs)}
@@ -15267,7 +15447,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // 4. Splits (km splits)
       const splitsSlot = document.getElementById('srSplitsSlot');
       if (splitsSlot && full && full.splits_metric && full.splits_metric.length > 0) {
-        const splits = full.splits_metric.slice(0, 12); // cap to first 12 km
+        const splits = full.splits_metric.slice(0, 12);
         const fastestPace = Math.min(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
         const slowestPace = Math.max(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
         splitsSlot.innerHTML = `
@@ -15439,6 +15619,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       activeEnergy:    data.activeEnergy     || [],
       respiratoryRate: data.respiratoryRate  || [],
       spo2:            data.spo2             || [],
+      steps:           data.steps            || [],
     };
 
     // ── 1. Workouts → merge into stravaActivities-compatible list ────────
@@ -15461,12 +15642,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       'Soccer':                         'Soccer',
     };
 
+    // Compute elevation gain from a HealthKit route array [{alt}].
+    function hkElevGain(route) {
+      if (!route || route.length < 2) return 0;
+      let gain = 0;
+      for (let i = 1; i < route.length; i++) {
+        const d = (route[i].alt || 0) - (route[i - 1].alt || 0);
+        if (d > 0) gain += d;
+      }
+      return Math.round(gain);
+    }
+
     const hkActivities = (data.workouts || []).map(w => {
       const actType = HK_TYPE_MAP[w.activityName] || 'Workout';
       const durationMin = typeof w.duration === 'number'
-        ? Math.round(w.duration)        // react-native-health returns minutes
+        ? Math.round(w.duration)
         : Math.round(((new Date(w.end) - new Date(w.start)) / 60000));
       const distKm = (w.distance || 0) / 1000; // HealthKit returns metres
+      // Avg watts: use cyclingPower for rides, runPower for runs (if available).
+      const avgWatts = w.cyclingPower || w.runPower || null;
       return {
         id:              'hk-' + w.start,
         name:            w.activityName || 'Workout',
@@ -15474,16 +15668,29 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         distance_km:     Math.round(distKm * 10) / 10,
         moving_min:      durationMin,
         elapsed_min:     durationMin,
-        elevation_m:     0,
+        elevation_m:     w.route ? hkElevGain(w.route) : 0,
         avg_hr:          w.averageHeartRate || null,
-        max_hr:          null,
-        avg_watts:       null,
+        max_hr:          w.maxHeartRate     || null,
+        avg_watts:       avgWatts,
+        avg_cadence:     w.cyclingCadence   || null,
         kilojoules:      w.calories ? Math.round(w.calories * 4.184) : null,
         suffer:          null,
         avg_temp_c:      null,
         start_date:      w.start,
         start_date_local: w.start,
         source:          'apple-health',
+        // Route + running dynamics (populated for most recent 30 workouts only).
+        route:           w.route           || null, // [{lat,lng,alt,spd}]
+        avg_pace_sec_km: w.avgPaceSecKm    || null, // sec/km
+        stride_len_m:    w.strideLen       || null, // m
+        ground_contact_ms: w.groundContact || null, // ms
+        vert_osc_cm:     w.vertOsc         || null, // cm
+        run_power_w:     w.runPower        || null, // W
+        // Time-series for charts (most recent 30 workouts only).
+        hr_series:       w.hrSeries        || null, // [{t,bpm}] seconds from start
+        dist_series:     w.distSeries      || null, // [{t,m}] cumulative metres, runs only
+        // Raw calories for display (gym workouts don't show distance)
+        calories_kcal:   w.calories        || null,
       };
     });
 
