@@ -7468,7 +7468,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         // needs to be unmistakable at a glance.
         cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:#FBF0D3; border:2px solid #D9A94A; border-radius:8px; ${cursor} overflow:hidden;">
           <div style="font-size:12px; font-weight:800; color:#7a5a18; line-height:1;">${d.getDate()}</div>
-          <div style="position:absolute; top:3px; right:4px; font-size:11px; line-height:1;">🏁</div>
+          <div style="position:absolute; top:3px; right:4px; line-height:1;">${icon('flag',{size:11,color:'#D9A94A',stroke:2.5})}</div>
         </div>`;
       } else {
         cellsHtml += `<div ${onclick} title="${tooltip}" style="position:relative; aspect-ratio: 1 / 1; display:flex; align-items:flex-start; justify-content:flex-start; padding:5px 6px; background:${bgColor}; border:${borderStyle}; border-radius:${borderRadius}; opacity:${opacity}; ${cursor} overflow:hidden;">
@@ -7612,7 +7612,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         'When the itch comes back, talk to Coach about the next goal',
       ];
     } else if (daysOut === 0) {
-      title = `🏁 RACE DAY · ${event}`;
+      title = `RACE DAY · ${event}`;
       body = `Today is the day. Every training session, every early morning, every "I don't feel like it but I will" — all of it lands here. Trust the work. You're ready.`;
       tips = [
         'Eat your tested breakfast 2-3 hr before start',
@@ -7724,7 +7724,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (planState.injury && planState.injury.area) {
       const inj = planState.injury;
       const sev = inj.severity || 'low';
-      const sevLabel = sev === 'high' ? '🚫 Plan paused' : '⚠ Injury flagged';
+      const sevLabel = sev === 'high' ? 'Plan paused' : 'Injury flagged';
       slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
         <strong>${sevLabel} — ${escapeHtml(inj.area)} · ${escapeHtml(sev)}.</strong>
         ${sev === 'high' ? 'See a doctor or PT before resuming. Plan modifications active.' : 'Plan adapted to protect this area. Update daily in your check-in.'}
@@ -7736,7 +7736,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // race-week checklist). Race-DAY cell on the calendar keeps gold.
     if (days != null && days >= 0 && days <= 7) {
       slot.innerHTML = `<div style="background:#DCEADF; border:1px solid #3B8968; color:#2E6B51; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
-        <strong>🏁 Race week.</strong> Volume drops, intensity stays sharp. Your job is to arrive fresh — sleep + fuel matter most right now.
+        <strong>Race week.</strong> Volume drops, intensity stays sharp. Your job is to arrive fresh — sleep + fuel matter most right now.
       </div>`;
       return;
     }
@@ -7818,7 +7818,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       : '';
     const planBanner = `<div class="injury-banner">
         <div class="title-row" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>${sev === 'high' ? '🚫 Plan paused · see a pro' : '⚠ Injury flagged'}</span>
+          <span style="display:flex;align-items:center;gap:4px;">${icon(sev === 'high' ? 'x' : 'flag',{size:13,color:'currentColor'})} ${sev === 'high' ? 'Plan paused · see a pro' : 'Injury flagged'}</span>
           <button onclick="clearInjuryFromUI()" style="background:none; border:0; color:var(--text-soft); font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer; font-family:inherit;">Clear</button>
         </div>
         <div><strong>${escapeHtml(inj.area)}</strong> · ${escapeHtml(sev)} severity${daysTxt ? ' · ' + daysTxt : ''}.
@@ -9456,7 +9456,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         _pushNotification({
           dedupKey: 'rpe-easy-' + longDay,
           severity: 'info',
-          icon: '💪',
+          icon: icon('trendingUp', { size: 15 }),
           title: `You've got capacity — extend ${longDay}?`,
           summary: `${day}'s session felt easier than expected (RPE ${rpe} vs ~${prescribedRpe}). Suggests you have room to push the next long session.`,
           breakdown: [
@@ -10556,7 +10556,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // ── T-0: Race-morning brief ──
       slot.style.display = 'block';
       slot.innerHTML = `<div style="background:linear-gradient(135deg, #D9A94A, #E8B961); color:#fff; border-radius:14px; padding:18px 18px;">
-        <div style="font-size:11px; font-weight:800; letter-spacing:0.6px; text-transform:uppercase; opacity:0.9;">🏁 RACE DAY</div>
+        <div style="font-size:11px; font-weight:800; letter-spacing:0.6px; text-transform:uppercase; opacity:0.9; display:flex; align-items:center; gap:5px;">${icon('flag',{size:13,color:'#fff',stroke:2.5})} RACE DAY</div>
         <div style="font-size:24px; font-weight:800; margin-top:4px;">${escapeHtml(event)}</div>
         <div style="font-size:13px; opacity:0.95; line-height:1.5; margin:10px 0 14px;">All the work is done. Today is execution.</div>
         <div style="background:rgba(255,255,255,0.18); border-radius:10px; padding:11px 13px; font-size:12.5px; line-height:1.6;">
@@ -17590,7 +17590,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
         intro.className = 'bubble system';
         intro.setAttribute('data-checkin-bridge', '1');
         intro.style.maxWidth = '100%';
-        intro.innerHTML = '☀ <strong>Bringing your check-in straight to the coach.</strong> They\'ll review your plan + adherence and propose adjustments. Add anything else after their reply.';
+        intro.innerHTML = `${icon('sun',{size:14,color:'var(--caution)'})} <strong>Bringing your check-in straight to the coach.</strong> They\'ll review your plan + adherence and propose adjustments. Add anything else after their reply.`;
         const sugg = area.querySelector('#suggestRow');
         if (sugg) area.insertBefore(intro, sugg);
         else area.appendChild(intro);
@@ -17768,7 +17768,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       _pushNotification({
         dedupKey: 'checkin-recovery',
         severity: 'warn',
-        icon: '☀',
+        icon: icon('sun', { size: 15 }),
         title: 'Check-in suggests easier day',
         summary: `You logged ${body.toLowerCase()}${sleep === 'Under 5h' || sleep === '5-6h' ? ' + ' + sleep + ' sleep' : ''}. Engine recommends reducing today's intensity.`,
         breakdown: [
