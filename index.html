@@ -1464,7 +1464,7 @@
           <div style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Real-life examples</div>
           <div style="font-size: 13px; line-height: 1.7; color: var(--text);">
             <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="font-size: 16px;">🌙</span><span><strong>Bad night with the kids?</strong> Today's intervals ease.</span></div>
-            <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="font-size: 16px;">🏊</span><span><strong>Pool closed?</strong> Swim swaps to bike or run.</span></div>
+            <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg></span><span><strong>Pool closed?</strong> Swim swaps to bike or run.</span></div>
             <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="font-size: 16px;">✈️</span><span><strong>Travel week?</strong> Volume scales. No catch-up cramming.</span></div>
             <div style="display: flex; gap: 10px;"><span style="font-size: 16px;">🦵</span><span><strong>Knee tight?</strong> Intensity adjusts automatically.</span></div>
           </div>
@@ -1851,7 +1851,7 @@
         <p class="sub">All optional — pick anything you know, skip the rest. Concrete numbers let me prescribe real paces and zones instead of generic ones. Don't know any? That's fine — I'll start with conservative estimates.</p>
 
         <div class="field">
-          <label>🏃 Most recent run race</label>
+          <label>Most recent run race</label>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">A recent race time gives me your run-pace zones (Daniels VDOT). Skip if you haven't raced recently.</div>
           <div class="chip-row" id="fmRunDist">
             <button class="chip" data-val="" onclick="singleChipVal(this)">— None</button>
@@ -1899,7 +1899,7 @@
              for beginners. Defaults to nothing selected — AI uses experience
              chip from step 2 as a fallback when this is blank. -->
         <div class="field">
-          <label>🏃 How long can you run continuously today?</label>
+          <label>How long can you run continuously today?</label>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Honest answer beats best-case. The plan starts where you are.</div>
           <div class="chip-row" id="fmRunAbility">
             <button class="chip" data-val="walk-run" onclick="singleChipVal(this)">Walk + short jogs</button>
@@ -1917,18 +1917,18 @@
              onbStep(5) → adjustFmAdvancedVisibility(). -->
         <div class="field" id="fmAdvancedHeader" style="display:none;">
           <label style="display:flex; justify-content:space-between; align-items:center;">
-            <span>🚴 🏊 Advanced markers</span>
+            <span>Advanced markers</span>
             <button type="button" onclick="toggleFmAdvanced()" id="fmAdvancedToggle" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Show</button>
           </label>
           <div style="font-size:12px; color:var(--text-soft); margin-top:4px;">FTP (bike) and CSS (swim) — only if you've tested them. Skip if you haven't.</div>
         </div>
         <div id="fmAdvancedFields" style="display:none;">
           <div class="field" id="fmFtpField">
-            <label style="font-size:12px;">🚴 Bike FTP (watts) — 1-hour sustainable power</label>
+            <label style="font-size:12px;">Bike FTP (watts) — 1-hour sustainable power</label>
             <input type="number" id="fmFtp" min="80" max="500" placeholder="e.g. 245" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
           </div>
           <div class="field" id="fmCssField">
-            <label style="font-size:12px;">🏊 Swim CSS — threshold pace per 100m</label>
+            <label style="font-size:12px;">Swim CSS — threshold pace per 100m</label>
             <input type="text" id="fmCss" placeholder="e.g. 1:38" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
           </div>
         </div>
@@ -1950,7 +1950,7 @@
           Back
         </button>
         <div style="text-align:center;">
-        <div style="font-size: 48px; margin-bottom: 20px;">🎯</div>
+        <div style="width:56px; height:56px; border-radius:16px; background:var(--primary-soft); display:flex; align-items:center; justify-content:center; margin:0 auto 16px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
         <h1 style="text-align:center;">Building your plan…</h1>
         <p class="sub" style="text-align:center;" id="planBuildingStatus">
           Applying Friel block periodization, Daniels VDOT pacing, and Seiler 80/20 to your inputs. This takes 15-30 seconds.
@@ -2100,7 +2100,7 @@
           <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--alert)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Morning check-in</div>
           <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">How's your body today?</div>
         </button>
-        <button onclick="runWeeklyRecalc()" style="background: var(--caution-soft); border: 1px solid transparent; color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
+        <button id="weeklyReviewBtn" onclick="runWeeklyRecalc()" style="background: var(--caution-soft); border: 1px solid transparent; color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
           <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--caution)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></svg>Weekly review</div>
           <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">Reshape next week</div>
         </button>
@@ -2117,7 +2117,7 @@
           <label>How's your body today?</label>
           <div class="chip-row" id="ciBody">
             <button class="chip" onclick="singleChip(this)">Fresh</button>
-            <button class="chip active" onclick="singleChip(this)">OK</button>
+            <button class="chip" onclick="singleChip(this)">OK</button>
             <button class="chip" onclick="singleChip(this)">Tight</button>
             <button class="chip" onclick="singleChip(this)">Exhausted</button>
           </div>
@@ -2128,7 +2128,7 @@
             <button class="chip" onclick="singleChip(this)">Under 5h</button>
             <button class="chip" onclick="singleChip(this)">5-6h</button>
             <button class="chip" onclick="singleChip(this)">6-7h</button>
-            <button class="chip active" onclick="singleChip(this)">7-8h</button>
+            <button class="chip" onclick="singleChip(this)">7-8h</button>
             <button class="chip" onclick="singleChip(this)">8h+</button>
           </div>
         </div>
@@ -2136,7 +2136,7 @@
           <label>Stress level today</label>
           <div class="chip-row" id="ciStress">
             <button class="chip" onclick="singleChip(this)">Low</button>
-            <button class="chip active" onclick="singleChip(this)">Normal</button>
+            <button class="chip" onclick="singleChip(this)">Normal</button>
             <button class="chip" onclick="singleChip(this)">High</button>
           </div>
         </div>
@@ -2299,13 +2299,13 @@
         <div style="margin-bottom:12px;">
           <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Workout type <span style="font-weight:500; text-transform:none;">— change it if you did something different than planned</span></label>
           <div class="chip-row" id="logActualType" style="margin-top:6px; flex-wrap:wrap;">
-            <button type="button" class="chip" data-type="run" onclick="pickLogType(this)">🏃 Run</button>
-            <button type="button" class="chip" data-type="bike" onclick="pickLogType(this)">🚴 Bike</button>
-            <button type="button" class="chip" data-type="swim" onclick="pickLogType(this)">🏊 Swim</button>
-            <button type="button" class="chip" data-type="strength" onclick="pickLogType(this)">🏋️ Strength</button>
-            <button type="button" class="chip" data-type="brick" onclick="pickLogType(this)">🚴+🏃 Brick</button>
-            <button type="button" class="chip" data-type="quality" onclick="pickLogType(this)">⚡ Intervals</button>
-            <button type="button" class="chip" data-type="mobility" onclick="pickLogType(this)">🧘 Mobility</button>
+            <button type="button" class="chip" data-type="run" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 17l5 1l.75-1.5"/><path d="M15 21l0 -4l-4 -3l1 -6"/><path d="M7 12l0 -3l5 -1l3 3l3 1"/></svg>Run</button>
+            <button type="button" class="chip" data-type="bike" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/></svg>Bike</button>
+            <button type="button" class="chip" data-type="swim" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg>Swim</button>
+            <button type="button" class="chip" data-type="strength" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg>Strength</button>
+            <button type="button" class="chip" data-type="brick" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/><line x1="11" y1="5" x2="11" y2="11"/><line x1="13" y1="13" x2="13" y2="19"/></svg>Brick</button>
+            <button type="button" class="chip" data-type="quality" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Intervals</button>
+            <button type="button" class="chip" data-type="mobility" onclick="pickLogType(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M16 5a1 1 0 1 0 -2 0a1 1 0 0 0 2 0z"/><path d="M17 11l-5 1l-3 -2l-3 1l-3 5"/><path d="M7 18l4 -2"/><path d="M9 13v4l5 1l-1 4"/><path d="M19 21v-3l-1 -2l-3 0"/></svg>Mobility</button>
           </div>
         </div>
         <!-- Brick detail — only shown when "Brick" is the selected type. Lets
@@ -2315,11 +2315,11 @@
           <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Brick detail</label>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;">
             <div>
-              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">🚴 Bike (min)</div>
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">Bike (min)</div>
               <input type="number" id="logBrickBike" min="0" max="360" placeholder="e.g. 50" style="width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
             </div>
             <div>
-              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">🏃 Run (min)</div>
+              <div style="font-size:11px; color:var(--text-soft); margin-bottom:4px;">Run (min)</div>
               <input type="number" id="logBrickRun" min="0" max="360" placeholder="e.g. 20" style="width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
             </div>
           </div>
@@ -2375,7 +2375,7 @@
       </button>
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <div class="greeting" id="progressGreeting">Pulse</div>
+          <div class="greeting" id="progressGreeting">Stats</div>
           <div class="title">How you're trending</div>
         </div>
         <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
@@ -2545,7 +2545,7 @@
           <label>How's your body today?</label>
           <div class="chip-row" id="ciBody">
             <button class="chip" onclick="singleChip(this)">Fresh</button>
-            <button class="chip active" onclick="singleChip(this)">OK</button>
+            <button class="chip" onclick="singleChip(this)">OK</button>
             <button class="chip" onclick="singleChip(this)">Tight</button>
             <button class="chip" onclick="singleChip(this)">Exhausted</button>
           </div>
@@ -2556,7 +2556,7 @@
             <button class="chip" onclick="singleChip(this)">Under 5h</button>
             <button class="chip" onclick="singleChip(this)">5-6h</button>
             <button class="chip" onclick="singleChip(this)">6-7h</button>
-            <button class="chip active" onclick="singleChip(this)">7-8h</button>
+            <button class="chip" onclick="singleChip(this)">7-8h</button>
             <button class="chip" onclick="singleChip(this)">8h+</button>
           </div>
         </div>
@@ -2564,7 +2564,7 @@
           <label>Stress level today</label>
           <div class="chip-row" id="ciStress">
             <button class="chip" onclick="singleChip(this)">Low</button>
-            <button class="chip active" onclick="singleChip(this)">Normal</button>
+            <button class="chip" onclick="singleChip(this)">Normal</button>
             <button class="chip" onclick="singleChip(this)">High</button>
           </div>
         </div>
@@ -2776,7 +2776,7 @@
     </button>
     <button class="nav-btn" data-screen="data" onclick="showScreen('data')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
-      Pulse
+      Stats
     </button>
     <button class="nav-btn" data-screen="profile" onclick="showScreen('profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -2816,7 +2816,7 @@
   <div class="modal-bg center" id="firstSessionModal">
     <div class="modal" style="max-width: 380px;">
       <div style="text-align:center; margin-bottom:14px;">
-        <div style="font-size:42px; margin-bottom:6px;">🎯</div>
+        <div style="width:56px; height:56px; border-radius:16px; background:var(--primary-soft); display:flex; align-items:center; justify-content:center; margin:0 auto 16px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
         <h2 style="font-size:22px; margin:0 0 4px 0;">Your plan is ready</h2>
         <div style="color:var(--text-soft); font-size:13px;">Here's what comes next.</div>
       </div>
@@ -3018,10 +3018,10 @@
       <div id="dayAvailDiscWrap">
         <div class="detail-label" style="margin-top:16px; margin-bottom:8px;">Which disciplines work this day?</div>
         <div class="chip-row" id="dayAvailDiscs">
-          <button type="button" class="chip active" data-disc="run" onclick="toggleDayAvailDisc(this)">🏃 Run</button>
-          <button type="button" class="chip active" data-disc="bike" onclick="toggleDayAvailDisc(this)">🚴 Bike</button>
-          <button type="button" class="chip active" data-disc="swim" onclick="toggleDayAvailDisc(this)">🏊 Swim</button>
-          <button type="button" class="chip active" data-disc="strength" onclick="toggleDayAvailDisc(this)">🏋️ Strength</button>
+          <button type="button" class="chip active" data-disc="run" onclick="toggleDayAvailDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 17l5 1l.75-1.5"/><path d="M15 21l0 -4l-4 -3l1 -6"/><path d="M7 12l0 -3l5 -1l3 3l3 1"/></svg>Run</button>
+          <button type="button" class="chip active" data-disc="bike" onclick="toggleDayAvailDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/></svg>Bike</button>
+          <button type="button" class="chip active" data-disc="swim" onclick="toggleDayAvailDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg>Swim</button>
+          <button type="button" class="chip active" data-disc="strength" onclick="toggleDayAvailDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg>Strength</button>
         </div>
       </div>
 
@@ -3094,6 +3094,7 @@
   <div class="modal-bg" id="sessionReportModal">
     <div class="modal" style="max-height: 90vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <button onclick="closeSessionReport()" style="background:none; border:0; color:var(--text-soft); cursor:pointer; padding:0; line-height:0; display:flex; align-items:center; gap:4px; font-size:13px; font-weight:600; font-family:inherit;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
         <h2 id="srTitle" style="font-size: 20px; margin: 0;">Session report</h2>
         <button onclick="closeSessionReport()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
       </div>
@@ -3293,11 +3294,11 @@
         <div class="field" style="margin-top: 14px;">
           <label>Discipline</label>
           <div class="chip-row" id="edDisciplineChips" style="flex-wrap: wrap;">
-            <button type="button" class="chip" data-disc="run" onclick="pickEdDiscipline('run')">🏃 Run</button>
-            <button type="button" class="chip" data-disc="bike" onclick="pickEdDiscipline('bike')">🚴 Bike</button>
-            <button type="button" class="chip" data-disc="swim" onclick="pickEdDiscipline('swim')">🏊 Swim</button>
-            <button type="button" class="chip" data-disc="strength" onclick="pickEdDiscipline('strength')">🏋️ Strength</button>
-            <button type="button" class="chip" data-disc="brick" onclick="pickEdDiscipline('brick')">🚴+🏃 Brick</button>
+            <button type="button" class="chip" data-disc="run" onclick="pickEdDiscipline('run')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 17l5 1l.75-1.5"/><path d="M15 21l0 -4l-4 -3l1 -6"/><path d="M7 12l0 -3l5 -1l3 3l3 1"/></svg>Run</button>
+            <button type="button" class="chip" data-disc="bike" onclick="pickEdDiscipline('bike')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/></svg>Bike</button>
+            <button type="button" class="chip" data-disc="swim" onclick="pickEdDiscipline('swim')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg>Swim</button>
+            <button type="button" class="chip" data-disc="strength" onclick="pickEdDiscipline('strength')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg>Strength</button>
+            <button type="button" class="chip" data-disc="brick" onclick="pickEdDiscipline('brick')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/><line x1="11" y1="5" x2="11" y2="11"/><line x1="13" y1="13" x2="13" y2="19"/></svg>Brick</button>
             <button type="button" class="chip" data-disc="rest" onclick="pickEdDiscipline('rest')">Rest</button>
           </div>
         </div>
@@ -3339,14 +3340,14 @@
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Set each leg. Your session total updates automatically.</div>
           <div style="display:flex; gap:10px;">
             <div style="flex:1;">
-              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">🚴 Bike</div>
+              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">Bike</div>
               <div style="display:flex; gap:6px; align-items:center;">
                 <input type="number" id="edBrickBike" min="0" max="360" oninput="pickEdBrickSplit()" style="flex:1; padding:6px 10px;">
                 <span style="font-size:12px; color:var(--text-soft);">min</span>
               </div>
             </div>
             <div style="flex:1;">
-              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">🏃 Run</div>
+              <div style="font-size:12px; color:var(--text-soft); margin-bottom:4px;">Run</div>
               <div style="display:flex; gap:6px; align-items:center;">
                 <input type="number" id="edBrickRun" min="0" max="360" oninput="pickEdBrickSplit()" style="flex:1; padding:6px 10px;">
                 <span style="font-size:12px; color:var(--text-soft);">min</span>
@@ -3422,10 +3423,10 @@
 
       <div class="detail-label" style="margin-bottom: 8px;">What can you do today?</div>
       <div class="chip-row" id="crunchDiscs" style="margin-bottom: 16px;">
-        <button class="chip active" data-disc="swim" onclick="toggleCrunchDisc(this)">🏊 Swim</button>
-        <button class="chip active" data-disc="bike" onclick="toggleCrunchDisc(this)">🚴 Bike</button>
-        <button class="chip active" data-disc="run" onclick="toggleCrunchDisc(this)">🏃 Run</button>
-        <button class="chip active" data-disc="strength" onclick="toggleCrunchDisc(this)">🏋️ Gym</button>
+        <button class="chip active" data-disc="swim" onclick="toggleCrunchDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg>Swim</button>
+        <button class="chip active" data-disc="bike" onclick="toggleCrunchDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/></svg>Bike</button>
+        <button class="chip active" data-disc="run" onclick="toggleCrunchDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M4 17l5 1l.75-1.5"/><path d="M15 21l0 -4l-4 -3l1 -6"/><path d="M7 12l0 -3l5 -1l3 3l3 1"/></svg>Run</button>
+        <button class="chip active" data-disc="strength" onclick="toggleCrunchDisc(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg>Gym</button>
       </div>
       <div id="crunchDiscHint" style="font-size: 12px; color: var(--text-soft); margin-bottom: 14px; margin-top: -8px; display: none;"></div>
       <div class="card" style="background: var(--primary-soft); border: 0;">
@@ -3721,7 +3722,7 @@
     // auto-expand since most cyclists know their FTP.
     if (ftpField) ftpField.style.display = 'block';
     if (cssField) cssField.style.display = isTri ? 'block' : 'none';
-    if (headerLabel) headerLabel.textContent = isBike ? '🚴 Bike FTP' : '🚴 🏊 Advanced markers';
+    if (headerLabel) headerLabel.textContent = isBike ? 'Bike FTP' : 'Advanced markers';
     if (fields && !show) {
       // Collapse + clear values when neither tri nor bike.
       fields.style.display = 'none';
@@ -5881,6 +5882,21 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     refresh:     '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/>',
     target:      '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     dumbbell:    '<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
+    // Navigation tab icons
+    home:        '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    chat:        '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    plan:        '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/>',
+    stats:       '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    person:      '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    // Training types
+    intervals:   '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+    // Utility
+    plus:        '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    trophy:      '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>',
+    heart:       '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/>',
+    clock:       '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    info:        '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+    rpe:         '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="15"/>',
   };
 
   // ──────────────────────────────────────────────────────────────────────
@@ -8972,7 +8988,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       <div class="card" style="padding:0; overflow:hidden; margin-bottom:14px;">
         <div style="padding:14px 16px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
           <div style="font-weight:700; font-size:15px; color:${headerColor};">Coach insights</div>
-          <div style="font-size:11px; color:var(--text-soft); font-weight:600;">${sorted.length} note${sorted.length > 1 ? 's' : ''}</div>
         </div>
         ${rows}${overflowSection}${fixesBtn}${footer}
       </div>`;
@@ -12676,6 +12691,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     window.runAllSanityScenarios = runAllSanityScenarios;
   }
 
+  // Show weekly review only Sunday (0) or Monday (1), or if ≥80% of week days have passed
+  function shouldShowWeeklyReview() {
+    const dow = new Date().getDay(); // 0=Sun
+    if (dow === 0 || dow === 1) return true;
+    // Also show if it's Thursday or later (day 4+) — week is well underway
+    return dow >= 4;
+  }
+
   function renderTodayHero() {
     const todayDay = getTodayDay();
     const s = planState.sessions[todayDay];
@@ -12848,6 +12871,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         viewBtn.textContent = 'See your week →';
       }
     }
+
+    // Show/hide weekly review button based on day of week
+    const wrBtn = document.getElementById('weeklyReviewBtn');
+    if (wrBtn) wrBtn.style.display = shouldShowWeeklyReview() ? '' : 'none';
   }
   // Render the "Coming up" section on Today tab — next 2 non-rest sessions
   function renderTodayComingUp() {
@@ -14246,13 +14273,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Strava activity → display icon
   function iconForStravaType(type) {
     const t = (type || '').toLowerCase();
-    if (t.includes('run')) return '🏃';
-    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return '🚴';
-    if (t.includes('swim')) return '🏊';
-    if (t.includes('weight') || t.includes('strength')) return '🏋️';
-    if (t.includes('walk') || t.includes('hike')) return '🥾';
-    if (t.includes('yoga')) return '🧘';
-    return '✓';
+    if (t.includes('run'))                            return icon('run',       { size: 16 });
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return icon('bike', { size: 16 });
+    if (t.includes('swim'))                           return icon('swim',      { size: 16 });
+    if (t.includes('weight') || t.includes('strength') || t.includes('crosstraining') || t.includes('hiit') || t.includes('functional')) return icon('strength', { size: 16 });
+    if (t.includes('walk') || t.includes('hike'))     return icon('walk',      { size: 16 });
+    if (t.includes('yoga') || t.includes('mobil'))    return icon('mobility',  { size: 16 });
+    if (t.includes('row'))                            return icon('swim',      { size: 16 });
+    return icon('activity', { size: 16 });
   }
   function formatHM(mins) {
     if (!mins || mins < 1) return '—';
@@ -15347,13 +15375,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       byDisc[d] = (byDisc[d] || 0) + (a.moving_min || 0);
     });
     const discOrder = [
-      { id: 'run', label: 'Run', icon: '🏃', color: 'var(--primary)' },
-      { id: 'bike', label: 'Bike', icon: '🚴', color: '#5DA985' },
-      { id: 'swim', label: 'Swim', icon: '🏊', color: '#2980B9' },
-      { id: 'strength', label: 'Strength', icon: '🏋️', color: '#D9A94A' },
-      { id: 'walk', label: 'Walk / Hike', icon: '🥾', color: '#A89878' },
-      { id: 'mobility', label: 'Yoga / Mobility', icon: '🧘', color: '#8E44AD' },
-      { id: 'other', label: 'Other', icon: '✓', color: '#888' },
+      { id: 'run',      label: 'Run',            icon: icon('run',      {size:14}), color: 'var(--primary)' },
+      { id: 'bike',     label: 'Bike',           icon: icon('bike',     {size:14}), color: '#5DA985' },
+      { id: 'swim',     label: 'Swim',           icon: icon('swim',     {size:14}), color: '#2980B9' },
+      { id: 'strength', label: 'Strength',       icon: icon('strength', {size:14}), color: '#D9A94A' },
+      { id: 'walk',     label: 'Walk / Hike',    icon: icon('walk',     {size:14}), color: '#A89878' },
+      { id: 'mobility', label: 'Yoga / Mobility',icon: icon('mobility', {size:14}), color: '#8E44AD' },
+      { id: 'other',    label: 'Other',          icon: icon('activity', {size:14}), color: '#888' },
     ];
     const discTotal = Object.values(byDisc).reduce((a, b) => a + b, 0);
     if (discBars) {
@@ -17689,6 +17717,13 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     // Body-readiness card on Today reads planState.lastCheckin — needs a
     // full re-render to reflect the new check-in scores.
     if (typeof renderAll === 'function') renderAll();
+
+    // Show a brief confirmation banner
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;z-index:9999;padding:14px 20px;background:var(--good);color:#fff;font-weight:600;font-size:14px;text-align:center;';
+    banner.textContent = '✓ Check-in saved — plan stays tuned to how you feel';
+    document.body.appendChild(banner);
+    setTimeout(() => banner.remove(), 2800);
   }
 
   // Open today's session detail modal — same one that opens when tapping the day pill on Plan tab.

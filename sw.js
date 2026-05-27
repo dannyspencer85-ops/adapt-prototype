@@ -11,7 +11,7 @@
 //
 // Bump CACHE_VERSION on every deploy to bust stale shells.
 
-const CACHE_VERSION = 'adapt-v24';
+const CACHE_VERSION = 'adapt-v25';
 
 function appShell() {
   const s = self.registration.scope; // e.g. "https://host/adapt-prototype/"
