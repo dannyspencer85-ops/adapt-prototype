@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Vercel Dev (full stack)",
+      "runtimeExecutable": "vercel",
+      "runtimeArgs": ["dev", "--cwd", "/Users/dannyspencer/adapt-prototype"],
+      "port": 3000
+    },
+    {
+      "name": "Python Static Server",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/dannyspencer/adapt-prototype"],
+      "port": 8080
+    }
+  ]
+}

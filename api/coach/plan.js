@@ -106,7 +106,7 @@ export default async function handler(req) {
   const weeksToRace = computeWeeksToRace(todayStr, raceDate);
 
   const systemPrompt = buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, todayStr });
-  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location });
+  const userMsg = buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, currentWeeklyHours });
 
   // Force a JSON-shaped response. Mistral supports response_format = {type:'json_object'}.
   const payload = {
@@ -120,15 +120,28 @@ export default async function handler(req) {
     temperature: 0.3, // low temp for consistency, but not 0 — we want some judgment
   };
 
-  let upstream;
-  try {
-    upstream = await withTimeout(fetch(MISTRAL_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }), REQUEST_TIMEOUT_MS);
-  } catch (e) {
-    return jsonErr(502, 'Mistral request failed: ' + (e && e.message || 'unknown error'));
+  // Retry up to 3× on transient Mistral errors (500/502/503/529).
+  // Same strategy as /api/coach/chat — brief back-off prevents hammering.
+  const TRANSIENT = new Set([500, 502, 503, 529]);
+  const MAX_ATTEMPTS = 3;
+  let upstream, attempt = 0;
+  while (attempt < MAX_ATTEMPTS) {
+    try {
+      upstream = await withTimeout(fetch(MISTRAL_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }), REQUEST_TIMEOUT_MS);
+    } catch (e) {
+      // Network / timeout error — only retry if attempts remain.
+      attempt++;
+      if (attempt >= MAX_ATTEMPTS) return jsonErr(502, 'Mistral request failed after retries: ' + (e && e.message || 'timeout'));
+      await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2500));
+      continue;
+    }
+    if (upstream.ok || !TRANSIENT.has(upstream.status)) break;
+    attempt++;
+    if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2500));
   }
 
   if (!upstream.ok) {
@@ -574,7 +587,7 @@ const RACE_MIN_HOURS_SERVER = {
   'Road 100mi':        { floorMin: 6,   recMin: 8 },
 };
 
-function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location }) {
+function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, currentWeeklyHours }) {
   const limiter = (triFocus && triFocus.limiter) || '';
   const strategy = (triFocus && triFocus.strategy) || '';
   const discList = Array.isArray(availableDisciplines) && availableDisciplines.length > 0 ? availableDisciplines.join(', ') : '';
@@ -694,6 +707,7 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
   // which one is "the long session" (gets the higher cap).
 
   let prevWeekMin = null;
+  let prevWasDeload = false;
   for (let wi = 0; wi < parsed.weeks.length; wi++) {
     const wk = parsed.weeks[wi];
     if (!wk || typeof wk !== 'object') return { ok: false, reason: `week ${wi} is not an object` };
@@ -702,8 +716,15 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
     let restCount = 0;
     let qualityDays = [];
     for (const dayName of DAYS_ORDER) {
-      const sess = wk.sessions[dayName];
-      if (!sess) return { ok: false, reason: `week ${wi} ${dayName} missing` };
+      let sess = wk.sessions[dayName];
+      // AI often omits non-training days entirely — fill them in as rest
+      // rather than rejecting the whole plan for a missing key.
+      if (!sess) {
+        sess = wk.sessions[dayName] = {
+          name: 'Rest', type: 'rest', durationMin: 0,
+          intensity: 'rest', prescription: 'Full rest day.', targets: '',
+        };
+      }
       if (typeof sess.name !== 'string') sess.name = sess.name || 'Untitled';
       // Field consistency defense: strip duration/pace/distance numbers from name
       // so the card label doesn't conflict with durationMin shown beside it.
@@ -830,12 +851,15 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
     }
     // Weekly volume sanity. Allow taper weeks below floor; flag if >ceiling.
     if (weekMin > maxWeeklyMin) return { ok: false, reason: `week ${wi} total ${weekMin}min exceeds ceiling ${maxWeeklyMin}` };
-    // Week-over-week jump check (skip first week).
-    if (prevWeekMin != null && weekMin > 0) {
+    // Week-over-week jump check. Skip when the previous week was a deload —
+    // rebuilding from a deload naturally doubles volume and is correct.
+    // Also skip taper weeks dropping volume (those are fine going down).
+    if (prevWeekMin != null && weekMin > 0 && !prevWasDeload) {
       const ratio = weekMin / prevWeekMin;
-      if (ratio > 1.30) return { ok: false, reason: `week ${wi} jumped ${Math.round((ratio - 1) * 100)}% over previous week` };
+      if (ratio > 1.40) return { ok: false, reason: `week ${wi} jumped ${Math.round((ratio - 1) * 100)}% over previous week` };
     }
     if (typeof wk.weeklyTotalMin !== 'number') wk.weeklyTotalMin = weekMin;
+    prevWasDeload = !!wk.deload;
     prevWeekMin = weekMin;
   }
   return { ok: true, plan: parsed };
