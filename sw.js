@@ -11,7 +11,7 @@
 //
 // Bump CACHE_VERSION on every deploy to bust stale shells.
 
-const CACHE_VERSION = 'adapt-v32';
+const CACHE_VERSION = 'adapt-v33';
 
 function appShell() {
   const s = self.registration.scope; // e.g. "https://host/adapt-prototype/"
@@ -91,6 +91,13 @@ self.addEventListener('push', (event) => {
     data: data.url || self.registration.scope,
   };
   event.waitUntil(self.registration.showNotification(title, opts));
+});
+
+// Allow the page to force this SW to activate immediately (skip the waiting
+// state) when a new version is detected. Prevents stuck "waiting" SW from
+// keeping the app on a stale/broken cached shell.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('notificationclick', (event) => {
