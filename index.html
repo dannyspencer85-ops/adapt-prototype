@@ -4442,9 +4442,34 @@
   // Strip embedded numbers/duration/pace/zone tokens out of a session name so
   // the card label can never disagree with the displayed duration. Mirror of
   // the server-side sanitizeSessionName in api/coach/plan.js — defense in depth.
+  // Strip AI writing tells from any string. Applied to all text that comes
+  // directly from the LLM (session names, prescriptions, targets, plan notes).
+  // Rules (in order):
+  //   1. Em dash (—) and en dash (–) used as separators → colon-space.
+  //      Numeric ranges like "3–5 reps" are preserved by the look-behind.
+  //   2. " - " used as a mid-sentence separator → colon-space.
+  //      Hyphenated words and ranges ("30-min", "RPE 5-6") are untouched.
+  //   3. Bullet-style leading "- " or "• " at line/string start → stripped.
+  //   4. Collapse multiple spaces and trim.
+  function cleanAIText(raw) {
+    if (typeof raw !== 'string') return raw;
+    let s = raw;
+    // Em/en dash between words → ": "
+    s = s.replace(/(?<=\S)\s*[—–]\s*(?=\S)/g, ': ');
+    // Standalone " - " separator (spaces on both sides, not part of a range) → ": "
+    s = s.replace(/(?<=\s)-(?=\s)/g, ':');
+    // Leading bullet "- " or "• " at string/line start
+    s = s.replace(/(^|\n)\s*[-•]\s+/g, '$1');
+    // Trailing em/en dashes
+    s = s.replace(/\s*[—–]\s*$/g, '');
+    // Collapse whitespace
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  }
+
   function sanitizeSessionName(raw) {
     if (typeof raw !== 'string') return 'Easy session';
-    let s = raw.trim();
+    let s = cleanAIText(raw).trim();
     s = s.replace(/\b\d+\s*(?:-)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hr|hour|hrs|hours)\b\.?/gi, '');
     s = s.replace(/\b\d+\s*[x×]\s*\([^)]*\)/gi, '');
     s = s.replace(/\b\d+\s*[x×]\s*\d+\s*[a-z]*/gi, '');
@@ -4465,16 +4490,16 @@
       meta: buildSessionMeta(s),
       duration: Number(s.durationMin) || 0,
       type: s.type || 'rest',
-      prescription: s.prescription || '',
-      targets: s.targets || '',
+      prescription: cleanAIText(s.prescription || ''),
+      targets: cleanAIText(s.targets || ''),
       intensity: s.intensity || '',
     };
   }
 
   function applyAIPlan(plan) {
     planState.fullPlan = plan;
-    planState.aiPlanSummary = plan.summary || '';
-    planState.aiPlanNotes = Array.isArray(plan.notesForUser) ? plan.notesForUser : [];
+    planState.aiPlanSummary = cleanAIText(plan.summary || '');
+    planState.aiPlanNotes = Array.isArray(plan.notesForUser) ? plan.notesForUser.map(cleanAIText) : [];
     // Pick the active week — if today is past the race date, fall back to last week.
     const todayStr = new Date().toISOString().slice(0, 10);
     const raceStr = planState.raceDate || localStorage.getItem('race-date') || '';
@@ -4513,7 +4538,7 @@
       return {
         dates: w.label || `Week ${i + 1}`,
         hours: `${h}:${String(mm).padStart(2, '0')}`,
-        focus: w.focus || w.phase || 'Build',
+        focus: cleanAIText(w.focus || w.phase || 'Build'),
         current: i === activeWeekIdx,
       };
     });
