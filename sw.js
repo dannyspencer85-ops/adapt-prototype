@@ -1,101 +1,35 @@
-// Adapt service worker — offline-capable app shell with GitHub Pages support.
+// Adapt service worker — v35 passthrough / cache-bust edition.
 //
-// Strategy:
-//   - Network-first for navigation (always fetch fresh shell when online),
-//     fall back to cached index.html when offline.
-//   - Cache-first for static same-origin assets (icon, manifest).
-//   - Skip /api/* — dynamic, never cache.
+// This version deliberately skips ALL caching and fetch interception.
+// It exists solely to:
+//   1. Evict every previous Adapt cache (v30–v34) that may contain
+//      a stale or broken app shell.
+//   2. Claim all open clients immediately so the clean state takes
+//      effect on the current tab without a reload.
 //
-// Uses self.registration.scope so paths work on any hosting prefix
-// (e.g. /adapt-prototype/ on GitHub Pages or / on a custom domain).
-//
-// Bump CACHE_VERSION on every deploy to bust stale shells.
+// After the stale-cache eviction a future deploy will re-enable
+// caching once the app is confirmed stable.
 
-const CACHE_VERSION = 'adapt-v34';
-
-function appShell() {
-  const s = self.registration.scope; // e.g. "https://host/adapt-prototype/"
-  return [s, s + 'index.html', s + 'manifest.json', s + 'icon.svg', s + 'apple-touch-icon.png', s + 'icon-192.png', s + 'icon-512.png'];
-}
+const CACHE_VERSION = 'adapt-v35';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(appShell()).catch(() => {}))
-      .then(() => self.skipWaiting())
-  );
+  // Nothing to pre-cache — skip straight to activation.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  const url = new URL(req.url);
+// No fetch handler — every request goes straight to the network.
+// This guarantees the browser always loads fresh HTML/assets from
+// Vercel and is never served a cached broken shell.
 
-  // API + cross-origin: pass through, never cache.
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
-    return;
-  }
-
-  // Navigation — network first, cached shell as offline fallback.
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          const scope = self.registration.scope;
-          caches.open(CACHE_VERSION)
-            .then((cache) => cache.put(scope + 'index.html', copy))
-            .catch(() => {});
-          return res;
-        })
-        .catch(() =>
-          caches.match(self.registration.scope + 'index.html')
-            .then((c) => c || caches.match(self.registration.scope))
-        )
-    );
-    return;
-  }
-
-  // Static assets — cache first.
-  event.respondWith(
-    caches.match(req).then((cached) =>
-      cached ||
-      fetch(req).then((res) => {
-        if (res && res.status === 200 && req.method === 'GET') {
-          const copy = res.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy)).catch(() => {});
-        }
-        return res;
-      }).catch(() => cached)
-    )
-  );
-});
-
-// Push notification handler — server side push can call this once VAPID is configured.
-self.addEventListener('push', (event) => {
-  let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (e) {}
-  const title = data.title || 'Adapt';
-  const opts = {
-    body: data.body || 'You have a new training update.',
-    icon: self.registration.scope + 'icon.svg',
-    badge: self.registration.scope + 'icon.svg',
-    tag: data.tag || 'adapt-default',
-    data: data.url || self.registration.scope,
-  };
-  event.waitUntil(self.registration.showNotification(title, opts));
-});
-
-// Allow the page to force this SW to activate immediately (skip the waiting
-// state) when a new version is detected. Prevents stuck "waiting" SW from
-// keeping the app on a stale/broken cached shell.
+// Allow the page to force this SW to activate immediately.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
