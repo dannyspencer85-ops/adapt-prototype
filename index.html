@@ -1463,7 +1463,7 @@
         <div style="background: var(--bg); border-radius: 14px; padding: 14px 16px; margin-bottom: 22px;">
           <div style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Real-life examples</div>
           <div style="font-size: 13px; line-height: 1.7; color: var(--text);">
-            <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="font-size: 16px;">🌙</span><span><strong>Bad night with the kids?</strong> Today's intervals ease.</span></div>
+            <div style="display: flex; gap: 10px; margin-bottom: 6px;">${icon('rest', { size: 16, color: 'var(--text-soft)' })}<span><strong>Bad night with the kids?</strong> Today's intervals ease.</span></div>
             <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg></span><span><strong>Pool closed?</strong> Swim swaps to bike or run.</span></div>
             <div style="display: flex; gap: 10px; margin-bottom: 6px;"><span style="font-size: 16px;">✈️</span><span><strong>Travel week?</strong> Volume scales. No catch-up cramming.</span></div>
             <div style="display: flex; gap: 10px;"><span style="font-size: 16px;">🦵</span><span><strong>Knee tight?</strong> Intensity adjusts automatically.</span></div>
@@ -3618,13 +3618,13 @@
       warn.style.background = '#fde8e8';
       warn.style.border = '1px solid #f5b5b5';
       warn.style.color = '#7a2828';
-      warn.innerHTML = `<strong>⚠ ${hours} hr/week is too low for a ${profile.label}.</strong><br>Most ${profile.label} plans require <strong>${profile.floorMin}–${profile.recMin} hr/week minimum</strong>. At your current volume, the plan can only build base fitness — not prepare you for race day at this distance. Consider: pick a shorter race, push the date out, or commit to more hours.`;
+      warn.innerHTML = `<div style="display:flex;align-items:flex-start;gap:8px;">${icon('flag',{size:16,color:'#7a2828'})}<div><strong>${hours} hr/week is too low for a ${profile.label}.</strong><br>Most ${profile.label} plans require <strong>${profile.floorMin}–${profile.recMin} hr/week minimum</strong>. At your current volume, the plan can only build base fitness — not prepare you for race day at this distance. Consider: pick a shorter race, push the date out, or commit to more hours.</div></div>`;
     } else {
       // Yellow: below the comfortable minimum but above the floor
       warn.style.background = '#fef6e0';
       warn.style.border = '1px solid #e8c46b';
       warn.style.color = '#7a5a18';
-      warn.innerHTML = `<strong>⚠ ${hours} hr/week is on the low end for a ${profile.label}.</strong><br>Doable, but the build is tight: expect a finish-focused race rather than a time goal. The recommended range for a healthy ${profile.label} build is <strong>${profile.recMin}–${profile.recMax} hr/week</strong>.`;
+      warn.innerHTML = `<div style="display:flex;align-items:flex-start;gap:8px;">${icon('flag',{size:16,color:'#7a5a18'})}<div><strong>${hours} hr/week is on the low end for a ${profile.label}.</strong><br>Doable, but the build is tight: expect a finish-focused race rather than a time goal. The recommended range for a healthy ${profile.label} build is <strong>${profile.recMin}–${profile.recMax} hr/week</strong>.</div></div>`;
     }
     warn.style.display = 'block';
   }
@@ -4703,11 +4703,11 @@
     }
     const html = flags.map(f => {
       if (f.type === 'block') {
-        return `<div style="padding: 12px 14px; margin-bottom: 8px; background: #FBE7D1; border-left: 3px solid var(--warn); border-radius: 8px; color: var(--warn); font-weight: 700; font-size: 14px; line-height: 1.45;">🚫 ${f.text}</div>`;
+        return `<div style="padding: 12px 14px; margin-bottom: 8px; background: #FBE7D1; border-left: 3px solid var(--warn); border-radius: 8px; color: var(--warn); font-weight: 700; font-size: 14px; line-height: 1.45; display:flex; align-items:center; gap:8px;">${icon('x',{size:16,color:'var(--warn)'})} ${f.text}</div>`;
       }
       const color = f.type === 'ok' ? 'var(--primary)' : 'var(--warn)';
-      const icon = f.type === 'ok' ? '✓' : '⚠';
-      return `<div style="padding: 10px 0; color: ${color}; font-weight: 600;">${icon} ${f.text}</div>`;
+      const flagIcon = f.type === 'ok' ? icon('check',{size:15,color:color}) : icon('flag',{size:15,color:color});
+      return `<div style="padding: 10px 0; color: ${color}; font-weight: 600; display:flex; align-items:center; gap:6px;">${flagIcon} ${f.text}</div>`;
     }).join('');
     document.getElementById('readinessFlags').innerHTML = html;
   }
@@ -4903,10 +4903,10 @@
   // Default: all 7 days available, all 4 disciplines allowed.
   // ──────────────────────────────────────────────────────────────────────
   const SCHEDULE_DISCIPLINES = [
-    { id: 'run', label: 'Run', icon: '🏃' },
-    { id: 'bike', label: 'Bike', icon: '🚴' },
-    { id: 'swim', label: 'Swim', icon: '🏊' },
-    { id: 'strength', label: 'Strength', icon: '🏋️' },
+    { id: 'run',      label: 'Run',      icon: icon('run',      { size: 13 }) },
+    { id: 'bike',     label: 'Bike',     icon: icon('bike',     { size: 13 }) },
+    { id: 'swim',     label: 'Swim',     icon: icon('swim',     { size: 13 }) },
+    { id: 'strength', label: 'Strength', icon: icon('strength', { size: 13 }) },
   ];
   // Default schedule = the user's ACTUAL onboarding selections, derived from
   // 'training-days' + 'available-disciplines'. Previously this returned
@@ -7649,7 +7649,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
 
     _showCalendarPopover({
-      icon: daysOut === 0 ? '🏁' : daysOut < 0 ? '🎖️' : '🎯',
+      icon: daysOut === 0 ? icon('flag', { size: 22, color: '#fff', stroke: 2 }) : daysOut < 0 ? icon('trophy', { size: 22, color: '#fff', stroke: 2 }) : icon('target', { size: 22, color: '#fff', stroke: 2 }),
       tag: daysOut === 0 ? 'RACE DAY' : daysOut < 0 ? 'RACE COMPLETE' : 'YOUR RACE',
       title,
       body: location && daysOut !== 0 ? `${body}\n\n${location}` : body,
@@ -7745,7 +7745,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // failed and the user is on the locally-built plan.
     if (planSource === 'fallback') {
       slot.innerHTML = `<div style="background:#fef6e0; border:1px solid #e8c46b; color:#7a5a18; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
-        <strong>⚠ Local plan in use.</strong> The AI coach didn't connect, so we built a local plan with phase-based scaling. Tap the rebuild button in Coach Chat to retry once your network is back.
+        <div style="display:flex;align-items:flex-start;gap:8px;">${icon('flag',{size:16,color:'#7a5a18'})}<div><strong>Local plan in use.</strong> The AI coach didn't connect, so we built a local plan with phase-based scaling. Tap the rebuild button in Coach Chat to retry once your network is back.</div></div>
       </div>`;
       return;
     }
@@ -9317,7 +9317,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const when = formatTimeAgo(n.timestamp);
       return `<div class="notif-card ${n.severity}">
         <div class="notif-head">
-          <span>${n.icon || '⚡'}</span>
+          <span>${n.icon || icon('intervals', { size: 15 })}</span>
           <span style="flex:1;">${escapeHtml(n.title)}</span>
           <span class="notif-time">${when}</span>
         </div>
@@ -9433,7 +9433,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         _pushNotification({
           dedupKey: 'rpe-hot-' + nextQualityDay,
           severity: 'warn',
-          icon: '⚡',
+          icon: icon('intervals', { size: 15 }),
           title: `${nextQualityDay}'s session may need adjustment`,
           summary: `${day}'s session ran hotter than prescribed (RPE ${rpe} vs ~${prescribedRpe}). Suggest easing ${nextQualityDay} to prevent fatigue buildup.`,
           breakdown: [
@@ -11162,7 +11162,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const el = document.getElementById(containerId);
     if (!el) return;
     const r = computeRaceReadiness();
-    const emoji = r.status === 'on-track' ? '✓' : r.status === 'slightly-behind' ? '◎' : '⚠';
+    const emoji = r.status === 'on-track' ? icon('check', { size: 14, color: 'var(--good)' }) : r.status === 'slightly-behind' ? icon('clock', { size: 14, color: 'var(--caution)' }) : icon('flag', { size: 14, color: 'var(--alert)' });
     const headline = r.status === 'on-track'
       ? 'You\'re ready to keep building.'
       : r.status === 'slightly-behind'
@@ -11190,8 +11190,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
           <button onclick="toggleReadinessDetail(this)" style="display:block; background:none; border:0; color:${r.color}; font-weight:600; font-size:13px; cursor:pointer; padding:0; font-family:inherit; text-align:left;">Tell me more →</button>
           <div style="display:none; margin-top:10px;">
-            ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px;">✓ WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
-            ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px;">⚠ NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
+            ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('check',{size:12,color:'var(--primary)'})} WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
+            ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
             ${r.issues.length === 0 ? `<div style="font-size: 13px; color: var(--text-soft); font-style: italic;">Everything checks out. Stay consistent.</div>` : ''}
           </div>
         </div>
@@ -11210,8 +11210,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <div style="font-size: 13px; margin-top: 6px; opacity: 0.95;">${escapeHtml(headline)}</div>
       </div>
       <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
-        ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px;">✓ WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
-        ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px;">⚠ NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
+        ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('check',{size:12,color:'var(--primary)'})} WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
+        ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
         ${r.issues.length === 0 ? `<div style="font-size: 13px; color: var(--text-soft); font-style: italic;">Everything checks out. Stay consistent.</div>` : ''}
       </div>
     </div>`;
@@ -12803,7 +12803,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     if (tgtEl) {
       if (showPrescription && s.targets) {
-        tgtEl.innerHTML = '🎯 ' + markupGlossaryTerms(String(s.targets));
+        tgtEl.innerHTML = markupGlossaryTerms(String(s.targets));
         tgtEl.style.display = 'block';
       } else {
         tgtEl.style.display = 'none';
@@ -12919,7 +12919,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (planState.planSource !== 'fallback') return '';
       const errLine = planState.aiPlanError ? `<div style="font-size:11px; opacity:0.8; margin-top:2px;">${escapeHtml(planState.aiPlanError)}</div>` : '';
       return `<div style="background:var(--secondary-soft); border:1px solid var(--secondary); padding:10px 12px; border-radius:10px; margin-bottom:14px; font-size:12px; line-height:1.5; color:var(--text); display:flex; gap:10px; align-items:flex-start;">
-        <span style="flex-shrink:0;">⚠</span>
+        <span style="flex-shrink:0;">${icon('flag',{size:16,color:'var(--secondary)'})}</span>
         <div style="flex:1;">
           <div style="font-weight:700;">Starter scaffold (couldn't reach the AI engine)</div>
           <div style="color:var(--text-soft); margin-top:2px;">You're seeing a basic schedule, not the AI-coached plan with intervals and zones. <a onclick="retryAIPlan()" style="color:var(--primary); cursor:pointer; font-weight:600;">Retry AI plan →</a></div>
@@ -13093,12 +13093,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!el) return;
     const s = computeStreak();
     if (s.days < 2) { el.innerHTML = ''; return; }
-    el.innerHTML = ` · 🔥 ${s.days}-day streak`;
+    el.innerHTML = ` · ${icon('flame', { size: 13, color: '#E8941F' })} ${s.days}-day streak`;
   }
 
   // ── Celebration moments ──
   function celebrate(emoji, title, text) {
-    document.getElementById('celebrateEmoji').textContent = emoji;
+    document.getElementById('celebrateEmoji').innerHTML = emoji;
     document.getElementById('celebrateTitle').textContent = title;
     document.getElementById('celebrateText').textContent = text;
     document.getElementById('celebrateBg').classList.add('show');
@@ -13110,12 +13110,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const seen = JSON.parse(localStorage.getItem('celebrations-seen') || '[]');
     if (seen.includes(trigger)) return;
     const moments = {
-      'first-session': { emoji: '🎯', title: 'First session logged!', text: 'Consistency beats heroics. One down — keep stacking.' },
-      'first-brick': { emoji: '🚴', title: 'Your first brick is done!', text: 'The brick is the single most important session for a half IM. You just did the one that matters most.' },
-      'first-long-run': { emoji: '🏃', title: 'First 75+ min long run!', text: "The long session is the engine of endurance fitness. You're building what actually gets you to the finish line." },
-      'streak-3': { emoji: '🔥', title: '3-day streak!', text: 'Consistency is the #1 driver of endurance gains. Keep it going.' },
-      'streak-7': { emoji: '⚡', title: '7 days in a row!', text: "A full week of consistency. You're building a real training pattern." },
-      'checkin-streak': { emoji: '☀', title: 'Morning check-in habit', text: "You're building the ritual. The daily signal lets the engine make sharper recommendations." }
+      'first-session': { emoji: icon('trophy',    { size: 48, color: '#D9A94A', stroke: 1.5 }), title: 'First session logged!', text: 'Consistency beats heroics. One down — keep stacking.' },
+      'first-brick':   { emoji: icon('bike',      { size: 48, color: '#7E5BB6', stroke: 1.5 }), title: 'Your first brick is done!', text: 'The brick is the single most important session for a half IM. You just did the one that matters most.' },
+      'first-long-run':{ emoji: icon('run',       { size: 48, color: '#3B8968', stroke: 1.5 }), title: 'First 75+ min long run!', text: "The long session is the engine of endurance fitness. You're building what actually gets you to the finish line." },
+      'streak-3':      { emoji: icon('flame',     { size: 48, color: '#E8941F', stroke: 1.5 }), title: '3-day streak!', text: 'Consistency is the #1 driver of endurance gains. Keep it going.' },
+      'streak-7':      { emoji: icon('intervals', { size: 48, color: '#C44545', stroke: 1.5 }), title: '7 days in a row!', text: "A full week of consistency. You're building a real training pattern." },
+      'checkin-streak':{ emoji: icon('sun',       { size: 48, color: '#D9A94A', stroke: 1.5 }), title: 'Morning check-in habit', text: "You're building the ritual. The daily signal lets the engine make sharper recommendations." }
     };
     const m = moments[trigger];
     if (!m) return;
@@ -14260,7 +14260,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (!err) { slot.style.display = 'none'; slot.innerHTML = ''; return; }
       slot.style.display = 'block';
       slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
-        <div style="font-weight:700; margin-bottom:4px;">⚠ Strava connection lost</div>
+        <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;">${icon('flag',{size:14,color:'#7a2828'})} Strava connection lost</div>
         <div style="margin-bottom:8px;">Recent activities aren't syncing. Reconnect to keep your training data flowing.</div>
         <button onclick="showScreen('profile')" style="background:#C44545; color:#fff; border:0; padding:7px 14px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;">Open Profile to reconnect</button>
       </div>`;
@@ -14758,7 +14758,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const cached = planState.stravaSyncDays || 0;
     if (getStravaConfig() && days > cached) {
       const note = document.getElementById('perfSyncNotice');
-      if (note) note.innerHTML = `🔄 Pulling deeper history from Strava…`;
+      if (note) note.innerHTML = `${icon('sync', { size: 14 })} Pulling deeper history from Strava…`;
       syncStravaActivities(getDesiredSyncDays())
         .then(acts => {
           if (note) note.innerHTML = `✅ Synced ${acts ? acts.length : 0} activities. <button onclick="renderPerformanceTab()" style="background:none; border:0; color:var(--primary); font-weight:600; cursor:pointer; font-family:inherit; padding:0;">Refresh →</button>`;
