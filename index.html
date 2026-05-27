@@ -1422,6 +1422,47 @@
         <div class="onboard-actions" style="padding-top: 0;">
           <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">Log in</button>
         </div>
+        <div style="text-align:center; margin-top:14px;">
+          <button onclick="showForgotPassword()" style="background:none;border:0;color:var(--text-soft);font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;">Forgot password?</button>
+        </div>
+      </div>
+
+      <!-- Forgot password panel -->
+      <div id="authForgot" style="display:none;">
+        <h1 style="font-size: 24px; margin-bottom: 8px;">Reset your password</h1>
+        <p style="font-size:14px; color:var(--text-soft); margin-bottom:20px; line-height:1.5;">Enter your email and we'll send you a link to set a new password.</p>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="forgotEmail" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="auth-error" id="forgotError" style="display:none;"></div>
+        <div id="forgotSuccess" style="display:none; background:var(--good-soft); color:var(--good); border-radius:10px; padding:12px 14px; font-size:13px; line-height:1.5; margin-bottom:12px;">
+          Check your inbox — a reset link is on its way.
+        </div>
+        <div class="onboard-actions" style="padding-top:0;">
+          <button class="btn btn-primary btn-full btn-lg" onclick="doForgotPassword()">Send reset link</button>
+        </div>
+        <div style="text-align:center; margin-top:14px;">
+          <button onclick="showAuthLogin()" style="background:none;border:0;color:var(--text-soft);font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;">Back to log in</button>
+        </div>
+      </div>
+
+      <!-- Set new password panel — shown when user returns via reset email -->
+      <div id="authReset" style="display:none;">
+        <h1 style="font-size: 24px; margin-bottom: 8px;">Set a new password</h1>
+        <p style="font-size:14px; color:var(--text-soft); margin-bottom:20px; line-height:1.5;">Choose a new password for your account.</p>
+        <div class="field">
+          <label>New password</label>
+          <input type="password" id="resetPassword" autocomplete="new-password" placeholder="At least 6 characters">
+        </div>
+        <div class="field">
+          <label>Confirm new password</label>
+          <input type="password" id="resetConfirm" autocomplete="new-password">
+        </div>
+        <div class="auth-error" id="resetError" style="display:none;"></div>
+        <div class="onboard-actions" style="padding-top:0;">
+          <button class="btn btn-primary btn-full btn-lg" onclick="doSetNewPassword()">Save new password</button>
+        </div>
       </div>
 
       <div id="authSignup" style="display:none;">
@@ -3510,8 +3551,15 @@
     if (!_sb) return;
     const { data } = await _sb.auth.getSession();
     if (data.session) _sbUsername = _sbUserFromMeta(data.session.user);
-    _sb.auth.onAuthStateChange((_evt, session) => {
+    _sb.auth.onAuthStateChange((evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
+      // When the user taps the reset-password link in their email, Supabase
+      // redirects back to the app with a recovery token. Detect that event
+      // and immediately show the "Set new password" panel.
+      if (evt === 'PASSWORD_RECOVERY') {
+        showScreen('auth');
+        if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
+      }
     });
   }
 
@@ -13503,8 +13551,74 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.getElementById('tabSignup').classList.toggle('active', which === 'signup');
     document.getElementById('authLogin').style.display = which === 'login' ? 'block' : 'none';
     document.getElementById('authSignup').style.display = which === 'signup' ? 'block' : 'none';
+    document.getElementById('authForgot').style.display = 'none';
+    document.getElementById('authReset').style.display = 'none';
     document.getElementById('loginError').style.display = 'none';
     document.getElementById('signupError').style.display = 'none';
+  }
+
+  function _setAuthPanel(show) {
+    ['authLogin','authSignup','authForgot','authReset'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = id === show ? 'block' : 'none';
+    });
+    // Keep tab buttons in sync
+    const isLogin = show === 'authLogin';
+    const isSignup = show === 'authSignup';
+    document.getElementById('tabLogin').classList.toggle('active', isLogin);
+    document.getElementById('tabSignup').classList.toggle('active', isSignup);
+  }
+
+  function showForgotPassword() {
+    _setAuthPanel('authForgot');
+    document.getElementById('forgotError').style.display = 'none';
+    document.getElementById('forgotSuccess').style.display = 'none';
+    const em = document.getElementById('loginEmail')?.value || '';
+    if (em) document.getElementById('forgotEmail').value = em;
+    document.getElementById('forgotEmail').focus();
+  }
+
+  function showAuthLogin() {
+    _setAuthPanel('authLogin');
+  }
+
+  async function doForgotPassword() {
+    if (!_isSupabase()) { showError('forgotError', 'Password reset requires an account — sign up first.'); return; }
+    const email = (document.getElementById('forgotEmail')?.value || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) { showError('forgotError', 'Please enter a valid email address.'); return; }
+    const btn = document.querySelector('#authForgot .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try {
+      const redirectTo = window.location.origin + (window.location.pathname || '/');
+      await _sb.auth.resetPasswordForEmail(email, { redirectTo });
+      document.getElementById('forgotError').style.display = 'none';
+      document.getElementById('forgotSuccess').style.display = 'block';
+    } catch (e) {
+      showError('forgotError', 'Could not send reset email. Try again in a moment.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send reset link'; }
+    }
+  }
+
+  async function doSetNewPassword() {
+    if (!_isSupabase()) return;
+    const pw  = document.getElementById('resetPassword')?.value || '';
+    const cfm = document.getElementById('resetConfirm')?.value || '';
+    if (!pw || pw.length < 6) { showError('resetError', 'Password must be at least 6 characters.'); return; }
+    if (pw !== cfm) { showError('resetError', 'Passwords don\'t match.'); return; }
+    const btn = document.querySelector('#authReset .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+      const { error } = await _sb.auth.updateUser({ password: pw });
+      if (error) { showError('resetError', error.message); return; }
+      // Password updated — sign them straight in
+      await _sbLoad();
+      enterApp();
+    } catch (e) {
+      showError('resetError', 'Could not update password. Try again.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save new password'; }
+    }
   }
 
   function showError(id, msg) {
