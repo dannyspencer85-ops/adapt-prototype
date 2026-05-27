@@ -3504,31 +3504,8 @@
   // ──────────────────────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => {
-          // If a new SW is waiting, tell it to skip waiting and take over now.
-          // This prevents a stuck "waiting" SW from leaving the app on stale content.
-          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            if (!sw) return;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                sw.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-          });
-        })
-        .catch((err) => {
-          console.warn('Service worker registration failed:', err);
-        });
-      // If the controlling SW changes (new SW took over), reload once so the
-      // fresh shell is served rather than the cached stale one.
-      let swRefreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (swRefreshing) return;
-        swRefreshing = true;
-        window.location.reload();
+      navigator.serviceWorker.register('./sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
       });
     });
   }
