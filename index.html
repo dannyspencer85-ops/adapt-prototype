@@ -15614,10 +15614,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const GYM_ACTIVITY_NAMES = new Set(['CrossTraining','FunctionalStrengthTraining','TraditionalStrengthTraining','CoreTraining','HighIntensityIntervalTraining','Yoga']);
     const isGymActivity = a.source === 'apple-health' && GYM_ACTIVITY_NAMES.has(a.name);
 
-    let html = '<div class="stat-grid" style="margin-top: 10px;">';
+    // Derive avg/max HR from hr_series when not available from stats (common for gym activities).
+    const _hrSeriesBpms = (a.hr_series && a.hr_series.length > 0) ? a.hr_series.map(p => p.bpm) : null;
+    const _dispAvgHr = a.avg_hr ? Math.round(a.avg_hr) : (_hrSeriesBpms ? Math.round(_hrSeriesBpms.reduce((s,v) => s+v, 0) / _hrSeriesBpms.length) : null);
+    const _dispMaxHr = a.max_hr ? Math.round(a.max_hr) : (_hrSeriesBpms ? Math.round(Math.max(..._hrSeriesBpms)) : null);
+
+    // For gym workouts with HR data, compute time above threshold (intensity gauge).
+    // Uses 75% of session peak as the "high effort" cutoff — no age-max assumption needed.
+    let _gymHighPct = null;
+    if (isGymActivity && _hrSeriesBpms && _hrSeriesBpms.length > 0 && _dispMaxHr) {
+      const threshold = _dispMaxHr * 0.75;
+      const above = _hrSeriesBpms.filter(b => b >= threshold).length;
+      _gymHighPct = Math.round((above / _hrSeriesBpms.length) * 100);
+    }
+
+    // Build stat grid — gym activities get 4 tiles (Duration · Avg HR · Max HR · Calories).
+    const _gymFour = isGymActivity && _dispMaxHr && a.calories_kcal;
+    let html = `<div class="stat-grid" style="margin-top: 10px; ${_gymFour ? 'grid-template-columns: repeat(4,1fr);' : ''}">`;
     html += `<div class="stat-tile"><div class="stat-label">Duration</div><div class="stat-value">${formatHM(a.moving_min)}</div>${!isGymActivity && a.distance_km > 0.1 ? `<div class="stat-sub">${a.distance_km.toFixed(2)} km</div>` : ''}</div>`;
-    html += `<div class="stat-tile"><div class="stat-label">Avg HR</div><div class="stat-value">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div>${a.max_hr ? `<div class="stat-sub">Max ${Math.round(a.max_hr)}</div>` : ''}</div>`;
-    if (isGymActivity && a.calories_kcal) {
+    html += `<div class="stat-tile"><div class="stat-label">Avg HR</div><div class="stat-value">${_dispAvgHr || '—'}</div>${!_gymFour && _dispMaxHr ? `<div class="stat-sub">Max ${_dispMaxHr}</div>` : ''}</div>`;
+    if (_gymFour) {
+      // 4-tile gym layout: Duration | Avg HR | Max HR | Calories
+      html += `<div class="stat-tile"><div class="stat-label">Max HR</div><div class="stat-value">${_dispMaxHr}</div>${_gymHighPct != null ? `<div class="stat-sub">${_gymHighPct}% high effort</div>` : ''}</div>`;
+      html += `<div class="stat-tile"><div class="stat-label">Calories</div><div class="stat-value">${Math.round(a.calories_kcal)}</div><div class="stat-sub">kcal</div></div>`;
+    } else if (isGymActivity && a.calories_kcal) {
       html += `<div class="stat-tile"><div class="stat-label">Calories</div><div class="stat-value">${Math.round(a.calories_kcal)}</div><div class="stat-sub">kcal</div></div>`;
     } else if (a.avg_watts) {
       html += `<div class="stat-tile"><div class="stat-label">Avg Watts</div><div class="stat-value">${Math.round(a.avg_watts)}</div>${a.kilojoules ? `<div class="stat-sub">${Math.round(a.kilojoules)} kJ</div>` : ''}</div>`;
@@ -16059,8 +16079,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         moving_min:      durationMin,
         elapsed_min:     durationMin,
         elevation_m:     w.route ? hkElevGain(w.route) : 0,
-        avg_hr:          w.averageHeartRate || null,
-        max_hr:          w.maxHeartRate     || null,
+        avg_hr:          w.averageHeartRate
+                         || (w.hrSeries && w.hrSeries.length > 0
+                             ? Math.round(w.hrSeries.reduce((s,p) => s + p.bpm, 0) / w.hrSeries.length)
+                             : null),
+        max_hr:          w.maxHeartRate
+                         || (w.hrSeries && w.hrSeries.length > 0
+                             ? Math.round(Math.max(...w.hrSeries.map(p => p.bpm)))
+                             : null),
         avg_watts:       avgWatts,
         avg_cadence:     w.cyclingCadence   || null,
         kilojoules:      w.calories ? Math.round(w.calories * 4.184) : null,
