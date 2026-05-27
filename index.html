@@ -1448,7 +1448,7 @@
   <!-- DEMO PERSONA PICKER MODAL -->
 
   <!-- ONBOARDING -->
-  <div id="screen-onboard" class="screen">
+  <div id="screen-onboard" class="screen active">
     <div class="onboard">
       <div class="logo">
         <div class="logo-mark">A</div>
@@ -3468,10 +3468,15 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
 
   // Internal Supabase client — null when not configured (localStorage fallback).
+  // Wrapped in try/catch: if the CDN SDK version throws during createClient
+  // (e.g. API change) the error is swallowed and the app falls back to
+  // localStorage auth rather than silently killing the entire script block.
   const _sb = (() => {
-    if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return null;
-    if (typeof supabase === 'undefined') { console.warn('Supabase SDK not loaded'); return null; }
-    return supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    try {
+      if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return null;
+      if (typeof supabase === 'undefined') { console.warn('[Adapt] Supabase SDK not loaded'); return null; }
+      return supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) { console.warn('[Adapt] Supabase createClient error:', e); return null; }
   })();
   function _isSupabase() { return !!_sb; }
   function _sbEmail(u) { return `${u}@adapt-proto.app`; }
@@ -16229,42 +16234,54 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   };
 
   document.addEventListener('DOMContentLoaded', async () => {
-    if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
-    initAnalytics();
+    // Safety net: if anything in init throws, fall back to the onboard screen
+    // rather than leaving the user staring at a blank white page.
+    try {
+      if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
+      initAnalytics();
 
-    // Initialize Supabase session (no-op when not configured).
-    await initSupabaseSession();
+      // Initialize Supabase session (no-op when not configured).
+      await initSupabaseSession();
 
-    let returning = false;
-    if (_isSupabase()) {
-      // Supabase path: check for active cloud session.
-      if (_sbUsername) {
-        _clearUserScopedLocal();
-        await _sbLoad();
-        returning = true;
+      let returning = false;
+      if (_isSupabase()) {
+        // Supabase path: check for active cloud session.
+        if (_sbUsername) {
+          _clearUserScopedLocal();
+          await _sbLoad();
+          returning = true;
+        }
+      } else {
+        // localStorage fallback: provision demo / tester accounts, then check session.
+        ensureDemoAccount();
+        const session = localStorage.getItem('adapt-session');
+        if (session && getAccounts()[session]) {
+          await loadUserData(session);
+          returning = true;
+        }
       }
-    } else {
-      // localStorage fallback: provision demo / tester accounts, then check session.
-      ensureDemoAccount();
-      const session = localStorage.getItem('adapt-session');
-      if (session && getAccounts()[session]) {
-        await loadUserData(session);
-        returning = true;
+
+      if (returning) {
+        trackEvent('app_open', { returning: true });
+        enterApp();
+      } else {
+        trackEvent('app_open', { returning: false });
+        showScreen('onboard');
+        if (typeof onbStep === 'function') onbStep(0);
       }
-    }
 
-    if (returning) {
-      trackEvent('app_open', { returning: true });
-      enterApp();
-    } else {
-      trackEvent('app_open', { returning: false });
-      showScreen('onboard');
-      if (typeof onbStep === 'function') onbStep(0);
+      renderAll();
+      if (typeof loadCoachHistory === 'function') loadCoachHistory();
+      if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
+    } catch (initErr) {
+      console.error('[Adapt] init error:', initErr);
+      // Best-effort fallback: show the onboard/welcome screen so the app is
+      // usable even when something in the startup path threw unexpectedly.
+      try {
+        showScreen('onboard');
+        if (typeof onbStep === 'function') onbStep(0);
+      } catch (_) {}
     }
-
-    renderAll();
-    if (typeof loadCoachHistory === 'function') loadCoachHistory();
-    if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
   });
 
   // Coach Chat (Mistral via Adapt's backend) — gated on an explicit one-time
