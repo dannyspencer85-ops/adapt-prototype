@@ -2426,9 +2426,24 @@
 
       <!-- Discipline breakdown -->
       <div class="card">
-        <div class="card-title">By discipline</div>
-        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Tap a row to see the workouts behind it.</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div class="card-title" style="margin:0;" id="perfDisciplineTitle">By discipline</div>
+          <div id="perfDisciplinePeriod" style="font-size:11px; color:var(--primary); font-weight:600; display:none;"></div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Tap a volume bar above to zoom in, or a row here to see the workouts.</div>
         <div id="perfDisciplineBars"></div>
+      </div>
+
+      <!-- Fitness signals — volume vs RHR/HRV overlay -->
+      <div class="card">
+        <div class="card-title">Fitness signals</div>
+        <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Training load (bars) vs your body's response (line). Volume going up while RHR drops = you're getting fitter.</div>
+        <div style="display:flex; gap:6px; margin-bottom:12px;">
+          <button class="chip active" data-fitness-metric="rhr" onclick="setFitnessMetric('rhr')">Resting HR</button>
+          <button class="chip" data-fitness-metric="hrv" onclick="setFitnessMetric('hrv')">HRV</button>
+        </div>
+        <div id="perfFitnessCallout" style="display:none; padding:10px 12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5; margin-bottom:12px;"></div>
+        <div id="perfFitnessChart"></div>
       </div>
 
       <!-- Progress Trends — improvement over time -->
@@ -14623,6 +14638,195 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     return null;
   }
+  // ── Fitness Signals: volume bars + RHR/HRV line overlay ────────────────
+  function getFitnessMetric() { return localStorage.getItem('fitness-metric') || 'rhr'; }
+  function setFitnessMetric(m) {
+    localStorage.setItem('fitness-metric', m);
+    document.querySelectorAll('[data-fitness-metric]').forEach(b => b.classList.toggle('active', b.dataset.fitnessMetric === m));
+    renderFitnessSignals();
+  }
+
+  function renderFitnessSignals() {
+    const chartEl  = document.getElementById('perfFitnessChart');
+    const calloutEl = document.getElementById('perfFitnessCallout');
+    if (!chartEl) return;
+
+    const metric = getFitnessMetric();
+    document.querySelectorAll('[data-fitness-metric]').forEach(b => b.classList.toggle('active', b.dataset.fitnessMetric === metric));
+
+    const days = getPerfRange();
+    const { buckets, bucketSize } = _perfBucketCache || bucketActivities(getActivitiesInRangeDays(days), days);
+
+    // Source: Apple Health global daily readings for the selected metric
+    const hk = planState.healthKit || {};
+    const rawData = (metric === 'rhr'
+      ? (hk.restingHeartRate || []).filter(r => r && r.value > 20 && r.value < 120)
+      : (hk.hrv || []).filter(r => r && r.value > 0 && r.value < 250)
+    );
+
+    const noDataMsg = metric === 'rhr'
+      ? 'No resting heart rate data — install the latest build from TestFlight and wear your Apple Watch to sleep.'
+      : 'No HRV data — Apple Watch records HRV nightly during sleep. Wear it to sleep for a few days to see this chart.';
+
+    if (rawData.length === 0) {
+      chartEl.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding:14px 0; text-align:center;">${noDataMsg}</div>`;
+      if (calloutEl) calloutEl.style.display = 'none';
+      return;
+    }
+
+    // Average the fitness metric within each bucket's time window
+    const msPerBucket = bucketSize === 'day' ? 86400000 : bucketSize === 'week' ? 7 * 86400000 : 31 * 86400000;
+    const fitnessPerBucket = buckets.map(b => {
+      const bStart = b.start.getTime();
+      const bEnd   = bStart + msPerBucket;
+      const inBucket = rawData.filter(r => {
+        const t = new Date(r.startDate).getTime();
+        return t >= bStart && t < bEnd;
+      });
+      if (inBucket.length === 0) return null;
+      return Math.round(inBucket.reduce((s, r) => s + r.value, 0) / inBucket.length * 10) / 10;
+    });
+
+    const validFitness = fitnessPerBucket.filter(v => v !== null);
+    if (validFitness.length < 2) {
+      chartEl.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding:14px 0; text-align:center;">Need at least 2 ${metric === 'rhr' ? 'RHR' : 'HRV'} readings in this range. Extend the range or continue wearing your Apple Watch.</div>`;
+      if (calloutEl) calloutEl.style.display = 'none';
+      return;
+    }
+
+    // Chart geometry
+    const w = 320, h = 190;
+    const padL = 34, padR = 34, padT = 12, padB = 22;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+    const n = buckets.length;
+    const barW = Math.max(2, (chartW / n) * 0.6);
+
+    // Volume scale (left axis)
+    const peakMins = Math.max(60, ...buckets.map(b => b.mins));
+
+    // Fitness scale (right axis) — pad 10% either side
+    const fMin = Math.min(...validFitness);
+    const fMax = Math.max(...validFitness);
+    const fPad = Math.max(1, (fMax - fMin) * 0.18);
+    const fYMin = fMin - fPad;
+    const fYMax = fMax + fPad;
+    const fRange = Math.max(1, fYMax - fYMin);
+
+    const barCenterX = i => padL + (i + 0.5) / n * chartW;
+    const volBarH   = mins => mins > 0 ? Math.max(3, (mins / peakMins) * chartH) : 0;
+    const fitnessY  = v => padT + (1 - (v - fYMin) / fRange) * chartH;
+
+    // Volume bars (background, muted)
+    const volBars = buckets.map((b, i) => {
+      const bh = volBarH(b.mins);
+      const bw = barW;
+      const x  = (barCenterX(i) - bw / 2).toFixed(1);
+      const y  = (padT + chartH - bh).toFixed(1);
+      if (b.mins < 1) return '';
+      const isSelected = _perfDrill && _perfDrill.kind === 'bucket' && _perfDrill.idx === i;
+      return `<rect x="${x}" y="${y}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="var(--primary)" opacity="${isSelected ? '0.45' : '0.18'}" rx="2"/>`;
+    }).join('');
+
+    // Fitness metric line + dots
+    const lineParts = [];
+    const dotParts  = [];
+    fitnessPerBucket.forEach((v, i) => {
+      if (v === null) return;
+      const cx = barCenterX(i).toFixed(1);
+      const cy = fitnessY(v).toFixed(1);
+      dotParts.push(`<circle cx="${cx}" cy="${cy}" r="3.5" fill="var(--alert)" stroke="#fff" stroke-width="1.5"/>`);
+      lineParts.push(lineParts.length === 0 ? `M${cx},${cy}` : `L${cx},${cy}`);
+    });
+
+    // Right y-axis labels (fitness metric)
+    const fmtF = v => metric === 'rhr' ? `${Math.round(v)}` : `${Math.round(v)}`;
+    const rightAxis = [fYMin + fRange * 0.1, fYMin + fRange * 0.5, fYMax - fRange * 0.1].map(v => {
+      const y = (fitnessY(v) + 3.5).toFixed(1);
+      return `<text x="${w - 2}" y="${y}" text-anchor="end" font-size="9" fill="var(--alert)" font-weight="700">${fmtF(v)}</text>`;
+    }).join('');
+
+    // Left y-axis vol label
+    const leftLabel = `<text x="${padL - 2}" y="${padT + 9}" text-anchor="end" font-size="9" fill="var(--primary)" opacity="0.7" font-weight="700">vol</text>`;
+
+    // X-axis labels
+    let xLabels = '';
+    const labelIdxs = n <= 7 ? buckets.map((_, i) => i) : [0, Math.floor(n / 2), n - 1];
+    labelIdxs.forEach(i => {
+      const x = barCenterX(i).toFixed(1);
+      xLabels += `<text x="${x}" y="${(padT + chartH + 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--text-soft)" font-weight="600">${buckets[i].label}</text>`;
+    });
+
+    // Grid lines (subtle)
+    const gridLines = [0.25, 0.5, 0.75].map(f => {
+      const y = (padT + f * chartH).toFixed(1);
+      return `<line x1="${padL}" y1="${y}" x2="${padL + chartW}" y2="${y}" stroke="rgba(0,0,0,0.04)" stroke-width="1"/>`;
+    }).join('');
+
+    const metricLabel = metric === 'rhr' ? 'Resting HR (bpm)' : 'HRV (ms)';
+    const lowerIsBetter = metric === 'rhr';
+
+    chartEl.innerHTML = `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:190px; display:block;" preserveAspectRatio="xMidYMid meet">
+        ${gridLines}
+        ${volBars}
+        ${lineParts.length > 1 ? `<path d="${lineParts.join(' ')}" fill="none" stroke="var(--alert)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+        ${dotParts.join('')}
+        ${rightAxis}
+        ${leftLabel}
+        ${xLabels}
+      </svg>
+      <div style="display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--text-soft);">
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px; height:10px; background:var(--primary); opacity:0.35; border-radius:2px;"></div> Volume</div>
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:14px; height:3px; background:var(--alert); border-radius:2px;"></div> ${metricLabel}</div>
+      </div>`;
+
+    // Trend callout — compare first half vs second half of valid readings
+    if (calloutEl) {
+      const half = Math.max(1, Math.floor(validFitness.length / 2));
+      const firstHalf  = validFitness.slice(0, half);
+      const secondHalf = validFitness.slice(-half);
+      const early = firstHalf.reduce((s, v) => s + v, 0) / firstHalf.length;
+      const late  = secondHalf.reduce((s, v) => s + v, 0) / secondHalf.length;
+      const change = late - early;
+      const threshold = metric === 'rhr' ? 0.8 : 1.5;
+      const trendBetter = lowerIsBetter ? change < -threshold : change > threshold;
+      const trendWorse  = lowerIsBetter ? change > threshold  : change < -threshold;
+
+      let icon, bgColor, headline, detail;
+      if (trendBetter) {
+        icon = lowerIsBetter ? '▼' : '▲'; bgColor = 'var(--good-soft)';
+        headline = metric === 'rhr'
+          ? `RHR dropping — aerobic fitness is building`
+          : `HRV rising — your body is recovering well`;
+        detail = metric === 'rhr'
+          ? `Early avg: <strong>${Math.round(early)} bpm</strong> → Recent avg: <strong>${Math.round(late)} bpm</strong>. Each beat lower at rest = stronger heart. This is the adaptation you're training for.`
+          : `Early avg: <strong>${Math.round(early)} ms</strong> → Recent avg: <strong>${Math.round(late)} ms</strong>. Higher HRV means your nervous system is adapting well to load.`;
+      } else if (trendWorse) {
+        icon = lowerIsBetter ? '▲' : '▼'; bgColor = 'var(--warn-soft)';
+        headline = metric === 'rhr'
+          ? `RHR creeping up — watch for overtraining or illness`
+          : `HRV declining — accumulated fatigue or stress`;
+        detail = metric === 'rhr'
+          ? `Early avg: <strong>${Math.round(early)} bpm</strong> → Recent avg: <strong>${Math.round(late)} bpm</strong>. Could be ramping load too fast, poor sleep, or early illness. Consider an easy week.`
+          : `Early avg: <strong>${Math.round(early)} ms</strong> → Recent avg: <strong>${Math.round(late)} ms</strong>. Your body may need more recovery. Prioritise sleep and back off intensity.`;
+      } else {
+        icon = '↔'; bgColor = 'var(--bg-soft)';
+        headline = metric === 'rhr' ? `RHR stable` : `HRV stable`;
+        detail = `Avg ${metric === 'rhr' ? 'RHR' : 'HRV'}: <strong>${Math.round((early + late) / 2)} ${metric === 'rhr' ? 'bpm' : 'ms'}</strong> — consistent across this period. Good sign of sustainable training.`;
+      }
+
+      calloutEl.style.display = 'block';
+      calloutEl.style.background = bgColor;
+      calloutEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+          <span style="font-size:18px; font-weight:800;">${icon}</span>
+          <strong style="font-size:13px;">${headline}</strong>
+        </div>
+        <div style="font-size:12px; color:var(--text-soft); line-height:1.5;">${detail}</div>`;
+    }
+  }
+
   function renderProgressTrends() {
     const chartEl = document.getElementById('perfTrendChart');
     const calloutEl = document.getElementById('perfTrendCallout');
@@ -15022,9 +15226,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       axis.innerHTML = labels.map(l => `<span>${escapeHtml(l)}</span>`).join('');
     }
 
-    // Discipline breakdown
+    // Discipline breakdown — filter to selected volume bucket so the two charts are linked
+    let discActs = acts;
+    const discPeriodEl = document.getElementById('perfDisciplinePeriod');
+    if (_perfDrill && _perfDrill.kind === 'bucket' && _perfBucketCache) {
+      const selBucket = _perfBucketCache.buckets[_perfDrill.idx];
+      if (selBucket) {
+        discActs = acts.filter(a => {
+          const t = new Date(a.start_date_local || a.start_date); t.setHours(0,0,0,0);
+          if (bucketSize === 'day')  return t.toISOString().slice(0,10) === selBucket.key;
+          if (bucketSize === 'week') {
+            const x = new Date(t); const dow = x.getDay(); const diff = dow === 0 ? 6 : dow - 1; x.setDate(x.getDate() - diff);
+            return x.toISOString().slice(0,10) === selBucket.key;
+          }
+          return `${t.getFullYear()}-${t.getMonth()}` === selBucket.key;
+        });
+        if (discPeriodEl) { discPeriodEl.textContent = selBucket.label; discPeriodEl.style.display = 'block'; }
+      }
+    } else {
+      if (discPeriodEl) discPeriodEl.style.display = 'none';
+    }
     const byDisc = {};
-    acts.forEach(a => {
+    discActs.forEach(a => {
       const d = mapStravaTypeToSessionType(a.type);
       byDisc[d] = (byDisc[d] || 0) + (a.moving_min || 0);
     });
@@ -15071,6 +15294,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           ${rows}`;
       }
     }
+
+    // Fitness signals (volume vs RHR/HRV overlay)
+    renderFitnessSignals();
 
     // Progress trends (pace / duration / HR over time)
     renderProgressTrends();
