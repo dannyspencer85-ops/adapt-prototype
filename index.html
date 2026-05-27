@@ -5249,7 +5249,7 @@
       const icon = a ? iconForStravaType(a.type) : '?';
       return `
         <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-          <div style="width:28px; height:28px; border-radius:6px; background: var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px;">${icon}</div>
+          ${sportBadge(a.type, { size: 28 })}
           <div style="flex:1; min-width: 0;">
             <div style="font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(labelMain)}</div>
             <div style="color:var(--text-soft); font-size:11px; margin-top:1px;">${escapeHtml(labelSub)}</div>
@@ -5309,7 +5309,7 @@
       const meta = [a.type, km, dur].filter(Boolean).join(' · ');
       details.innerHTML = `
         <div style="display:flex; align-items:center; gap:12px;">
-          <div style="width:36px; height:36px; border-radius:8px; background: var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px;">${iconForStravaType(a.type)}</div>
+          ${sportBadge(a.type, { size: 36 })}
           <div style="flex:1; min-width: 0;">
             <div style="font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(a.name)}</div>
             <div style="color:var(--text-soft); font-size:12px; margin-top:2px;">${shortDay(a.start_date_local)}</div>
@@ -6923,29 +6923,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // Past + completed = real Strava data attached, show as Done.
       // Future = show as planned.
       // Today = show as Up next (handled by renderTodayHero, but the row stays visible here).
-      let statusText, rowClass, iconStyle, iconChar;
+      let statusText, rowClass, badgeHtml;
       if (isCompleted) {
         statusText = 'Done';
         rowClass = 'session-row done';
-        iconStyle = 'style="background:var(--primary);color:#fff;"';
-        iconChar = '✓';
+        badgeHtml = sportBadge(s.type, { size: 40, completed: true });
       } else if (isPast) {
         // Past but no real workout — show muted, "Skipped" or "Rest" depending on plan
         const wasRest = s.type === 'rest';
         statusText = wasRest ? 'Rest' : 'Not logged';
         rowClass = 'session-row';
-        iconStyle = 'style="background:var(--bg-soft); color: var(--text-soft); opacity: 0.7;"';
-        iconChar = wasRest ? icon('rest', { size: 16, color: 'var(--text-soft)' }) : '–';
+        badgeHtml = sportBadge(s.type, { size: 40, muted: true });
       } else if (isToday) {
         statusText = 'Up next';
         rowClass = 'session-row today';
-        iconStyle = '';
-        iconChar = ICON[s.type] || '•';
+        badgeHtml = sportBadge(s.type, { size: 40 });
       } else {
         statusText = 'Planned';
         rowClass = 'session-row';
-        iconStyle = '';
-        iconChar = ICON[s.type] || '•';
+        badgeHtml = sportBadge(s.type, { size: 40 });
       }
 
       const dayLabel = planState.dates[day] + ' · ' + day + (isToday ? ' · Today' : '');
@@ -6975,7 +6971,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
       html += `<div class="${rowClass}" style="display:block; ${muted}" onclick="openSessionModal('${day}')">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="session-icon" ${iconStyle}>${iconChar}</div>
+          ${badgeHtml}
           <div class="session-info">
             <div class="session-day">${dayLabel}</div>
             <div class="session-name">${escapeHtml(nameToShow)}</div>
@@ -12898,7 +12894,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const safe = _safeSession(s);
       return `
       <div class="session-row" onclick="openSessionModal('${day}')" style="cursor:pointer;">
-        <div class="session-icon">${ICON[safe.type] || '•'}</div>
+        ${sportBadge(safe.type, { size: 40 })}
         <div class="session-info">
           <div class="session-day">${DAY_FULL[day]} · ${planState.dates[day] || ''}</div>
           <div class="session-name">${escapeHtml(safe.name)}</div>
@@ -14271,6 +14267,49 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
   }
   // Strava activity → display icon
+  // Maps any type string (Strava or plan) → a SPORT_COLORS key
+  function typeToSportKey(typeStr) {
+    const t = (typeStr || '').toLowerCase();
+    // Direct plan keys
+    if (['run','bike','swim','brick','quality','strength','mobility','walk','rest'].includes(t)) return t;
+    // Strava-style strings
+    if (t.includes('run') || t.includes('jog'))                                                 return 'run';
+    if (t.includes('ride') || t.includes('bike') || t.includes('cycl'))                        return 'bike';
+    if (t.includes('swim'))                                                                     return 'swim';
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit') ||
+        t.includes('crosstraining') || t.includes('hiit') || t.includes('functional'))         return 'strength';
+    if (t.includes('walk') || t.includes('hike'))                                              return 'walk';
+    if (t.includes('yoga') || t.includes('mobil'))                                             return 'mobility';
+    if (t.includes('row'))                                                                      return 'swim';
+    return 'other';
+  }
+
+  // Maps a sport key → icon name
+  const SPORT_ICON = {
+    run: 'run', bike: 'bike', swim: 'swim', brick: 'bike',
+    quality: 'intervals', strength: 'strength', mobility: 'mobility',
+    walk: 'walk', rest: 'rest', other: 'activity'
+  };
+
+  // Returns a sport-colored circle badge div with the correct SVG icon inside.
+  // typeStr  — Strava type ("Run", "Ride") or plan type ("run", "bike")
+  // opts.size — badge diameter in px (default 40)
+  // opts.completed — show check icon instead of sport icon
+  // opts.muted  — low-opacity style for skipped/rest past days
+  function sportBadge(typeStr, opts) {
+    const o = opts || {};
+    const size = o.size || 40;
+    const sportKey = typeToSportKey(typeStr);
+    const c = sportColor(sportKey);
+    const iconName = SPORT_ICON[sportKey] || 'activity';
+    const iconSize = Math.round(size * 0.44);
+    const badgeIcon = o.completed
+      ? icon('check', { size: iconSize, color: c.fg })
+      : icon(iconName, { size: iconSize, color: c.fg });
+    const opacity = o.muted ? ' opacity:0.55;' : '';
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${c.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;${opacity}">${badgeIcon}</div>`;
+  }
+
   function iconForStravaType(type) {
     const t = (type || '').toLowerCase();
     if (t.includes('run'))                            return icon('run',       { size: 16 });
@@ -14324,7 +14363,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           </button>
           <div style="cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
             <div style="display: flex; align-items: center; gap: 12px; padding-right: 30px;">
-              <div class="session-icon" style="background: var(--primary); color: #fff;">${iconForStravaType(a.type)}</div>
+              ${sportBadge(a.type, { size: 40 })}
               <div class="session-info">
                 <div class="session-day">${shortDay(a.start_date_local)}</div>
                 <div class="session-name">${escapeHtml(a.name)}</div>
@@ -15185,7 +15224,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (listEl) {
       listEl.innerHTML = sorted.map((a, i) => `
         <div onclick="openStravaSessionReport('${a.id}')" style="display: flex; align-items: center; gap: 10px; padding: 10px 0; ${i === sorted.length - 1 ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;">
-          <div style="width: 30px; height: 30px; border-radius: 6px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;">${iconForStravaType(a.type)}</div>
+          ${sportBadge(a.type, { size: 36 })}
           <div style="flex: 1; min-width: 0;">
             <div style="font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(a.name)}</div>
             <div style="font-size: 11px; color: var(--text-soft); margin-top: 1px;">${shortDay(a.start_date_local)}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}</div>
@@ -15431,14 +15470,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (topSess) {
       const top = acts.slice().sort((a, b) => (b.moving_min || 0) - (a.moving_min || 0)).slice(0, 5);
       topSess.innerHTML = top.map((a, i) => `
-        <div style="padding: 14px 16px; ${i === top.length - 1 ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">${iconForStravaType(a.type)} ${escapeHtml(a.name)} ›</div>
-              <div style="color: var(--text-soft); font-size: 12px;">${shortDay(a.start_date_local)}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}</div>
-            </div>
-            <div style="font-weight: 700; font-size: 15px;">${formatHM(a.moving_min)}</div>
+        <div style="padding: 12px 16px; display: flex; align-items: center; gap: 12px; ${i === top.length - 1 ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
+          ${sportBadge(a.type, { size: 40 })}
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(a.name)}</div>
+            <div style="color: var(--text-soft); font-size: 12px; margin-top: 2px;">${shortDay(a.start_date_local)}${a.distance_km > 0.1 ? ' · ' + a.distance_km.toFixed(1) + ' km' : ''}</div>
           </div>
+          <div style="font-weight: 700; font-size: 14px; flex-shrink: 0;">${formatHM(a.moving_min)}</div>
+          <div style="color: var(--text-soft); font-size: 16px;">›</div>
         </div>
       `).join('');
     }
@@ -15534,14 +15573,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const km = a.distance_km > 0.1 ? a.distance_km.toFixed(1) + ' km' : '';
       return `
         <div style="padding: 14px 16px; ${last ? '' : 'border-bottom: 1px solid var(--border);'} cursor: pointer;" onclick="openStravaSessionReport('${a.id}')">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <div>
-              <div style="font-weight: 700; font-size: 15px;">${iconForStravaType(a.type)} ${escapeHtml(a.name)} ›</div>
-              <div style="color: var(--text-soft); font-size: 12px;">${shortDay(a.start_date_local)}${km ? ' · ' + km : ''}</div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            ${sportBadge(a.type, { size: 40 })}
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(a.name)}</div>
+              <div style="color: var(--text-soft); font-size: 12px; margin-top: 2px;">${shortDay(a.start_date_local)}${km ? ' · ' + km : ''}</div>
             </div>
             ${a.suffer ? `<div title="Strava's Relative Effort (formerly Suffer Score)" style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">Effort ${a.suffer}</div>` : ''}
+            <div style="color: var(--text-soft); font-size: 16px;">›</div>
           </div>
-          <div class="data-row" style="margin-top: 12px;">
+          <div class="data-row">
             <div class="data-cell"><div class="label">Duration</div><div class="value">${formatHM(a.moving_min)}</div></div>
             <div class="data-cell"><div class="label">Avg HR</div><div class="value">${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div></div>
             <div class="data-cell"><div class="label">${a.avg_watts ? 'Avg W' : 'Elev'}</div><div class="value">${a.avg_watts ? Math.round(a.avg_watts) : (a.elevation_m ? Math.round(a.elevation_m * 3.28) + ' ft' : '—')}</div></div>
