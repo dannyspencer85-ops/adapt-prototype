@@ -50,16 +50,6 @@
     --alert-soft: #FBDADA;
     --info: #3973A8;
     --info-soft: #DCEAF5;
-    /* Sport badge colors — run tracks theme primary; others stay semantic */
-    --sport-run: #3B8968;
-    --sport-bike: #E8941F;
-    --sport-swim: #3D8FD9;
-    --sport-brick: #7E5BB6;
-    --sport-quality: #C44545;
-    --sport-strength: #5A4B8C;
-    --sport-mobility: #B0B7BD;
-    --sport-walk: #84A9B5;
-    --sport-rest: #E6E6E6;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -595,19 +585,15 @@
   }
   .rpe-btn {
     aspect-ratio: 1;
-    width: 100%;
+    min-height: 44px;
+    min-width: 44px;
     border: 1px solid var(--border);
     background: #fff;
-    color: var(--text);
     border-radius: 8px;
     font-family: inherit;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   .rpe-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
   .rpe-scale {
@@ -4256,10 +4242,6 @@
           generatePlanFromInputs();
           planState.planSource = 'fallback';
         }
-        // Stamp plan creation time — the insight engine uses this to
-        // suppress structural critiques for 48h after first-ever setup,
-        // so new users never land on a warning screen right after onboarding.
-        if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
         // Mark onboarding done here (not in goHome) so Supabase users
         // don't get looped back to onboarding on every app reload.
         markOnboardingComplete();
@@ -4279,7 +4261,6 @@
         planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
         planState.planSource = 'fallback';
         generatePlanFromInputs();
-        if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
         // Mark onboarding done even on AI failure — rule engine produced a plan.
         markOnboardingComplete();
         stopStagedPlanStatus();
@@ -5723,11 +5704,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     root.style.setProperty('--primary-soft', t.soft);
     root.style.setProperty('--primary-dark', t.dark);
     root.style.setProperty('--primary-light', t.light);
-    // Run badge always matches the selected theme color so the most
-    // common sport icon feels native to the personalization choice.
-    root.style.setProperty('--sport-run', t.primary);
-    root.style.setProperty('--sport-quality', t.dark);
-    root.style.setProperty('--sport-strength', t.dark);
   }
   function setTheme(name) {
     if (!THEMES[name]) return;
@@ -5849,8 +5825,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     dates: buildWeekDateLabels(),
     weekArc: [], // generated dynamically by generatePlanFromInputs based on race date
     injury: null,
-    lastChange: null,
-    planCreatedAt: null   // timestamp set when plan is first generated; suppresses early structural insights
+    lastChange: null
   };
 
   // ──────────────────────────────────────────────────────────────────────
@@ -8098,12 +8073,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const noHistoryYet = completedCount === 0;
     // AI plan + no manual edits → trust the AI's structural decisions.
     const aiPlanIntact = planState.planSource === 'ai' && !planState.lastChange;
-    // Newly created plan (< 48 h old) — even if Strava auto-matched some past
-    // sessions as "completed", the user hasn't actually trained on this plan
-    // yet. Show suggestions only after they've had time to actually use it.
-    const planAge = planState.planCreatedAt ? (Date.now() - planState.planCreatedAt) : Infinity;
-    const planIsNew = planAge < 48 * 60 * 60 * 1000;
-    const aiPlanProtected = noHistoryYet || aiPlanIntact || planIsNew;
+    const aiPlanProtected = noHistoryYet || aiPlanIntact;
 
     // 1. Key session coverage (plan-structure — gated)
     const hasLong = activeSessions.some(x => x.s.duration >= 75);
@@ -10826,8 +10796,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // render" bug where the celebration is silently consumed.
     const r = fresh[0];
     slot.style.display = 'block';
-    slot.innerHTML = `<div style="background:linear-gradient(135deg, var(--primary-light, #5DA985), var(--primary, #3B8968)); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
-      <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${icon('trophy', { size: 24, color: '#fff', stroke: 1.8 })}</div>
+    slot.innerHTML = `<div style="background:linear-gradient(135deg, #5DA985, #3B8968); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+      <div style="font-size:34px; line-height:1;">🏆</div>
       <div style="flex:1; min-width:0;">
         <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.9;">${welcomeShown ? 'NEW PERSONAL BEST' : 'YOUR BEST RECORD'}</div>
         <div style="font-size:16px; font-weight:800; margin-top:2px;">${escapeHtml(r.label)} — ${escapeHtml(r.value)}</div>
@@ -13290,7 +13260,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     planState.courseIntel = null;
     planState.injury = null;
     planState.lastChange = null;
-    planState.planCreatedAt = null;
     planState.lastCheckin = null;
     planState.notifications = [];
     planState.stravaActivities = [];
@@ -13351,7 +13320,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
     'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
     'stravaAuthError', 'lastCheckin', 'notifications',
-    'aiPlanError', 'profile', 'onboardingComplete', 'planCreatedAt',
+    'aiPlanError', 'profile', 'onboardingComplete',
   ];
 
   // Keys that are user-specific (scoped to account, not device).
@@ -14338,10 +14307,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ? icon('check', { size: iconSize, color: c.fg })
       : icon(iconName, { size: iconSize, color: c.fg });
     const opacity = o.muted ? ' opacity:0.55;' : '';
-    // Use CSS variable so run/quality/strength track the selected theme
-    // color automatically. Fallback to hardcoded hex for unsupported keys.
-    const bg = `var(--sport-${sportKey}, ${c.bg})`;
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;${opacity}">${badgeIcon}</div>`;
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${c.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;${opacity}">${badgeIcon}</div>`;
   }
 
   function iconForStravaType(type) {
