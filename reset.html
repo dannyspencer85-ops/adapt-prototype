@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Reset your Adapt password</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f4f4f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .logo-mark {
+      width: 40px; height: 40px;
+      background: #3B8968;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 18px;
+    }
+    .logo-name { font-size: 20px; font-weight: 700; color: #1a1a1a; }
+    h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; }
+    p.sub { font-size: 14px; color: #777; margin-bottom: 24px; line-height: 1.5; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 16px;
+    }
+    input:focus { border-color: #3B8968; }
+    button {
+      width: 100%;
+      background: #3B8968;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error {
+      background: #fff0f0;
+      border: 1px solid #ffc0c0;
+      color: #c00;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .success {
+      text-align: center;
+      display: none;
+    }
+    .success svg { margin-bottom: 16px; }
+    .success h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1a1a1a; }
+    .success p { font-size: 14px; color: #777; margin-bottom: 24px; }
+    .success a {
+      display: inline-block;
+      background: #3B8968;
+      color: #fff;
+      text-decoration: none;
+      padding: 13px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px 0;
+      color: #777;
+      font-size: 14px;
+    }
+    .link-expired {
+      text-align: center;
+      display: none;
+    }
+    .link-expired h2 { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; }
+    .link-expired p { font-size: 14px; color: #777; margin-bottom: 20px; line-height: 1.5; }
+    .link-expired a {
+      display: inline-block;
+      background: #3B8968;
+      color: #fff;
+      text-decoration: none;
+      padding: 13px 28px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-mark">A</div>
+      <div class="logo-name">Adapt</div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading" id="loading">Verifying your link…</div>
+
+    <!-- Reset form -->
+    <div id="resetForm" style="display:none;">
+      <h1>Set a new password</h1>
+      <p class="sub">Choose a strong password for your Adapt account.</p>
+      <div class="error" id="resetError"></div>
+      <label for="pw">New password</label>
+      <input type="password" id="pw" placeholder="At least 6 characters" autocomplete="new-password">
+      <label for="pw2">Confirm password</label>
+      <input type="password" id="pw2" placeholder="Repeat password" autocomplete="new-password">
+      <button id="saveBtn" onclick="savePassword()">Save new password</button>
+    </div>
+
+    <!-- Success state -->
+    <div class="success" id="successState">
+      <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+        <circle cx="26" cy="26" r="26" fill="#3B8968" opacity="0.12"/>
+        <circle cx="26" cy="26" r="20" fill="#3B8968" opacity="0.18"/>
+        <path d="M17 26l6 6 12-12" stroke="#3B8968" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h2>Password updated!</h2>
+      <p>You're all set. Head back to the app and log in with your new password.</p>
+      <a href="/">Open Adapt</a>
+    </div>
+
+    <!-- Link expired state -->
+    <div class="link-expired" id="expiredState">
+      <h2>Link expired</h2>
+      <p>This password reset link has expired or already been used. Request a new one from the app.</p>
+      <a href="/">Back to Adapt</a>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL      = 'https://lykorfkapbxufkjcqtnl.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
+    const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function showError(msg) {
+      const el = document.getElementById('resetError');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function init() {
+      // Wait a moment for the SDK to process the URL hash/code
+      await new Promise(r => setTimeout(r, 500));
+
+      const { data: { session }, error } = await _sb.auth.getSession();
+
+      document.getElementById('loading').style.display = 'none';
+
+      if (session) {
+        document.getElementById('resetForm').style.display = 'block';
+      } else {
+        document.getElementById('expiredState').style.display = 'block';
+      }
+    }
+
+    async function savePassword() {
+      const pw  = document.getElementById('pw').value;
+      const pw2 = document.getElementById('pw2').value;
+
+      if (!pw || pw.length < 6) { showError('Password must be at least 6 characters.'); return; }
+      if (pw !== pw2) { showError("Passwords don't match."); return; }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      document.getElementById('resetError').style.display = 'none';
+
+      const { error } = await _sb.auth.updateUser({ password: pw });
+      if (error) {
+        showError(error.message || 'Could not update password. Try again.');
+        btn.disabled = false;
+        btn.textContent = 'Save new password';
+        return;
+      }
+
+      // Sign out so user logs in fresh with new password
+      await _sb.auth.signOut();
+
+      document.getElementById('resetForm').style.display = 'none';
+      document.getElementById('successState').style.display = 'block';
+    }
+
+    init();
+  </script>
+</body>
+</html>

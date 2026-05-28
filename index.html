@@ -13625,7 +13625,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const btn = document.querySelector('#authForgot .btn-primary');
     if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
     try {
-      const redirectTo = window.location.origin + (window.location.pathname || '/');
+      const redirectTo = window.location.origin + '/reset.html';
       await _sb.auth.resetPasswordForEmail(email, { redirectTo });
       document.getElementById('forgotError').style.display = 'none';
       document.getElementById('forgotSuccess').style.display = 'block';
@@ -16442,20 +16442,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try {
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
-
-      // TEMPORARY DEBUG — shows URL state on load so we can diagnose recovery routing.
-      // Remove once password reset is confirmed working.
-      (() => {
-        const h = window.location.hash || '(none)';
-        const s = window.location.search || '(none)';
-        const ss = sessionStorage.getItem('_adaptRecovery') || '0';
-        const pr = _pendingPasswordRecovery;
-        const d = document.createElement('div');
-        d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;font-size:11px;padding:6px 10px;z-index:99999;font-family:monospace;word-break:break-all;';
-        d.textContent = `RECOVERY DEBUG — hash:${h} | search:${s} | ss:${ss} | flag:${pr}`;
-        document.body.appendChild(d);
-        setTimeout(() => d.remove(), 30000);
-      })();
 
       // Fast-path: a password-recovery URL was detected (before createClient
       // ran) or the PASSWORD_RECOVERY event already fired.  Skip all normal
