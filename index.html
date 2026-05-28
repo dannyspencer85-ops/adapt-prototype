@@ -13682,6 +13682,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         await _sbLoad();
         trackEvent('login', { method: 'supabase' });
         enterApp();
+      } catch (err) {
+        // Surface any unexpected post-login exception so it's visible to the user
+        // instead of silently resetting the button with no feedback.
+        showError('loginError', err?.message || 'Something went wrong — please try again.');
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
       }
