@@ -3539,6 +3539,9 @@
 
   // Cached username so currentUser() stays synchronous everywhere.
   let _sbUsername = null;
+  // Set to true when a PASSWORD_RECOVERY event fires so DOMContentLoaded
+  // can skip normal routing (enterApp / showScreen('onboard')) entirely.
+  let _pendingPasswordRecovery = false;
   function _sbUserFromMeta(user) {
     // Prefer stored display name, fall back to the part before @ in their email.
     return (user?.user_metadata?.display_name)
@@ -3554,6 +3557,7 @@
     _sb.auth.onAuthStateChange((evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
       if (evt === 'PASSWORD_RECOVERY') {
+        _pendingPasswordRecovery = true;
         showScreen('auth');
         if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
       }
@@ -16406,23 +16410,40 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
 
-      // If the URL hash contains a Supabase password-recovery token, intercept
-      // before any session checks and show the reset panel immediately.
-      // This is a belt-and-suspenders fallback: the onAuthStateChange listener
-      // should catch PASSWORD_RECOVERY too, but the event can fire during SDK
-      // init before the listener is wired up.
-      const _hashStr = window.location.hash || '';
-      if (_hashStr.includes('type=recovery')) {
-        await initSupabaseSession(); // exchange token so updateUser() works
-        showScreen('auth');
-        _setAuthPanel('authReset');
-        history.replaceState(null, '', window.location.pathname);
-        renderAll();
-        return; // skip normal login routing
+      // Detect Supabase password-recovery URLs in both the legacy implicit
+      // flow (hash contains type=recovery) and the modern PKCE flow (search
+      // param contains code=).  In the PKCE case the PASSWORD_RECOVERY event
+      // fires inside initSupabaseSession() via onAuthStateChange and sets
+      // _pendingPasswordRecovery=true; we check that flag right after.
+      const _hashStr   = window.location.hash   || '';
+      const _searchStr = window.location.search || '';
+      const _looksLikeRecovery = _hashStr.includes('type=recovery') || _searchStr.includes('code=');
+
+      if (_looksLikeRecovery) {
+        // Exchange the token / code so updateUser() will work, and let the
+        // onAuthStateChange handler set _pendingPasswordRecovery if this
+        // really is a PASSWORD_RECOVERY event (not some other OAuth code).
+        await initSupabaseSession();
+        if (_pendingPasswordRecovery || _hashStr.includes('type=recovery')) {
+          showScreen('auth');
+          _setAuthPanel('authReset');
+          history.replaceState(null, '', window.location.pathname);
+          renderAll();
+          return; // skip normal login routing
+        }
+        // If the code= was for something else (e.g. Strava OAuth), fall
+        // through to normal routing below.
+      } else {
+        // Initialize Supabase session (no-op when not configured).
+        await initSupabaseSession();
       }
 
-      // Initialize Supabase session (no-op when not configured).
-      await initSupabaseSession();
+      // If a PASSWORD_RECOVERY event already fired (e.g. during SDK init),
+      // stay on the reset panel and skip all normal routing.
+      if (_pendingPasswordRecovery) {
+        renderAll();
+        return;
+      }
 
       let returning = false;
       if (_isSupabase()) {
