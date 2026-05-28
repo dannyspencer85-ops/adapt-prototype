@@ -3549,18 +3549,17 @@
   // Called once in DOMContentLoaded to hydrate _sbUsername from any existing session.
   async function initSupabaseSession() {
     if (!_sb) return;
-    const { data } = await _sb.auth.getSession();
-    if (data.session) _sbUsername = _sbUserFromMeta(data.session.user);
+    // Register the listener BEFORE getSession() so we never miss a
+    // PASSWORD_RECOVERY event that fires during SDK initialisation.
     _sb.auth.onAuthStateChange((evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
-      // When the user taps the reset-password link in their email, Supabase
-      // redirects back to the app with a recovery token. Detect that event
-      // and immediately show the "Set new password" panel.
       if (evt === 'PASSWORD_RECOVERY') {
         showScreen('auth');
         if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
       }
     });
+    const { data } = await _sb.auth.getSession();
+    if (data.session) _sbUsername = _sbUserFromMeta(data.session.user);
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -16406,6 +16405,21 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try {
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
+
+      // If the URL hash contains a Supabase password-recovery token, intercept
+      // before any session checks and show the reset panel immediately.
+      // This is a belt-and-suspenders fallback: the onAuthStateChange listener
+      // should catch PASSWORD_RECOVERY too, but the event can fire during SDK
+      // init before the listener is wired up.
+      const _hashStr = window.location.hash || '';
+      if (_hashStr.includes('type=recovery')) {
+        await initSupabaseSession(); // exchange token so updateUser() works
+        showScreen('auth');
+        _setAuthPanel('authReset');
+        history.replaceState(null, '', window.location.pathname);
+        renderAll();
+        return; // skip normal login routing
+      }
 
       // Initialize Supabase session (no-op when not configured).
       await initSupabaseSession();
