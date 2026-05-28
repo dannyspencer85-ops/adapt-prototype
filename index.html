@@ -3542,6 +3542,7 @@
   // Set to true when a PASSWORD_RECOVERY event fires so DOMContentLoaded
   // can skip normal routing (enterApp / showScreen('onboard')) entirely.
   let _pendingPasswordRecovery = false;
+
   function _sbUserFromMeta(user) {
     // Prefer stored display name, fall back to the part before @ in their email.
     return (user?.user_metadata?.display_name)
@@ -3549,19 +3550,31 @@
         || (user?.email ? user.email.split('@')[0] : null);
   }
 
-  // Called once in DOMContentLoaded to hydrate _sbUsername from any existing session.
-  async function initSupabaseSession() {
-    if (!_sb) return;
-    // Register the listener BEFORE getSession() so we never miss a
-    // PASSWORD_RECOVERY event that fires during SDK initialisation.
+  // Register the auth-state listener at module level — RIGHT NOW, before
+  // DOMContentLoaded — so we never miss a PASSWORD_RECOVERY event that the
+  // Supabase SDK fires during its async initialise() / URL-code-exchange,
+  // which happens immediately after createClient() and can complete before
+  // DOMContentLoaded fires.
+  if (_sb) {
     _sb.auth.onAuthStateChange((evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
       if (evt === 'PASSWORD_RECOVERY') {
         _pendingPasswordRecovery = true;
-        showScreen('auth');
-        if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
+        // If the DOM is already loaded, show the reset panel immediately.
+        // If not, DOMContentLoaded will check _pendingPasswordRecovery and act.
+        if (document.readyState !== 'loading') {
+          if (typeof showScreen === 'function') showScreen('auth');
+          if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
+        }
       }
     });
+  }
+
+  // Called once in DOMContentLoaded to hydrate _sbUsername from any existing
+  // session.  The auth-state listener is already registered above — this just
+  // triggers getSession() so the SDK can exchange a PKCE code if one is present.
+  async function initSupabaseSession() {
+    if (!_sb) return;
     const { data } = await _sb.auth.getSession();
     if (data.session) _sbUsername = _sbUserFromMeta(data.session.user);
   }
@@ -16410,37 +16423,36 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
 
-      // Detect Supabase password-recovery URLs in both the legacy implicit
-      // flow (hash contains type=recovery) and the modern PKCE flow (search
-      // param contains code=).  In the PKCE case the PASSWORD_RECOVERY event
-      // fires inside initSupabaseSession() via onAuthStateChange and sets
-      // _pendingPasswordRecovery=true; we check that flag right after.
-      const _hashStr   = window.location.hash   || '';
-      const _searchStr = window.location.search || '';
-      const _looksLikeRecovery = _hashStr.includes('type=recovery') || _searchStr.includes('code=');
-
-      if (_looksLikeRecovery) {
-        // Exchange the token / code so updateUser() will work, and let the
-        // onAuthStateChange handler set _pendingPasswordRecovery if this
-        // really is a PASSWORD_RECOVERY event (not some other OAuth code).
-        await initSupabaseSession();
-        if (_pendingPasswordRecovery || _hashStr.includes('type=recovery')) {
-          showScreen('auth');
-          _setAuthPanel('authReset');
-          history.replaceState(null, '', window.location.pathname);
-          renderAll();
-          return; // skip normal login routing
-        }
-        // If the code= was for something else (e.g. Strava OAuth), fall
-        // through to normal routing below.
-      } else {
-        // Initialize Supabase session (no-op when not configured).
-        await initSupabaseSession();
+      // Fast-path: PASSWORD_RECOVERY event fired during SDK init (before
+      // DOMContentLoaded).  Skip all normal routing immediately.
+      if (_pendingPasswordRecovery) {
+        showScreen('auth');
+        _setAuthPanel('authReset');
+        history.replaceState(null, '', window.location.pathname);
+        renderAll();
+        return;
       }
 
-      // If a PASSWORD_RECOVERY event already fired (e.g. during SDK init),
-      // stay on the reset panel and skip all normal routing.
+      // Initialize Supabase session.  If a PKCE ?code= is in the URL the SDK
+      // will exchange it here, which may fire PASSWORD_RECOVERY via the
+      // module-level onAuthStateChange listener we registered above.
+      await initSupabaseSession();
+
+      // Check again — event may have fired during getSession().
       if (_pendingPasswordRecovery) {
+        showScreen('auth');
+        _setAuthPanel('authReset');
+        history.replaceState(null, '', window.location.pathname);
+        renderAll();
+        return;
+      }
+
+      // Legacy fallback: implicit-flow reset link uses #type=recovery hash.
+      const _hashStr = window.location.hash || '';
+      if (_hashStr.includes('type=recovery')) {
+        showScreen('auth');
+        _setAuthPanel('authReset');
+        history.replaceState(null, '', window.location.pathname);
         renderAll();
         return;
       }
