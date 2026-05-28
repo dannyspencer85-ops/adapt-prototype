@@ -3572,12 +3572,32 @@
     'day-overrides', 'plan-difficulty-adjust',
   ];
 
-  // Declared here (top of script) so it is never in a temporal dead zone
-  // when auth callbacks or doLogin() reference it before the full
-  // initialisation block at ~line 6000 runs.  The object is populated
-  // in-place by the block below; using `let` (not `const`) so we can
-  // re-assign if needed without a duplicate-declaration error.
-  let planState;
+  // Declared here (top of script) with a safe default so it is never
+  // undefined when auth callbacks or doLogin() reference it before the
+  // full initialisation block lower in the file runs.
+  // The block at ~line 6000 reassigns this with the real default values
+  // (including buildWeekDateLabels() for dates — which needs DAYS, a const
+  // defined later). Until then, every field that code might set/read is
+  // already present as a safe empty value.
+  let planState = {
+    sessions: {
+      Mon: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Wed: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Thu: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Fri: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Sat: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Sun: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+    },
+    dates: {}, weekArc: [], injury: null, lastChange: null, planCreatedAt: null,
+    fullPlan: null, aiPlanSummary: null, aiPlanNotes: null, planSource: null,
+    raceEvent: null, raceDate: null, raceLocation: null,
+    triFocus: null, raceWeek: false, postRace: false, activeWeekIdx: 0,
+    stravaActivities: [], stravaSyncedAt: null, stravaSyncDays: null,
+    stravaAuthError: null, lastCheckin: null, notifications: [],
+    aiPlanError: null, profile: null, onboardingComplete: false,
+    courseIntel: null, weekArc: [],
+  };
 
   // Internal Supabase client — null when not configured (localStorage fallback).
   // Wrapped in try/catch: if the CDN SDK version throws during createClient
