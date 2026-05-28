@@ -3539,9 +3539,19 @@
 
   // Cached username so currentUser() stays synchronous everywhere.
   let _sbUsername = null;
-  // Set to true when a PASSWORD_RECOVERY event fires so DOMContentLoaded
-  // can skip normal routing (enterApp / showScreen('onboard')) entirely.
-  let _pendingPasswordRecovery = false;
+
+  // Detect a password-recovery redirect SYNCHRONOUSLY, before the Supabase
+  // SDK runs or any async event can fire.  Both flow types covered:
+  //   • Implicit flow → Supabase verify endpoint adds #access_token=...&type=recovery
+  //   • PKCE flow    → adds ?code=... (Strava OAuth also uses ?code= but always
+  //                    adds ?scope= too, so we exclude that)
+  let _pendingPasswordRecovery = (() => {
+    try {
+      const h = window.location.hash   || '';
+      const s = window.location.search || '';
+      return h.includes('type=recovery') || (s.includes('code=') && !s.includes('scope='));
+    } catch (_) { return false; }
+  })();
 
   function _sbUserFromMeta(user) {
     // Prefer stored display name, fall back to the part before @ in their email.
