@@ -3535,10 +3535,11 @@
   const _RECOVERY_HASH   = (window.location.hash   || '').includes('type=recovery');
   const _RECOVERY_CODE   = (window.location.search || '').includes('code=') &&
                            !(window.location.search || '').includes('scope=');
-  // Store immediately in sessionStorage so it survives even if the SDK
-  // wipes window.location before DOMContentLoaded.
+  // Redirect immediately to the dedicated reset page — BEFORE createClient()
+  // can process or clear the URL params.  Passes the original search+hash so
+  // reset.html's Supabase client can exchange the code / read the token.
   if (_RECOVERY_HASH || _RECOVERY_CODE) {
-    sessionStorage.setItem('_adaptRecovery', '1');
+    window.location.replace('/reset.html' + window.location.search + window.location.hash);
   }
 
   // Internal Supabase client — null when not configured (localStorage fallback).
@@ -3558,10 +3559,10 @@
   // Cached username so currentUser() stays synchronous everywhere.
   let _sbUsername = null;
 
-  // _pendingPasswordRecovery is true if the pre-createClient() URL scan found
-  // a recovery redirect, OR if sessionStorage has the flag (set above).
-  let _pendingPasswordRecovery = _RECOVERY_HASH || _RECOVERY_CODE ||
-                                 sessionStorage.getItem('_adaptRecovery') === '1';
+  // Recovery flows now redirect to /reset.html before the SDK runs,
+  // so this flag is always false here.  Kept for the onAuthStateChange
+  // fallback path below.
+  let _pendingPasswordRecovery = false;
 
   function _sbUserFromMeta(user) {
     // Prefer stored display name, fall back to the part before @ in their email.
@@ -3579,13 +3580,11 @@
     _sb.auth.onAuthStateChange((evt, session) => {
       _sbUsername = session ? _sbUserFromMeta(session.user) : null;
       if (evt === 'PASSWORD_RECOVERY') {
-        _pendingPasswordRecovery = true;
-        // If the DOM is already loaded, show the reset panel immediately.
-        // If not, DOMContentLoaded will check _pendingPasswordRecovery and act.
-        if (document.readyState !== 'loading') {
-          if (typeof showScreen === 'function') showScreen('auth');
-          if (typeof _setAuthPanel === 'function') _setAuthPanel('authReset');
-        }
+        // Belt-and-suspenders: if the early URL redirect somehow didn't fire
+        // (e.g. the SDK fired PASSWORD_RECOVERY before our redirect ran),
+        // the session is now in localStorage — redirect to reset.html which
+        // will pick it up via getSession().
+        window.location.replace('/reset.html');
       }
     });
   }
@@ -16443,42 +16442,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
 
-      // Fast-path: a password-recovery URL was detected (before createClient
-      // ran) or the PASSWORD_RECOVERY event already fired.  Skip all normal
-      // routing and go straight to the reset-password panel.
-      if (_pendingPasswordRecovery) {
-        sessionStorage.removeItem('_adaptRecovery'); // consumed
-        await initSupabaseSession();                 // exchange code → valid session
-        showScreen('auth');
-        _setAuthPanel('authReset');
-        history.replaceState(null, '', window.location.pathname);
-        renderAll();
-        return;
-      }
-
-      // Initialize Supabase session.  If a PKCE ?code= is in the URL the SDK
-      // will exchange it here, which may fire PASSWORD_RECOVERY via the
-      // module-level onAuthStateChange listener we registered above.
+      // Initialize Supabase session.
       await initSupabaseSession();
-
-      // Check again — event may have fired during getSession().
-      if (_pendingPasswordRecovery) {
-        showScreen('auth');
-        _setAuthPanel('authReset');
-        history.replaceState(null, '', window.location.pathname);
-        renderAll();
-        return;
-      }
-
-      // Legacy fallback: implicit-flow reset link uses #type=recovery hash.
-      const _hashStr = window.location.hash || '';
-      if (_hashStr.includes('type=recovery')) {
-        showScreen('auth');
-        _setAuthPanel('authReset');
-        history.replaceState(null, '', window.location.pathname);
-        renderAll();
-        return;
-      }
 
       let returning = false;
       if (_isSupabase()) {
