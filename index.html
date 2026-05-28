@@ -3572,6 +3572,13 @@
     'day-overrides', 'plan-difficulty-adjust',
   ];
 
+  // Declared here (top of script) so it is never in a temporal dead zone
+  // when auth callbacks or doLogin() reference it before the full
+  // initialisation block at ~line 6000 runs.  The object is populated
+  // in-place by the block below; using `let` (not `const`) so we can
+  // re-assign if needed without a duplicate-declaration error.
+  let planState;
+
   // Internal Supabase client — null when not configured (localStorage fallback).
   // Wrapped in try/catch: if the CDN SDK version throws during createClient
   // (e.g. API change) the error is swallowed and the app falls back to
@@ -5975,7 +5982,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     planState.dates = buildWeekDateLabels();
   }
 
-  const planState = {
+  planState = {
     sessions: {
       Mon: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
       Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
