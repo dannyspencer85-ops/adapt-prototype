@@ -3523,6 +3523,24 @@
   const SUPABASE_URL      = 'https://lykorfkapbxufkjcqtnl.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
 
+  // ── PASSWORD RECOVERY URL DETECTION ─────────────────────────────────────
+  // Must happen BEFORE createClient() — the Supabase SDK may synchronously
+  // clear the URL hash / search params during initialisation, so we capture
+  // the intent right now while the original URL is still intact.
+  //
+  // Supabase verify endpoint redirects in two flavours:
+  //   • Implicit flow  → #access_token=...&type=recovery (hash)
+  //   • PKCE flow      → ?code=...  (query param; Strava also uses ?code= but
+  //                      always adds ?scope= so we can exclude it)
+  const _RECOVERY_HASH   = (window.location.hash   || '').includes('type=recovery');
+  const _RECOVERY_CODE   = (window.location.search || '').includes('code=') &&
+                           !(window.location.search || '').includes('scope=');
+  // Store immediately in sessionStorage so it survives even if the SDK
+  // wipes window.location before DOMContentLoaded.
+  if (_RECOVERY_HASH || _RECOVERY_CODE) {
+    sessionStorage.setItem('_adaptRecovery', '1');
+  }
+
   // Internal Supabase client — null when not configured (localStorage fallback).
   // Wrapped in try/catch: if the CDN SDK version throws during createClient
   // (e.g. API change) the error is swallowed and the app falls back to
@@ -3540,18 +3558,10 @@
   // Cached username so currentUser() stays synchronous everywhere.
   let _sbUsername = null;
 
-  // Detect a password-recovery redirect SYNCHRONOUSLY, before the Supabase
-  // SDK runs or any async event can fire.  Both flow types covered:
-  //   • Implicit flow → Supabase verify endpoint adds #access_token=...&type=recovery
-  //   • PKCE flow    → adds ?code=... (Strava OAuth also uses ?code= but always
-  //                    adds ?scope= too, so we exclude that)
-  let _pendingPasswordRecovery = (() => {
-    try {
-      const h = window.location.hash   || '';
-      const s = window.location.search || '';
-      return h.includes('type=recovery') || (s.includes('code=') && !s.includes('scope='));
-    } catch (_) { return false; }
-  })();
+  // _pendingPasswordRecovery is true if the pre-createClient() URL scan found
+  // a recovery redirect, OR if sessionStorage has the flag (set above).
+  let _pendingPasswordRecovery = _RECOVERY_HASH || _RECOVERY_CODE ||
+                                 sessionStorage.getItem('_adaptRecovery') === '1';
 
   function _sbUserFromMeta(user) {
     // Prefer stored display name, fall back to the part before @ in their email.
@@ -16433,9 +16443,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
 
-      // Fast-path: PASSWORD_RECOVERY event fired during SDK init (before
-      // DOMContentLoaded).  Skip all normal routing immediately.
+      // Fast-path: a password-recovery URL was detected (before createClient
+      // ran) or the PASSWORD_RECOVERY event already fired.  Skip all normal
+      // routing and go straight to the reset-password panel.
       if (_pendingPasswordRecovery) {
+        sessionStorage.removeItem('_adaptRecovery'); // consumed
+        await initSupabaseSession();                 // exchange code → valid session
         showScreen('auth');
         _setAuthPanel('authReset');
         history.replaceState(null, '', window.location.pathname);
