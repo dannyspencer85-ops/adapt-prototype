@@ -3542,6 +3542,36 @@
     window.location.replace('/reset.html' + window.location.search + window.location.hash);
   }
 
+  // Declare shared constants at the very top of the script so they are
+  // guaranteed to be initialised before any function (including doLogin,
+  // _clearUserScopedLocal, _sbLoad, _sbSave) can reference them.
+  // Keeping them here — rather than near the auth section at ~line 13 000 —
+  // eliminates any risk of a temporal-dead-zone error if a cached JS version
+  // or early callback tries to use them before reaching the later declaration.
+
+  // planState fields persisted per-user (Supabase and localStorage).
+  const _PLAN_FIELDS = [
+    'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
+    'fullPlan', 'aiPlanSummary', 'aiPlanNotes', 'planSource',
+    'raceEvent', 'raceDate', 'raceLocation',
+    'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
+    'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
+    'stravaAuthError', 'lastCheckin', 'notifications',
+    'aiPlanError', 'profile', 'onboardingComplete',
+  ];
+
+  // Keys that are user-specific (scoped to account, not device).
+  const USER_SCOPED_LOCAL_KEYS = [
+    'first-name', 'adapt-coach-history', 'adapt-coach-accepted',
+    'strava-config', 'strava-activities', 'strava-synced-at', 'strava-sync-days',
+    'complexity-mode', 'race-event', 'race-date', 'race-location',
+    'hours-per-week', 'training-days', 'course-intel',
+    'perf-range', 'trend-disc', 'integrations', 'fitness-markers',
+    'tri-limiter', 'tri-strategy', 'available-disciplines',
+    'user-profile', 'schedule-prefs', 'schedule-mode',
+    'day-overrides', 'plan-difficulty-adjust',
+  ];
+
   // Internal Supabase client — null when not configured (localStorage fallback).
   // Wrapped in try/catch: if the CDN SDK version throws during createClient
   // (e.g. API change) the error is swallowed and the app falls back to
@@ -13450,29 +13480,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (_isSupabase()) return _sbUsername;
     return localStorage.getItem('adapt-session');
   }
-
-  // planState fields persisted per-user (Supabase and localStorage).
-  const _PLAN_FIELDS = [
-    'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
-    'fullPlan', 'aiPlanSummary', 'aiPlanNotes', 'planSource',
-    'raceEvent', 'raceDate', 'raceLocation',
-    'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
-    'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
-    'stravaAuthError', 'lastCheckin', 'notifications',
-    'aiPlanError', 'profile', 'onboardingComplete',
-  ];
-
-  // Keys that are user-specific (scoped to account, not device).
-  const USER_SCOPED_LOCAL_KEYS = [
-    'first-name', 'adapt-coach-history', 'adapt-coach-accepted',
-    'strava-config', 'strava-activities', 'strava-synced-at', 'strava-sync-days',
-    'complexity-mode', 'race-event', 'race-date', 'race-location',
-    'hours-per-week', 'training-days', 'course-intel',
-    'perf-range', 'trend-disc', 'integrations', 'fitness-markers',
-    'tri-limiter', 'tri-strategy', 'available-disciplines',
-    'user-profile', 'schedule-prefs', 'schedule-mode',
-    'day-overrides', 'plan-difficulty-adjust',
-  ];
 
   function _clearUserScopedLocal() {
     USER_SCOPED_LOCAL_KEYS.forEach(k => localStorage.removeItem(k));
