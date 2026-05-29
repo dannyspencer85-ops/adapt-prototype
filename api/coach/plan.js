@@ -277,7 +277,9 @@ Weekly structure (typical):
 • Easy aerobic — 60-80% of weekly volume at conversational Z2.
 • Race-pace work in Build/Peak: include marathon-pace segments INSIDE the long run (e.g., last 60 min at goal pace) — the most specific session in marathon training.
 
-Pace anchor: derive everything from VDOT (from user's recent race time when present).`;
+Pace anchor: derive everything from VDOT (from user's recent race time when present).
+
+HARD RULE: This is a RUN event. NEVER prescribe swim or bike sessions. session.type must be one of: run, rest, strength, mobility. Type 'swim', 'bike', 'brick' are FORBIDDEN.`;
   } else if (isHalfMar) {
     disciplineNote = `Half marathon training. Mix of aerobic base and threshold work — the half is fundamentally a threshold race.
 
@@ -287,7 +289,9 @@ Weekly structure (typical):
 • Easy aerobic — fills volume.
 • Race-pace work in Peak: half-marathon-pace blocks within the long run (e.g., 5 mi at goal pace).
 
-Pace anchor: T-pace (threshold) is the most important number for HM athletes.`;
+Pace anchor: T-pace (threshold) is the most important number for HM athletes.
+
+HARD RULE: This is a RUN event. NEVER prescribe swim or bike sessions. session.type must be one of: run, rest, strength, mobility. Type 'swim', 'bike', 'brick' are FORBIDDEN.`;
   } else if (isShortRun) {
     const expLevel = profile && profile.exp;
     const runAbility = fitnessMarkers && fitnessMarkers.runAbility;
@@ -371,7 +375,14 @@ Weekly structure (typical):
 • Easy aerobic — supports recovery between hard sessions.
 • Race-pace work in Peak: short reps at goal 5K/10K pace.
 
-Pace anchor: I-pace and R-pace (Daniels), derived from VDOT.`;
+Pace anchor: I-pace and R-pace (Daniels), derived from VDOT.
+
+═══ ABSOLUTELY DO NOT PRESCRIBE ═══
+
+• Swim sessions — this is a RUN event, pools are irrelevant
+• Bike sessions — this is a RUN event, cycling is irrelevant
+• Brick sessions — triathlon-only, not applicable here
+• Any session.type of 'swim', 'bike', or 'brick'`;
     }
   } else if (isBike) {
     const dist = /200\s*mi/i.test(event) ? '200-mile ultra' : /100\s*mi/i.test(event) ? '100-mile (century)' : /100K/i.test(event) ? '100K' : /50K/i.test(event) ? '50K' : /40K/i.test(event) ? '40K' : 'mass-start';
@@ -488,8 +499,8 @@ Your plans MUST reflect these established frameworks:
 ═══ HARD CONSTRAINTS — MUST follow ═══
 
 • Use ONLY the user's selected training days for sessions. Other days = full rest. Do not invent training days.
-• **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — even if the user has 'swim' or 'bike' in their list — DO NOT prescribe swim or bike on a primary quality day. Swim/bike are cross-training only when the event is a triathlon. For run events, every "quality" or "long" day is a RUN day.
-• For run events: allowed types are ${hasStrength ? "{'run', 'rest', 'strength', 'mobility'}" : "{'run', 'rest', 'mobility'}"}. Never 'swim', never 'bike' (unless explicitly cross-training in cases of injury, and even then label it as 'run' replacement, not a primary session).
+• **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — EVEN IF the user has 'swim' or 'bike' in their available disciplines — NEVER prescribe swim or bike sessions OF ANY KIND. Not as quality, not as recovery, not as cross-training. Swim/bike exist ONLY in triathlon plans. For run events, every session is either run, rest, strength, or mobility.
+• For run events: allowed types are STRICTLY ${hasStrength ? "{'run', 'rest', 'strength', 'mobility'}" : "{'run', 'rest', 'mobility'}"}. TYPE 'swim' AND TYPE 'bike' ARE FORBIDDEN. Do not mention pools, swimming, cycling, or bike training anywhere in the plan.
 • For triathlon events: types follow the discipline allocation rules in the discipline note.
 • Total weekly minutes must be within ±15% of the user's stated weekly hours × 60. (User said ${hours} hrs/week → target ~${Math.round(hours * 60)} min/week.)
 • Each week must have at least one full rest day (duration:0, type:'rest'). Two if hours <= 4.
@@ -590,7 +601,18 @@ const RACE_MIN_HOURS_SERVER = {
 function buildUserPrompt({ event, hours, days, raceDate, weeksToRace, profile, courseIntel, triFocus, fitnessMarkers, availableDisciplines, difficultyAdjust, location, currentWeeklyHours }) {
   const limiter = (triFocus && triFocus.limiter) || '';
   const strategy = (triFocus && triFocus.strategy) || '';
-  const discList = Array.isArray(availableDisciplines) && availableDisciplines.length > 0 ? availableDisciplines.join(', ') : '';
+  // For run-only events, strip swim/bike/trainer from the available-disciplines
+  // list before passing it to the AI. Telling the AI "swim is available" for a
+  // 5K plan creates a conflicting signal that overrides the system-prompt rule
+  // "Never swim for run events" — the AI interprets "only prescribe these" as
+  // permission regardless of event type. The server-side coercion catches type
+  // violations but not description-level swim leakage; fixing the source is cleaner.
+  const _isRunOnlyEvent = /Marathon|10K|5K|Half Marathon/i.test(event) && !/Triathlon|Ironman/i.test(event);
+  const _discRaw = Array.isArray(availableDisciplines) ? availableDisciplines : [];
+  const _discFiltered = _isRunOnlyEvent
+    ? _discRaw.filter(d => !['swim', 'bike', 'trainer'].includes(d))
+    : _discRaw;
+  const discList = _discFiltered.length > 0 ? _discFiltered.join(', ') : '';
   // Under-volume detection — flag if user's available hours is below the
   // race's safe minimum so the AI tempers its plan accordingly.
   const minProf = RACE_MIN_HOURS_SERVER[event];
@@ -742,6 +764,17 @@ function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnes
         sess.type = 'run';
         sess.name = sess.name && !/run/i.test(sess.name) ? `Easy run (was ${original})` : (sess.name || 'Easy run');
         sess.prescription = (sess.prescription ? sess.prescription + ' ' : '') + `[Coerced from ${original} to run — this is a run-only event.]`;
+      }
+      // Content-level defense for run-only events: the AI sometimes wraps a swim
+      // session as type 'quality' or type 'run' but keeps "Swim" in the name.
+      // Catch any session whose name starts with "swim" (case-insensitive) and
+      // whose type isn't already a run-equivalent type.
+      if (isRunOnly && /^\s*swim/i.test(sess.name) && !['run', 'rest', 'mobility', 'strength'].includes(sess.type)) {
+        sess.type = 'run';
+        sess.name = 'Easy run';
+        sess.prescription = `Easy aerobic run at Z2, conversational pace. ${sess.durationMin} min. [Replaced swim session — swim is not prescribed for ${event}.]`;
+        sess.intensity = 'Z2';
+        sess.targets = 'HR Z2 · RPE 3-4 · conversational';
       }
       // Discipline-access enforcement: coerce sessions the user can't do.
       if (!_hasSwim && sess.type === 'swim') {
