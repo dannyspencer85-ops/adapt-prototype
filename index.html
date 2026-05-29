@@ -2163,46 +2163,11 @@
            status update lives where the user already goes to log their day. -->
       <div id="todayInjuryBanner"></div>
 
-      <!-- Check-in form (collapsed by default, opened via button above) -->
-      <div class="card" id="todayCheckin" style="display: none; margin-top: 10px;">
-        <div class="card-title">Morning check-in</div>
-        <div class="field">
-          <label>How's your body today?</label>
-          <div class="chip-row" id="ciBody">
-            <button class="chip" onclick="singleChip(this)">Fresh</button>
-            <button class="chip" onclick="singleChip(this)">OK</button>
-            <button class="chip" onclick="singleChip(this)">Tight</button>
-            <button class="chip" onclick="singleChip(this)">Exhausted</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Sleep last night</label>
-          <div class="chip-row" id="ciSleep">
-            <button class="chip" onclick="singleChip(this)">Under 5h</button>
-            <button class="chip" onclick="singleChip(this)">5-6h</button>
-            <button class="chip" onclick="singleChip(this)">6-7h</button>
-            <button class="chip" onclick="singleChip(this)">7-8h</button>
-            <button class="chip" onclick="singleChip(this)">8h+</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Stress level today</label>
-          <div class="chip-row" id="ciStress">
-            <button class="chip" onclick="singleChip(this)">Low</button>
-            <button class="chip" onclick="singleChip(this)">Normal</button>
-            <button class="chip" onclick="singleChip(this)">High</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Soreness or concerns (optional)</label>
-          <input type="text" id="ciNotes" placeholder="e.g. right calf tight, or leave blank">
-        </div>
-        <!-- Conditional: only shows when an injury is active. Populated by
-             renderInjuryCheckinField() which is called when the check-in
-             form opens. -->
-        <div id="ciInjuryWrap" style="display:none;"></div>
-        <button class="btn btn-primary btn-full" onclick="saveMorningCheckin()">Save check-in</button>
-      </div>
+      <!-- Check-in form removed from Today screen — it lives exclusively on
+           the Prep screen (screen-prep). Having duplicate #ciBody / #ciSleep /
+           #ciStress / #ciNotes IDs meant saveMorningCheckin() always read from
+           this hidden Today-screen copy (first in DOM order), returning fallback
+           defaults regardless of what the user selected on the Prep screen. -->
 
     </div>
   </div>
@@ -4289,9 +4254,7 @@
   }
 
   // Conditional check-in field: when an injury is active, ask how it's
-  // tracking today (improved / same / worse). Hidden otherwise. The wrap
-  // div has duplicates due to legacy form structure; querySelectorAll
-  // populates both safely.
+  // tracking today (improved / same / worse). Hidden otherwise.
   function renderInjuryCheckinField() {
     const wraps = document.querySelectorAll('#ciInjuryWrap');
     if (!wraps || wraps.length === 0) return;
@@ -6017,6 +5980,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     root.style.setProperty('--sport-run',      t.primary);
     root.style.setProperty('--sport-quality',  t.dark);
     root.style.setProperty('--sport-strength', t.dark);
+    // Force a synchronous layout so iOS WKWebView flushes the CSS custom-property
+    // updates immediately rather than batching them until after the next frame.
+    // Without this, elements already painted with var(--primary) can keep their
+    // old colour until some other DOM change triggers a repaint.
+    void root.offsetHeight; // eslint-disable-line no-unused-expressions
   }
   function setTheme(name) {
     if (!THEMES[name]) return;
