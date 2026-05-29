@@ -3549,6 +3549,15 @@
   // eliminates any risk of a temporal-dead-zone error if a cached JS version
   // or early callback tries to use them before reaching the later declaration.
 
+  // Analytics
+  const DEFAULT_POSTHOG_KEY = 'phc_zqNceWQkyHr4XEch57oQg3bym2DFEjVAB2t2CjJzq2Ez';
+  const DAYS       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const DAY_FULL   = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+  const STRAVA_ENABLED  = false;
+  const COACH_ACCEPT_KEY  = 'adapt-coach-accepted';
+  const COACH_HISTORY_KEY = 'adapt-coach-history';
+  const MAX_INSIGHTS_SHOWN = 3;
+
   // planState fields persisted per-user (Supabase and localStorage).
   const _PLAN_FIELDS = [
     'sessions', 'dates', 'weekArc', 'injury', 'courseIntel',
@@ -5917,7 +5926,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   applyTheme(getTheme());
 
   // ── Analytics (PostHog + console fallback) ──
-  const DEFAULT_POSTHOG_KEY = 'phc_zqNceWQkyHr4XEch57oQg3bym2DFEjVAB2t2CjJzq2Ez';
   function getAnalyticsKey() { return localStorage.getItem('posthog-key') || DEFAULT_POSTHOG_KEY; }
   let _posthogReady = false;
   function initAnalytics() {
@@ -5939,8 +5947,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
   }
 
-  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const DAY_FULL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
   function getToday() { return new Date(); }
   function getTodayDay() {
     const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][getToday().getDay()];
@@ -9108,7 +9114,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // Severity sort order — most urgent first.
   const SEVERITY_RANK = { alert: 4, warn: 3, info: 2, good: 1 };
-  const MAX_INSIGHTS_SHOWN = 3; // cap before "see N more" link
 
   function renderInsights() {
     pendingFixes = [];
@@ -13831,7 +13836,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // (dormant) so it's a one-flag flip — or a clean template for Apple Health.
   // credentials live in localStorage only, never in source
   // ──────────────────────────────────────────────────────────────────────
-  const STRAVA_ENABLED = false;
   function getStravaConfig() {
     if (!STRAVA_ENABLED) return null;
     try { return JSON.parse(localStorage.getItem('strava-config') || 'null'); }
@@ -16526,8 +16530,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // Coach Chat (Mistral via Adapt's backend) — gated on an explicit one-time
   // privacy acceptance. Conversation history persists in localStorage.
-  const COACH_ACCEPT_KEY = 'adapt-coach-accepted';
-  const COACH_HISTORY_KEY = 'adapt-coach-history';
 
   function hasAcceptedCoach() {
     return localStorage.getItem(COACH_ACCEPT_KEY) === '1';
