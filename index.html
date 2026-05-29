@@ -15153,6 +15153,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         return t >= bStart && t < bEnd;
       });
       if (inBucket.length === 0) return null;
+      if (metric === 'rhr') {
+        // Per-day minimums (same logic as the stat tile) — handles both true
+        // daily resting HR and continuous HR monitoring data.
+        const dayMap = {};
+        inBucket.forEach(r => {
+          const d = new Date(r.startDate).toDateString();
+          if (!dayMap[d] || r.value < dayMap[d]) dayMap[d] = r.value;
+        });
+        const vals = Object.values(dayMap);
+        return vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10 : null;
+      }
       return Math.round(inBucket.reduce((s, r) => s + r.value, 0) / inBucket.length * 10) / 10;
     });
 
@@ -15657,13 +15668,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Summary tiles
     const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
     const totalDistKm = acts.reduce((a, x) => a + (x.distance_km || 0), 0);
-    // Resting HR — average of daily readings within the selected period.
-    // Falls back to the most recent reading if nothing lands in the window.
+    // Resting HR — use per-day minimums, then average those.
+    // Why minimums: the native iOS app may send continuous HR samples (many/day)
+    // instead of Apple's true daily Resting HR metric. Continuous samples average
+    // ~70-80 bpm even for someone with a 56 bpm resting HR. Taking the minimum
+    // of each day gives the lowest (most-at-rest) reading, which closely matches
+    // the true resting HR regardless of data source.
     const cutoffTs = Date.now() - days * 86400000;
     const rhrAll = (planState.healthKit && planState.healthKit.restingHeartRate) || [];
-    const rhrInRange = rhrAll.filter(r => r && r.value > 20 && new Date(r.startDate).getTime() >= cutoffTs);
-    const rhrSrc = rhrInRange.length > 0 ? rhrInRange : rhrAll.filter(r => r && r.value > 20).slice(0, 7);
-    const avgRhr = rhrSrc.length > 0 ? Math.round(rhrSrc.reduce((s, r) => s + r.value, 0) / rhrSrc.length) : null;
+    const rhrInRange = rhrAll.filter(r => r && r.value > 20 && r.value < 120 && new Date(r.startDate).getTime() >= cutoffTs);
+    const rhrPool = rhrInRange.length > 0 ? rhrInRange : rhrAll.filter(r => r && r.value > 20 && r.value < 120).slice(0, 14);
+    const rhrDayMap = {};
+    rhrPool.forEach(r => {
+      const d = new Date(r.startDate).toDateString();
+      if (!rhrDayMap[d] || r.value < rhrDayMap[d]) rhrDayMap[d] = r.value;
+    });
+    const rhrDayVals = Object.values(rhrDayMap);
+    const avgRhr = rhrDayVals.length > 0 ? Math.round(rhrDayVals.reduce((s, v) => s + v, 0) / rhrDayVals.length) : null;
     if (totalEl) totalEl.textContent = formatHM(totalMins);
     if (sessionsEl) sessionsEl.textContent = acts.length;
     if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : '—';
@@ -16463,8 +16484,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // ── 3. Resting HR → body feel heuristic ───────────────────────────
     // Use the baseline from fitnessMarkers or the 7-day median from HealthKit.
-    const rhrSamples = (data.restingHeartRate || []).filter(r => r && r.value > 20);
-    const latestRhr  = rhrSamples.length ? rhrSamples[0].value : null;
+    // Per-day minimums: take the most recent day's lowest reading.
+    // Handles both true daily resting HR (1/day) and continuous HR data (many/day;
+    // minimum approximates true resting HR = the most-at-rest moment of the day).
+    const rhrSamples = (data.restingHeartRate || []).filter(r => r && r.value > 20 && r.value < 120);
+    const rhrDayMinMap = {};
+    rhrSamples.forEach(r => {
+      const d = new Date(r.startDate).toDateString();
+      if (!rhrDayMinMap[d] || r.value < rhrDayMinMap[d]) rhrDayMinMap[d] = r.value;
+    });
+    const rhrDaysSorted = Object.keys(rhrDayMinMap).sort((a, b) => new Date(b) - new Date(a));
+    const latestRhr = rhrDaysSorted.length > 0 ? rhrDayMinMap[rhrDaysSorted[0]] : null;
     let baselineRhr  = planState.fitnessMarkers?.restingHr || null;
     if (!baselineRhr && rhrSamples.length >= 3) {
       // Derive baseline from the week's readings (use median of oldest half).
