@@ -5152,11 +5152,14 @@
   // SCHEDULE PREFERENCES — per-day availability + allowed disciplines
   // Default: all 7 days available, all 4 disciplines allowed.
   // ──────────────────────────────────────────────────────────────────────
+  // Use getters so icon() (which needs ICON_PATHS, defined later in the file)
+  // is only called at render time — not during script initialisation where
+  // ICON_PATHS is still in the temporal dead zone.
   const SCHEDULE_DISCIPLINES = [
-    { id: 'run',      label: 'Run',      icon: icon('run',      { size: 13 }) },
-    { id: 'bike',     label: 'Bike',     icon: icon('bike',     { size: 13 }) },
-    { id: 'swim',     label: 'Swim',     icon: icon('swim',     { size: 13 }) },
-    { id: 'strength', label: 'Strength', icon: icon('strength', { size: 13 }) },
+    { id: 'run',      label: 'Run',      get icon() { return icon('run',      { size: 13 }); } },
+    { id: 'bike',     label: 'Bike',     get icon() { return icon('bike',     { size: 13 }); } },
+    { id: 'swim',     label: 'Swim',     get icon() { return icon('swim',     { size: 13 }); } },
+    { id: 'strength', label: 'Strength', get icon() { return icon('strength', { size: 13 }); } },
   ];
   // Default schedule = the user's ACTUAL onboarding selections, derived from
   // 'training-days' + 'available-disciplines'. Previously this returned
