@@ -3551,6 +3551,47 @@
 
   // Analytics
   const DEFAULT_POSTHOG_KEY = 'phc_zqNceWQkyHr4XEch57oQg3bym2DFEjVAB2t2CjJzq2Ez';
+  // Simple state variables — declared here so they are never in TDZ
+  // regardless of when an auth callback or doLogin() references them.
+  let _posthogReady = false;
+  let _stagedStatusTimer = null;
+  let currentScreen = null;
+  let _suppressNextHistoryPush = false;
+  let _extraWorkouts = [];
+  let _scheduleModalDraft = null;
+  let _bgRegenInFlight = false;
+  let _pendingChangeSeq = 0;
+  let pendingRecalc = null;
+  let viewWeekOffset = 0;
+  let _calMonthOffset = 0;
+  let pendingFixes = [];
+  let _notifSeq = 0;
+  let _dayAvailCtx = null;
+  let currentEditDay = null;
+  let logSessionDay = null;
+  let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60, brickBike: 0, brickRun: 0 };
+  let _prCache = null;
+  let _prCacheKey = null;
+  let tourIdx = 0;
+  let _perfDrill = null;
+  let _perfBucketCache = null;
+  // Const data structures — moved here to avoid TDZ
+  const screenHistory = [];
+  const _scheduledReminderHandles = [];
+  const _pendingChanges = new Map();
+  const _GATED_TOOLS = new Set([
+    'adjustPlanDifficulty','setTrainingFocus','addRestWeek','adjustVolume',
+    'moveSession','shortenSession','swapDiscipline','openTrainingDay','closeTrainingDay',
+  ]);
+  const _RUN_ABILITY_RANK = { 'walk-run': 0, 'under-15': 1, '15-30': 2, '30-plus': 3, '30-60': 3, '60-plus': 4 };
+  const _HK_SLEEP_CHIP_MAP = { 'Under 5h':'Under 5h', '5-6h':'5-6h', '6-7h':'6-7h', '7-8h':'7-8h', '8h+':'8h+' };
+  const _HK_BODY_CHIP_MAP  = { 'Good':'Great', 'Solid':'OK', 'Tired':'Tired', 'Exhausted':'Exhausted' };
+  const _PLAN_INTENSITY_NOTE = {
+    easier:   'Easing it back — the plan starts extra gentle and builds slowly.',
+    standard: 'Standard onramp — starts gentle and ramps to your full hours.',
+    harder:   'Kicked up — the plan starts nearer your current fitness and ramps faster.',
+  };
+
   const DAYS       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const DAY_FULL   = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
   const STRAVA_ENABLED  = false;
@@ -3829,8 +3870,6 @@
     'Marathon':      { minLevel: '30-plus', label: 'Marathon', minDescription: '30+ min continuous running' },
     'Half Ironman':  { minLevel: '30-plus', label: 'Half Ironman (70.3)', minDescription: '30+ min continuous running' },
   };
-  // Ordered by capability (lowest → highest) for comparison.
-  const _RUN_ABILITY_RANK = { 'walk-run': 0, 'under-15': 1, '15-30': 2, '30-plus': 3, '30-60': 3, '60-plus': 4 };
   // Returns true if the user has confirmed they accept building a long-event
   // plan despite low running ability.
   function checkRunAbilityFloor() {
@@ -4189,22 +4228,6 @@
     if (lastChild) lastChild.style.borderBottom = '0';
   }
 
-  // Map HealthKit sleep bucket strings to the check-in chip text labels.
-  const _HK_SLEEP_CHIP_MAP = {
-    'Under 5h': 'Under 5h',
-    '5-6h': '5-6h',
-    '6-7h': '6-7h',
-    '7-8h': '7-8h',
-    '8h+':  '8h+',
-  };
-  // Map HealthKit body-feel strings to the check-in chip text labels.
-  const _HK_BODY_CHIP_MAP = {
-    'Good':      'Great',
-    'Solid':     'OK',
-    'Tired':     'Tired',
-    'Exhausted': 'Exhausted',
-  };
-
   function autofillCheckin() {
     const connected = getConnectedIntegrations();
     const banner = document.getElementById('watchAutofilledBanner');
@@ -4446,7 +4469,6 @@
 
   // Rotate through methodology-flavored status lines while the AI plan
   // generator runs (15-30s with Mistral Large). Cleared by stopStagedPlanStatus.
-  let _stagedStatusTimer = null;
   function startStagedPlanStatus() {
     const el = document.getElementById('planBuildingStatus');
     if (!el) return;
@@ -4913,8 +4935,6 @@
     showScreen('today');
     document.getElementById('nav').style.display = 'flex';
   }
-  const screenHistory = [];
-  let currentScreen = null;
   function showScreen(name, fromBack) {
     if (currentScreen && currentScreen !== name && !fromBack) {
       screenHistory.push(currentScreen);
@@ -4937,13 +4957,6 @@
     if (name === 'prep') autofillCheckin();
     if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); }
   }
-  // Plan intensity — how aggressively the plan starts + ramps. Maps onto the
-  // existing 'plan-difficulty-adjust' signal that both engines read.
-  const _PLAN_INTENSITY_NOTE = {
-    easier: 'Easing it back — the plan starts extra gentle and builds slowly.',
-    standard: 'Standard onramp — starts gentle and ramps to your full hours.',
-    harder: 'Kicked up — the plan starts nearer your current fitness and ramps faster.',
-  };
   function getPlanIntensity() {
     const d = localStorage.getItem('plan-difficulty-adjust');
     return d === 'easier' || d === 'harder' ? d : 'standard';
@@ -4979,7 +4992,6 @@
   // Hook the browser's back button so it navigates the SPA instead of leaving
   // the app. We push a history entry on every showScreen, and intercept
   // popstate to call goBack() (or stay put when there's no history).
-  let _suppressNextHistoryPush = false;
   window.addEventListener('popstate', () => {
     if (screenHistory.length > 0) {
       _suppressNextHistoryPush = true; // we're going BACK in our SPA — don't push again
@@ -5024,7 +5036,6 @@
   // ── Multi-workout day logging ──
   // Additional workouts done the same day (the primary form is workout 1).
   const LOG_TYPE_LABEL = { run: 'Run', bike: 'Bike', swim: 'Swim', strength: 'Strength', brick: 'Brick', quality: 'Intervals', mobility: 'Mobility' };
-  let _extraWorkouts = [];
   function _syncExtraWorkoutsFromDOM() {
     const rows = [...document.querySelectorAll('#logExtraWorkouts [data-ew-row]')];
     _extraWorkouts = rows.map(r => ({
@@ -5229,7 +5240,6 @@
     }).join('');
   }
   // In-modal state mirror so changes don't persist until Save is tapped
-  let _scheduleModalDraft = null;
   function openScheduleModal() {
     _scheduleModalDraft = JSON.parse(JSON.stringify(getSchedulePrefs()));
     renderScheduleGrid();
@@ -5927,7 +5937,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── Analytics (PostHog + console fallback) ──
   function getAnalyticsKey() { return localStorage.getItem('posthog-key') || DEFAULT_POSTHOG_KEY; }
-  let _posthogReady = false;
   function initAnalytics() {
     const key = getAnalyticsKey();
     if (!key || _posthogReady || window.posthog) return;
@@ -6504,7 +6513,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Quiet plan regen that stays in chat — no navigation away. Runs the same
   // /api/coach/plan call as retryAIPlan but doesn't show the building screen.
   // Surfaces a system bubble in chat when complete (or on error).
-  let _bgRegenInFlight = false;
   async function _regeneratePlanInBackground() {
     if (_bgRegenInFlight) return;
     _bgRegenInFlight = true;
@@ -6727,21 +6735,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // (adjustPlanDifficulty, setTrainingFocus, addRestWeek, etc.) — those go
   // through a confirmation card in chat. The user clicks Apply or Cancel.
   // ──────────────────────────────────────────────────────────────────────
-  const _GATED_TOOLS = new Set([
-    'adjustPlanDifficulty',
-    'setTrainingFocus',
-    'addRestWeek',
-    'adjustVolume',
-    'moveSession',
-    'shortenSession',
-    'swapDiscipline',
-    'openTrainingDay',
-    'closeTrainingDay',
-  ]);
-  // Pending changes by id. id → { tool, input, description, ts }
-  const _pendingChanges = new Map();
-  let _pendingChangeSeq = 0;
-
   // Pretty descriptions for each gated tool — what we show on the confirm card.
   function _describePendingChange(tool, input) {
     const safe = input || {};
@@ -6905,8 +6898,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     };
   }
 
-  let pendingRecalc = null;
-
   function analyzeWeek() {
     const trainingSessions = Object.entries(planState.sessions).filter(([d, s]) => s.type !== 'rest');
     const completed = trainingSessions.filter(([d, s]) => s.completed);
@@ -7036,8 +7027,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function closeRecalcModal() {
     document.getElementById('recalcModal').classList.remove('show');
   }
-
-  let viewWeekOffset = 0;
 
   function navWeek(delta) {
     const totalWeeks = (planState.weekArc || []).length;
@@ -7209,8 +7198,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // pagination survives renderAll() refreshes (renderAll redraws the grid
   // for the same offset rather than resetting to the current month).
   // ──────────────────────────────────────────────────────────────────────
-  let _calMonthOffset = 0; // 0 = current month, 1 = next, -1 = previous
-
   function navUpcomingCalendar(delta) {
     // Allow navigation up to 18 months ahead so users with long-runway
     // races (Ironman 12+ months out) can see the full progression. Past
@@ -9207,7 +9194,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
 
 
-  let pendingFixes = [];
   function getComplexityMode() {
     return localStorage.getItem('complexity-mode') || 'simple';
   }
@@ -9464,7 +9450,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Push a notification with a stable unique id + dedup. If the notif carries
   // a dedupKey, any existing notification with the same key is replaced — so
   // checking in tired twice (or logging two hot sessions) never stacks repeats.
-  let _notifSeq = 0;
   function _pushNotification(notif) {
     planState.notifications = planState.notifications || [];
     notif.id = notif.id || ('notif_' + Date.now() + '_' + (++_notifSeq));
@@ -10046,7 +10031,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── PER-DAY AVAILABILITY OVERRIDE ──
   // Context for the day-availability modal: which day + week is being edited.
-  let _dayAvailCtx = null;
   function openDayAvail(day, weekOffset) {
     weekOffset = Number(weekOffset) || 0;
     _dayAvailCtx = { day, weekOffset };
@@ -10194,12 +10178,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof renderAll === 'function') renderAll();
     return true;
   }
-
-  let currentEditDay = null;
-  // Which day the Log screen is recording. null = today. Set by openLogForDay
-  // so users can log a session from the calendar, not just today's.
-  let logSessionDay = null;
-  let _edDraft = { discipline: 'run', intensity: 'easy', duration: 60, brickBike: 0, brickRun: 0 };
 
   // Parse "Bike 2:00 + Run 0:30" (or "... + Run 45 min") into {bike, run} mins.
   // Returns null if the meta isn't a recognizable brick split.
@@ -10858,9 +10836,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // Cache PR results by stravaActivities length + last sync time. Avoids
   // re-walking history on every renderAll. Bust the cache when activities
   // change. Single-pass O(N) sliding window for biggest-week.
-  let _prCache = null;
-  let _prCacheKey = null;
-
   function detectPRs() {
     const acts = (planState.stravaActivities || []).filter(a => a && a.start_date && a.moving_min > 0);
     if (acts.length < 2) return [];
@@ -11258,7 +11233,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // The new design queues each of the next 7 days' training sessions as a
   // separate setTimeout, so missing one doesn't kill the rest. Also
   // re-arms on visibilitychange so tab refocus reseeds any cleared timers.
-  const _scheduledReminderHandles = [];
   function _clearScheduledReminders() {
     while (_scheduledReminderHandles.length > 0) {
       try { clearTimeout(_scheduledReminderHandles.pop()); } catch (e) {}
@@ -13333,7 +13307,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     { title: 'Adjust today', text: "Can't do today's session? Tap 'Adjust today' on the workout card. Pick your time and available disciplines — the workout adapts." },
     { title: "You're set", text: "Tap any session to see full details, get chat help from the You tab, and check your bell for notifications. Go train." }
   ];
-  let tourIdx = 0;
   function startTour() {
     if (localStorage.getItem('tour-seen')) return;
     tourIdx = 0;
@@ -15397,8 +15370,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // Drill-down state — { kind: 'bucket' | 'discipline', idx | id }
-  let _perfDrill = null;
-  let _perfBucketCache = null; // populated by renderPerformanceTab; used by selectPerfBucket
   function selectPerfBucket(idx) {
     if (_perfDrill && _perfDrill.kind === 'bucket' && _perfDrill.idx === idx) {
       _perfDrill = null; // toggle off
