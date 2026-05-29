@@ -4066,6 +4066,14 @@
     if (smWrap) [...smWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.mode === sm));
     const smHint = document.getElementById('scheduleModeHint');
     if (smHint) smHint.style.display = sm === 'variable' ? 'block' : 'none';
+    // Color theme — restore saved selection so the chip reflects what the
+    // user previously picked (or the current applied theme). Without this
+    // the forest chip stays hardcoded-active every time the user navigates
+    // to this step, even though a different theme may be active.
+    const savedTheme = getTheme();
+    const tWrap = document.getElementById('themeChips');
+    if (tWrap) [...tWrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.theme === savedTheme));
+    applyTheme(savedTheme);
   }
   // Restore the step-2 chips when a returning user re-enters this step from
   // the You tab "Edit" links, so they see their saved answers, not defaults.
@@ -4423,36 +4431,52 @@
     // navigates home. Wrapped in try-catch so a bug here can never leave
     // the user permanently stuck on the building screen.
     function _finalizePlanBuild(aiPlan, err) {
+      if (_planWatchdogTimer) { clearTimeout(_planWatchdogTimer); _planWatchdogTimer = null; }
+      try { stopStagedPlanStatus(); } catch (_) {}
+
+      // 1. Apply the plan (AI or fallback).
+      let planApplied = false;
       try {
-        if (_planWatchdogTimer) { clearTimeout(_planWatchdogTimer); _planWatchdogTimer = null; }
-        stopStagedPlanStatus();
         if (aiPlan && aiPlan.weeks) {
           applyAIPlan(aiPlan);
           planState.planSource = 'ai';
-        } else {
-          if (err) {
-            console.warn('AI plan generation failed; falling back to rule engine:', err);
-            planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
-          }
-          planState.planSource = 'fallback';
-          try { generatePlanFromInputs(); } catch (fe) { console.error('Fallback plan also failed:', fe); }
+          planApplied = true;
         }
-        if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
-        markOnboardingComplete();
-        try { computeReadinessFlags(); } catch (_) {}
-        renderAll();
-        // Re-enable "See your plan" button and let the user tap through.
-        const btn = document.getElementById('seePlanBtn');
-        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
-        if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
-        if (typeof maybeShowFirstSessionMoment === 'function') setTimeout(maybeShowFirstSessionMoment, 600);
-      } catch (finalErr) {
-        console.error('_finalizePlanBuild crashed:', finalErr);
-        // Last resort — at least let the user tap the button.
-        const btn = document.getElementById('seePlanBtn');
-        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+      } catch (ae) { console.error('applyAIPlan failed:', ae); }
+
+      if (!planApplied) {
+        if (err) {
+          console.warn('AI plan failed; using rule engine:', err.message);
+          planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+        }
+        planState.planSource = 'fallback';
+        try { generatePlanFromInputs(); planApplied = true; } catch (fe) { console.error('generatePlanFromInputs failed:', fe); }
+      }
+
+      if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
+
+      // 2. Mark onboarding done and save — each step isolated.
+      try { markOnboardingComplete(); } catch (me) { console.error('markOnboardingComplete failed:', me); }
+      try { computeReadinessFlags(); } catch (_) {}
+      try { renderAll(); } catch (re) { console.error('renderAll failed:', re); }
+
+      // 3. Always re-enable the button — the user must be able to continue.
+      const btn = document.getElementById('seePlanBtn');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+
+      // 4. Navigate to home if a plan was produced.
+      if (planApplied) {
+        try {
+          if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
+          if (typeof maybeShowFirstSessionMoment === 'function') setTimeout(maybeShowFirstSessionMoment, 600);
+        } catch (_) {}
+      } else {
+        // No plan could be generated — show a friendly error and let the user retry.
         const errDiv = document.getElementById('planBuildingError');
-        if (errDiv) { errDiv.style.display = 'block'; errDiv.textContent = 'Something went wrong building your plan. Tap "See your plan" — you can regenerate from the Plan tab.'; }
+        if (errDiv) {
+          errDiv.style.display = 'block';
+          errDiv.innerHTML = 'Couldn\'t build your plan automatically. Tap <strong>See your plan</strong> — you\'ll get a starter schedule and can regenerate from the Plan tab once you\'re in.';
+        }
       }
     }
 
