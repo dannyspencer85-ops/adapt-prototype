@@ -18188,8 +18188,9 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       reason: 'adjusted via Adjust Today tool',
     });
 
-    // Visual confirmation on the Apply button so users see the click landed.
-    // The modal closes 600 ms later — long enough to register the change.
+    // Show brief confirmation, then close the modal and re-render.
+    // closeCrunch() is called inside the timeout so it's guaranteed to run
+    // even if renderAll() throws — the modal always closes.
     const applyBtn = document.querySelector('#crunch .btn.btn-primary');
     if (applyBtn) {
       applyBtn.textContent = '✓ Applied';
@@ -18198,15 +18199,11 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       applyBtn.style.opacity = '0.9';
       applyBtn.style.cursor = 'default';
     }
-    // Force every dependent surface to re-render. shortenSession's
-    // renderWeekSessions call only refreshes the Plan tab list; Today
-    // hero / calendar / readiness card / week-arc all read planState
-    // separately and need an explicit refresh.
-    if (typeof renderAll === 'function') renderAll();
     setTimeout(() => {
       closeCrunch();
-      showScreen('today');
-    }, 600);
+      // Force every dependent surface to re-render after the modal is gone.
+      if (typeof renderAll === 'function') renderAll();
+    }, 300);
   }
   function closeCrunch() { document.getElementById('crunch').classList.remove('show'); }
   function recommendForMinutes(mins) {
