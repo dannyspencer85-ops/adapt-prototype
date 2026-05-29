@@ -2019,8 +2019,9 @@
         </div>
         <div id="readinessFlags" style="margin-top: 30px; text-align: left;"></div>
 
+        <div id="planBuildingError" style="display:none; margin: 16px 0; padding: 12px 14px; background: #fff3cd; border-radius: 10px; font-size: 13px; color: #856404; line-height: 1.5; text-align: left;"></div>
         <div class="onboard-actions" style="margin-top: 30px;">
-          <button class="btn btn-primary btn-full btn-lg" onclick="goHome()">See your plan</button>
+          <button class="btn btn-primary btn-full btn-lg" id="seePlanBtn" onclick="goHome()" disabled style="opacity:0.5; cursor:not-allowed;">Building…</button>
         </div>
         </div>
       </div>
@@ -3552,6 +3553,7 @@
   // regardless of when an auth callback or doLogin() references them.
   let _posthogReady = false;
   let _stagedStatusTimer = null;
+  let _planWatchdogTimer = null;
   let currentScreen = null;
   let _suppressNextHistoryPush = false;
   let _extraWorkouts = [];
@@ -4416,53 +4418,57 @@
     if (markers) writeFitnessMarkers(markers);
 
     onbStep(6); // show "Building your plan…" screen immediately
-    // Try AI-generated plan first. If it fails (network, validation, timeout)
-    // we silently fall back to the rule-based engine so the user always lands
-    // on a working plan. The AI engine is the upgrade; the rule engine is the
-    // safety net.
-    // Drive the staged status messages so the user sees progress, not a
-    // 30-second pulse-dot black box.
-    startStagedPlanStatus();
-    generatePlanWithAI({ event, eventDate, eventLocation, hours, days: activeDays, complexity })
-      .then(aiPlan => {
+
+    // Helper called on both success and failure — enables the button and
+    // navigates home. Wrapped in try-catch so a bug here can never leave
+    // the user permanently stuck on the building screen.
+    function _finalizePlanBuild(aiPlan, err) {
+      try {
+        if (_planWatchdogTimer) { clearTimeout(_planWatchdogTimer); _planWatchdogTimer = null; }
+        stopStagedPlanStatus();
         if (aiPlan && aiPlan.weeks) {
           applyAIPlan(aiPlan);
           planState.planSource = 'ai';
         } else {
-          generatePlanFromInputs();
+          if (err) {
+            console.warn('AI plan generation failed; falling back to rule engine:', err);
+            planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
+          }
           planState.planSource = 'fallback';
+          try { generatePlanFromInputs(); } catch (fe) { console.error('Fallback plan also failed:', fe); }
         }
         if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
-        // Mark onboarding done here (not in goHome) so Supabase users
-        // don't get looped back to onboarding on every app reload.
         markOnboardingComplete();
-        stopStagedPlanStatus();
-        computeReadinessFlags();
+        try { computeReadinessFlags(); } catch (_) {}
         renderAll();
-        // If we're already past the "building" screen (user navigated away),
-        // re-show the home screen.
+        // Re-enable "See your plan" button and let the user tap through.
+        const btn = document.getElementById('seePlanBtn');
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
         if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
-        // First-session success moment — modal once after onboarding.
-        if (typeof maybeShowFirstSessionMoment === 'function') {
-          setTimeout(maybeShowFirstSessionMoment, 600);
-        }
-      })
-      .catch(err => {
-        console.warn('AI plan generation failed; falling back to rule engine:', err);
-        planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
-        planState.planSource = 'fallback';
-        generatePlanFromInputs();
-        if (!planState.planCreatedAt) planState.planCreatedAt = Date.now();
-        // Mark onboarding done even on AI failure — rule engine produced a plan.
-        markOnboardingComplete();
-        stopStagedPlanStatus();
-        computeReadinessFlags();
-        renderAll();
-        if (currentScreen !== 'today' && currentScreen !== 'plan') showScreen('today');
-        if (typeof maybeShowFirstSessionMoment === 'function') {
-          setTimeout(maybeShowFirstSessionMoment, 600);
-        }
-      });
+        if (typeof maybeShowFirstSessionMoment === 'function') setTimeout(maybeShowFirstSessionMoment, 600);
+      } catch (finalErr) {
+        console.error('_finalizePlanBuild crashed:', finalErr);
+        // Last resort — at least let the user tap the button.
+        const btn = document.getElementById('seePlanBtn');
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+        const errDiv = document.getElementById('planBuildingError');
+        if (errDiv) { errDiv.style.display = 'block'; errDiv.textContent = 'Something went wrong building your plan. Tap "See your plan" — you can regenerate from the Plan tab.'; }
+      }
+    }
+
+    // Safety watchdog: if the API hangs beyond 90s (AbortController fires at
+    // 60s but the .catch chain could itself stall), force the fallback.
+    _planWatchdogTimer = setTimeout(() => {
+      console.warn('Plan build watchdog fired — forcing fallback after 90s');
+      const statusEl = document.getElementById('planBuildingStatus');
+      if (statusEl) statusEl.textContent = 'Taking longer than expected — generating your plan locally…';
+      _finalizePlanBuild(null, new Error('watchdog timeout'));
+    }, 90000);
+
+    startStagedPlanStatus();
+    generatePlanWithAI({ event, eventDate, eventLocation, hours, days: activeDays, complexity })
+      .then(aiPlan => _finalizePlanBuild(aiPlan, null))
+      .catch(err  => _finalizePlanBuild(null, err));
   }
 
   // Rotate through methodology-flavored status lines while the AI plan
@@ -13137,20 +13143,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     onbStep(6); // building screen
     startStagedPlanStatus();
     planState.aiPlanError = null;
+    _planWatchdogTimer = setTimeout(() => {
+      const statusEl = document.getElementById('planBuildingStatus');
+      if (statusEl) statusEl.textContent = 'Taking longer than expected — generating your plan locally…';
+      try { stopStagedPlanStatus(); generatePlanFromInputs(); planState.planSource = 'fallback'; } catch (_) {}
+      const btn = document.getElementById('seePlanBtn');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+      renderAll(); showScreen('today');
+      _planWatchdogTimer = null;
+    }, 90000);
     generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity })
       .then(p => {
+        if (_planWatchdogTimer) { clearTimeout(_planWatchdogTimer); _planWatchdogTimer = null; }
         if (p && p.weeks) { applyAIPlan(p); planState.planSource = 'ai'; }
-        else { planState.planSource = 'fallback'; }
+        else { try { generatePlanFromInputs(); } catch (_) {} planState.planSource = 'fallback'; }
         stopStagedPlanStatus();
-        renderAll();
-        showScreen('today');
+        const btn = document.getElementById('seePlanBtn');
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+        renderAll(); showScreen('today');
       })
       .catch(err => {
+        if (_planWatchdogTimer) { clearTimeout(_planWatchdogTimer); _planWatchdogTimer = null; }
         planState.aiPlanError = (err && err.message) || 'Could not reach the AI engine';
         planState.planSource = 'fallback';
+        try { generatePlanFromInputs(); } catch (_) {}
         stopStagedPlanStatus();
-        renderAll();
-        showScreen('today');
+        const btn = document.getElementById('seePlanBtn');
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.textContent = 'See your plan'; }
+        renderAll(); showScreen('today');
       });
   }
 
