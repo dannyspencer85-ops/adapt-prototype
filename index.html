@@ -1824,6 +1824,8 @@
         <p class="sub">Tell us the truth. We'll build around real life, not an imagined one.</p>
         <div class="field">
           <label>Hours per week you can train</label>
+          <!-- Event-specific training context hint — populated by updateEventTrainingHint() -->
+          <div id="hoursEventHint" style="display:none;"></div>
           <div class="chip-row" id="hoursChips">
             <button class="chip" data-hours="2.5" onclick="singleChip(this); updateHoursVolumeWarning();">2-3</button>
             <button class="chip" data-hours="4" onclick="singleChip(this); updateHoursVolumeWarning();">4</button>
@@ -3745,6 +3747,57 @@
   //   - below floorMin    → red, hard caution
   //   - below recMin      → yellow, soft warning
   //   - in or above recMin → hidden
+  // Per-event training context shown near the "hours per week" label so the
+  // user understands what they're signing up for before they pick a chip.
+  // sweet       = the range most athletes land in
+  // sessions    = typical weekly session count (all sports combined)
+  // longSession = what the longest single session looks like at peak
+  // demand      = plain-English commitment label
+  // note        = one-line nudge with the most useful real-world truth
+  const RACE_TRAINING_CONTEXT = {
+    '5K':                { sweet: '2.5–5',  sessions: '3–4 sessions/week', longSession: 'Long run up to 60 min',    demand: 'Light',     demandColor: '#3B8968', demandBg: '#e8f5ee', note: 'Accessible for almost any fitness level — speed work is the main differentiator.' },
+    '10K':               { sweet: '3–6',    sessions: '4 sessions/week',   longSession: 'Long run up to 75 min',    demand: 'Light–Moderate', demandColor: '#5a7a3b', demandBg: '#eef5e8', note: 'A step up in endurance, but the long run stays under 90 min throughout.' },
+    'Half Marathon':     { sweet: '5–8',    sessions: '4–5 sessions/week', longSession: 'Long run builds to ~2 hr', demand: 'Moderate',  demandColor: '#7a5a18', demandBg: '#fef6e0', note: 'Expect to set aside a couple of hours each weekend as your long run builds.' },
+    'Marathon':          { sweet: '6–10',   sessions: '5 sessions/week',   longSession: 'Long run builds to 3+ hr', demand: 'High',      demandColor: '#C44545', demandBg: '#fde8e8', note: 'The long run alone can take 3+ hours at peak. Plan your weekends around it.' },
+    'Sprint Triathlon':  { sweet: '5–8',    sessions: '5–6 sessions/week', longSession: 'Brick session: ~90 min',   demand: 'Moderate',  demandColor: '#7a5a18', demandBg: '#fef6e0', note: 'Three sports mean more sessions per week, but each one is shorter.' },
+    'Olympic Triathlon': { sweet: '7–11',   sessions: '6–7 sessions/week', longSession: 'Long brick: 2.5–3 hr',    demand: 'High',      demandColor: '#C44545', demandBg: '#fde8e8', note: 'Your Saturday brick (bike + run back-to-back) will take most of a morning.' },
+    'Half Ironman':      { sweet: '9–14',   sessions: '8–10 sessions/week', longSession: 'Long brick: 4–5 hr',     demand: 'Very High', demandColor: '#8B2020', demandBg: '#fde0e0', note: 'A serious multi-month commitment. Your longest training day will be 4–5 hours.' },
+    'Gravel 50K':        { sweet: '5–9',    sessions: '4–5 sessions/week', longSession: 'Long ride: 2.5–3.5 hr',   demand: 'Moderate',  demandColor: '#7a5a18', demandBg: '#fef6e0', note: 'Weekend long rides are the backbone — expect a solid half-day effort at peak.' },
+    'Gravel 100K':       { sweet: '6–11',   sessions: '5–6 sessions/week', longSession: 'Long ride: 4–5 hr',       demand: 'High',      demandColor: '#C44545', demandBg: '#fde8e8', note: 'Your long ride will grow to consume most of a morning or afternoon each weekend.' },
+    'Road 40K':          { sweet: '5–9',    sessions: '4–5 sessions/week', longSession: 'Long ride: 2–3 hr',       demand: 'Moderate',  demandColor: '#7a5a18', demandBg: '#fef6e0', note: 'Tempo work plus one long ride per week covers most of what this distance needs.' },
+    'Road 100K':         { sweet: '6–11',   sessions: '5–6 sessions/week', longSession: 'Long ride: 4–5 hr',       demand: 'High',      demandColor: '#C44545', demandBg: '#fde8e8', note: 'Like the Gravel 100K — expect the long ride to build to a serious multi-hour effort.' },
+  };
+
+  function updateEventTrainingHint() {
+    const el = document.getElementById('hoursEventHint');
+    if (!el) return;
+    const event = document.getElementById('eventSelect')?.value || '';
+    const ctx = RACE_TRAINING_CONTEXT[event];
+    if (!ctx) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `<div style="background:var(--input-bg,#f4f4f5); border:1px solid var(--border-soft,#e5e5e5); border-radius:12px; padding:13px 15px; margin-bottom:12px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.3px; color:${ctx.demandColor}; background:${ctx.demandBg}; padding:3px 9px; border-radius:20px; white-space:nowrap;">${ctx.demand} commitment</span>
+        <span style="font-size:12px; color:var(--text-soft);">What training for a ${event} actually looks like</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:12.5px; margin-bottom:10px;">
+        <div>
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft); margin-bottom:2px;">Sweet spot</div>
+          <strong>${ctx.sweet} hr/week</strong>
+        </div>
+        <div>
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft); margin-bottom:2px;">Frequency</div>
+          <strong>${ctx.sessions}</strong>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft); margin-bottom:2px;">Longest session at peak</div>
+          <strong>${ctx.longSession}</strong>
+        </div>
+      </div>
+      <div style="font-size:12px; color:var(--text-soft); border-top:1px solid var(--border-soft,#e5e5e5); padding-top:9px; line-height:1.5;">${ctx.note}</div>
+    </div>`;
+  }
+
   function updateHoursVolumeWarning() {
     const warn = document.getElementById('hoursVolumeWarn');
     const floor = document.getElementById('hoursVolumeFloor');
@@ -3844,7 +3897,7 @@
     });
     const target = n === 0 ? 'welcome' : n === 6 ? 'building' : String(n);
     document.getElementById('onb-' + target).style.display = 'block';
-    if (n === 4) { populateDisciplineChips(); prefillStep4(); updateHoursVolumeWarning(); }
+    if (n === 4) { populateDisciplineChips(); prefillStep4(); updateEventTrainingHint(); updateHoursVolumeWarning(); }
     if (n === 3) {
       // Restore saved race event + date when navigating to step 3 (back button,
       // edit from You tab) so the user sees their previous selection, not
