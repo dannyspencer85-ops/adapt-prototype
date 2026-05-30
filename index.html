@@ -2822,9 +2822,23 @@
             <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfDistance">—</div>
           </div>
           <div style="padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
-            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;" title="Average resting heart rate over this period. Lower = better recovery baseline.">Resting HR</div>
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;" title="Most recent resting heart rate from Apple Health. Lower = more recovered.">Resting HR</div>
             <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfAvgHr">—</div>
+            <div style="font-size: 10px; color: var(--text-soft); margin-top: 2px;" id="perfRhrSub"></div>
           </div>
+        </div>
+        <!-- VO2 Max row — only rendered when Apple Health provides data -->
+        <div id="perfVo2Row" style="display:none; margin-top: 10px; padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">VO2 Max</div>
+            <div style="font-size: 10px; color: var(--text-soft);" id="perfVo2Date"></div>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
+            <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; letter-spacing: -0.02em;" id="perfVo2Val">—</div>
+            <div style="font-size: 11px; color: var(--text-soft);">mL/kg/min</div>
+            <div style="margin-left: auto; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);" id="perfVo2Badge"></div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;" id="perfVo2Change"></div>
         </div>
       </div>
 
@@ -2852,6 +2866,7 @@
         <div style="display:flex; gap:6px; margin-bottom:12px;">
           <button class="chip active" data-fitness-metric="rhr" onclick="setFitnessMetric('rhr')">Resting HR</button>
           <button class="chip" data-fitness-metric="hrv" onclick="setFitnessMetric('hrv')">HRV</button>
+          <button class="chip" data-fitness-metric="vo2" onclick="setFitnessMetric('vo2')">VO2 Max</button>
         </div>
         <div id="perfFitnessCallout" style="display:none; padding:10px 12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5; margin-bottom:12px;"></div>
         <div id="perfFitnessChart"></div>
@@ -15948,13 +15963,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // Source: Apple Health global daily readings for the selected metric
     const hk = planState.healthKit || {};
-    const rawData = (metric === 'rhr'
+    const rawData = metric === 'rhr'
       ? (hk.restingHeartRate || []).filter(r => r && r.value > 20 && r.value < 120)
-      : (hk.hrv || []).filter(r => r && r.value > 0 && r.value < 250)
-    );
+      : metric === 'vo2'
+      ? (hk.vo2max || []).filter(r => r && r.value > 10 && r.value < 80)
+      : (hk.hrv || []).filter(r => r && r.value > 0 && r.value < 250);
 
     const noDataMsg = metric === 'rhr'
-      ? 'No resting heart rate data. install the latest build from TestFlight and wear your Apple Watch to sleep.'
+      ? 'No resting heart rate data. Install the latest build from TestFlight and wear your Apple Watch to sleep.'
+      : metric === 'vo2'
+      ? 'No VO2 Max data. Apple Watch estimates VO2 Max from outdoor runs or walks. Try an outdoor run to trigger a reading.'
       : 'No HRV data. Apple Watch records HRV nightly during sleep. Wear it to sleep for a few days to see this chart.';
 
     if (rawData.length === 0) {
@@ -15973,23 +15991,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         return t >= bStart && t < bEnd;
       });
       if (inBucket.length === 0) return null;
-      if (metric === 'rhr') {
-        // Per-day minimums (same logic as the stat tile) — handles both true
-        // daily resting HR and continuous HR monitoring data.
-        const dayMap = {};
-        inBucket.forEach(r => {
-          const d = new Date(r.startDate).toDateString();
-          if (!dayMap[d] || r.value < dayMap[d]) dayMap[d] = r.value;
-        });
-        const vals = Object.values(dayMap);
-        return vals.length > 0 ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10 : null;
-      }
+      // For all three metrics, average the values in the bucket.
+      // (Apple's restingHeartRate is already one computed value per day, so averaging is correct.)
       return Math.round(inBucket.reduce((s, r) => s + r.value, 0) / inBucket.length * 10) / 10;
     });
 
     const validFitness = fitnessPerBucket.filter(v => v !== null);
     if (validFitness.length < 2) {
-      chartEl.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding:14px 0; text-align:center;">Need at least 2 ${metric === 'rhr' ? 'RHR' : 'HRV'} readings in this range. Extend the range or continue wearing your Apple Watch.</div>`;
+      const metricName = metric === 'rhr' ? 'RHR' : metric === 'vo2' ? 'VO2 Max' : 'HRV';
+      chartEl.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding:14px 0; text-align:center;">Need at least 2 ${metricName} readings in this range. Extend the range or continue wearing your Apple Watch.</div>`;
       if (calloutEl) calloutEl.style.display = 'none';
       return;
     }
@@ -16063,7 +16073,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return `<line x1="${padL}" y1="${y}" x2="${padL + chartW}" y2="${y}" stroke="rgba(0,0,0,0.04)" stroke-width="1"/>`;
     }).join('');
 
-    const metricLabel = metric === 'rhr' ? 'Resting HR (bpm)' : 'HRV (ms)';
+    const metricLabel = metric === 'rhr' ? 'Resting HR (bpm)' : metric === 'vo2' ? 'VO2 Max (mL/kg/min)' : 'HRV (ms)';
     const lowerIsBetter = metric === 'rhr';
 
     chartEl.innerHTML = `
@@ -16089,7 +16099,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const early = firstHalf.reduce((s, v) => s + v, 0) / firstHalf.length;
       const late  = secondHalf.reduce((s, v) => s + v, 0) / secondHalf.length;
       const change = late - early;
-      const threshold = metric === 'rhr' ? 0.8 : 1.5;
+      const threshold = metric === 'rhr' ? 0.8 : metric === 'vo2' ? 0.5 : 1.5;
       const trendBetter = lowerIsBetter ? change < -threshold : change > threshold;
       const trendWorse  = lowerIsBetter ? change > threshold  : change < -threshold;
 
@@ -16098,22 +16108,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         icon = lowerIsBetter ? '▼' : '▲'; bgColor = 'var(--good-soft)';
         headline = metric === 'rhr'
           ? `RHR dropping. aerobic fitness is building`
+          : metric === 'vo2'
+          ? `VO2 Max rising. aerobic ceiling is expanding`
           : `HRV rising. your body is recovering well`;
         detail = metric === 'rhr'
           ? `Early avg: <strong>${Math.round(early)} bpm</strong> → Recent avg: <strong>${Math.round(late)} bpm</strong>. Each beat lower at rest = stronger heart. This is the adaptation you're training for.`
+          : metric === 'vo2'
+          ? `Early: <strong>${early.toFixed(1)}</strong> → Recent: <strong>${late.toFixed(1)} mL/kg/min</strong>. Your aerobic engine is getting bigger. Keep the aerobic base work coming.`
           : `Early avg: <strong>${Math.round(early)} ms</strong> → Recent avg: <strong>${Math.round(late)} ms</strong>. Higher HRV means your nervous system is adapting well to load.`;
       } else if (trendWorse) {
         icon = lowerIsBetter ? '▲' : '▼'; bgColor = 'var(--warn-soft)';
         headline = metric === 'rhr'
           ? `RHR creeping up. watch for overtraining or illness`
+          : metric === 'vo2'
+          ? `VO2 Max dipping. normal with high load or little outdoor running`
           : `HRV declining. accumulated fatigue or stress`;
         detail = metric === 'rhr'
           ? `Early avg: <strong>${Math.round(early)} bpm</strong> → Recent avg: <strong>${Math.round(late)} bpm</strong>. Could be ramping load too fast, poor sleep, or early illness. Consider an easy week.`
+          : metric === 'vo2'
+          ? `Early: <strong>${early.toFixed(1)}</strong> → Recent: <strong>${late.toFixed(1)} mL/kg/min</strong>. Apple's estimate needs outdoor GPS runs to update. Indoors-heavy periods show a dip even if you're fitter.`
           : `Early avg: <strong>${Math.round(early)} ms</strong> → Recent avg: <strong>${Math.round(late)} ms</strong>. Your body may need more recovery. Prioritise sleep and back off intensity.`;
       } else {
         icon = '↔'; bgColor = 'var(--bg-soft)';
-        headline = metric === 'rhr' ? `RHR stable` : `HRV stable`;
-        detail = `Avg ${metric === 'rhr' ? 'RHR' : 'HRV'}: <strong>${Math.round((early + late) / 2)} ${metric === 'rhr' ? 'bpm' : 'ms'}</strong>. consistent across this period. Good sign of sustainable training.`;
+        headline = metric === 'rhr' ? `RHR stable` : metric === 'vo2' ? `VO2 Max stable` : `HRV stable`;
+        detail = metric === 'vo2'
+          ? `Avg: <strong>${((early + late) / 2).toFixed(1)} mL/kg/min</strong>. Stable across this period. Consistent aerobic training will gradually lift this number.`
+          : `Avg ${metric === 'rhr' ? 'RHR' : 'HRV'}: <strong>${Math.round((early + late) / 2)} ${metric === 'rhr' ? 'bpm' : 'ms'}</strong>. consistent across this period. Good sign of sustainable training.`;
       }
 
       calloutEl.style.display = 'block';
@@ -16488,27 +16508,82 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Summary tiles
     const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
     const totalDistKm = acts.reduce((a, x) => a + (x.distance_km || 0), 0);
-    // Resting HR — use per-day minimums, then average those.
-    // Why minimums: the native iOS app may send continuous HR samples (many/day)
-    // instead of Apple's true daily Resting HR metric. Continuous samples average
-    // ~70-80 bpm even for someone with a 56 bpm resting HR. Taking the minimum
-    // of each day gives the lowest (most-at-rest) reading, which closely matches
-    // the true resting HR regardless of data source.
+    // Resting HR — show most recent Apple Health reading (matches what Apple shows).
+    // This is Apple's own HKQuantityTypeIdentifierRestingHeartRate, one reading per day.
     const cutoffTs = Date.now() - days * 86400000;
     const rhrAll = (planState.healthKit && planState.healthKit.restingHeartRate) || [];
-    const rhrInRange = rhrAll.filter(r => r && r.value > 20 && r.value < 120 && new Date(r.startDate).getTime() >= cutoffTs);
-    const rhrPool = rhrInRange.length > 0 ? rhrInRange : rhrAll.filter(r => r && r.value > 20 && r.value < 120).slice(0, 14);
-    const rhrDayMap = {};
-    rhrPool.forEach(r => {
-      const d = new Date(r.startDate).toDateString();
-      if (!rhrDayMap[d] || r.value < rhrDayMap[d]) rhrDayMap[d] = r.value;
-    });
-    const rhrDayVals = Object.values(rhrDayMap);
-    const avgRhr = rhrDayVals.length > 0 ? Math.round(rhrDayVals.reduce((s, v) => s + v, 0) / rhrDayVals.length) : null;
+    const rhrValid = rhrAll.filter(r => r && r.value > 20 && r.value < 120);
+    // Most recent value — use as the primary display, matching Apple Health app.
+    const latestRhrEntry = rhrValid[0] || null;
+    const latestRhr = latestRhrEntry ? Math.round(latestRhrEntry.value) : null;
+    // 7-day average for subtitle context
+    const rhrInRange = rhrValid.filter(r => new Date(r.startDate).getTime() >= cutoffTs);
+    const rhrAvg7 = rhrInRange.length > 0
+      ? Math.round(rhrInRange.reduce((s, r) => s + r.value, 0) / rhrInRange.length)
+      : null;
     if (totalEl) totalEl.textContent = formatHM(totalMins);
     if (sessionsEl) sessionsEl.textContent = acts.length;
     if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : '—';
-    if (avgHrEl) avgHrEl.textContent = avgRhr ? avgRhr + ' bpm' : '—';
+    if (avgHrEl) avgHrEl.textContent = latestRhr ? latestRhr + ' bpm' : '—';
+    const rhrSubEl = document.getElementById('perfRhrSub');
+    if (rhrSubEl) {
+      if (latestRhrEntry) {
+        const rhrDate = new Date(latestRhrEntry.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        rhrSubEl.textContent = rhrAvg7 && rhrAvg7 !== latestRhr ? `${rhrDate} · ${days}-day avg ${rhrAvg7}` : rhrDate;
+      } else {
+        rhrSubEl.textContent = '';
+      }
+    }
+
+    // VO2 Max tile
+    const vo2Row = document.getElementById('perfVo2Row');
+    const vo2Val = document.getElementById('perfVo2Val');
+    const vo2Badge = document.getElementById('perfVo2Badge');
+    const vo2Date = document.getElementById('perfVo2Date');
+    const vo2Change = document.getElementById('perfVo2Change');
+    const vo2All = (planState.healthKit && planState.healthKit.vo2max) || [];
+    const vo2Valid = vo2All.filter(v => v && v.value > 10 && v.value < 80);
+    const latestVo2 = vo2Valid[0] || null;
+    if (latestVo2 && vo2Row) {
+      vo2Row.style.display = 'block';
+      const v = Math.round(latestVo2.value * 10) / 10;
+      if (vo2Val) vo2Val.textContent = v;
+      if (vo2Date) {
+        const vDate = new Date(latestVo2.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        vo2Date.textContent = vDate;
+      }
+      // VO2 Max category (Apple's 5-tier: Low / Below Average / Average / Above Average / High)
+      // Thresholds are rough midpoints for adults; Apple factors in age+sex but we use generic.
+      const category = v >= 56 ? { label: 'High', bg: '#EBF5F0', color: '#2D6B52' }
+        : v >= 48 ? { label: 'Above average', bg: '#EBF5F0', color: '#2D6B52' }
+        : v >= 40 ? { label: 'Average', bg: '#FEF3E2', color: '#B57A1F' }
+        : v >= 33 ? { label: 'Below average', bg: '#FEF3E2', color: '#B57A1F' }
+        : { label: 'Low', bg: '#FEECEC', color: '#B53B3B' };
+      if (vo2Badge) {
+        vo2Badge.textContent = category.label;
+        vo2Badge.style.background = category.bg;
+        vo2Badge.style.color = category.color;
+      }
+      // Show change from oldest reading in the selected period
+      const vo2InRange = vo2Valid.filter(v => new Date(v.startDate).getTime() >= cutoffTs);
+      if (vo2InRange.length >= 2) {
+        const oldest = vo2InRange[vo2InRange.length - 1].value;
+        const diff = Math.round((latestVo2.value - oldest) * 10) / 10;
+        if (vo2Change) {
+          if (Math.abs(diff) >= 0.5) {
+            vo2Change.textContent = diff > 0 ? `+${diff} over this period` : `${diff} over this period`;
+            vo2Change.style.color = diff > 0 ? '#2D6B52' : '#B53B3B';
+          } else {
+            vo2Change.textContent = 'Stable over this period';
+            vo2Change.style.color = 'var(--text-soft)';
+          }
+        }
+      } else if (vo2Change) {
+        vo2Change.textContent = '';
+      }
+    } else if (vo2Row) {
+      vo2Row.style.display = 'none';
+    }
 
     // Volume buckets
     const { buckets, bucketSize, bucketLabel } = bucketActivities(acts, days);
