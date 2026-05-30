@@ -27,9 +27,11 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #FFFFFF;
-    --bg-soft: #F5F5F7;  /* Light grey — used for nested surfaces and secondary areas. */
-    --card: #FFFFFF;
+    /* ── Page & card surfaces ─────────────────── */
+    --bg: #F6F4F1;          /* warm off-white page bg — cards lift off this */
+    --bg-soft: #EEECEA;     /* nested surfaces, secondary areas              */
+    --card: #FFFFFF;        /* white card background                         */
+    /* ── Brand colors ────────────────────────── */
     --primary: #3B8968;
     --primary-soft: #DCEADF;
     --primary-dark: #2E6B51;
@@ -39,6 +41,14 @@
     --text: #1F2A22;
     --text-soft: #5D6B62;
     --border: #E5E1D4;
+    /* ── Typography ──────────────────────────── */
+    --font-heading: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    /* ── Border radius system ────────────────── */
+    --radius-sm: 8px;     /* chips, pills, small buttons          */
+    --radius-md: 12px;    /* standard cards, inputs, rows         */
+    --radius-lg: 20px;    /* hero cards, banners                  */
+    --radius-pill: 999px; /* full round pills, time-filter tabs   */
     --warn: #C87A3B;
     --warn-soft: #FBE7D1;
     /* Coach insight semantic colors: good (positive trend), info (neutral fyi), caution (medium), alert (action needed) */
@@ -65,7 +75,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
-    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-family: var(--font-body);
     color: var(--text);
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
@@ -75,6 +85,16 @@
     justify-content: center;
     align-items: flex-start;
     padding: 0;
+  }
+  /* Heading font — applied to all display-scale elements */
+  h1, h2, h3,
+  .title,
+  .workout-name,
+  .hero-number,
+  .stat-value,
+  .race-days-count,
+  .wordmark {
+    font-family: var(--font-heading);
   }
   .phone {
     width: 100%;
@@ -96,7 +116,7 @@
   }
   .screen.active { display: flex; }
   .screen-inner {
-    padding: 14px 20px 100px;
+    padding: 12px 20px 110px;
     flex: 1;
   }
   .header {
@@ -134,12 +154,13 @@
     letter-spacing: 0;
   }
   .title {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.6px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
     margin-top: 2px;
-    line-height: 1.15;
+    line-height: 1.1;
     color: var(--text);
+    font-family: var(--font-heading);
   }
   /* Optional smaller subtitle beneath a title */
   .subtitle {
@@ -150,7 +171,7 @@
   }
   .card {
     background: var(--card);
-    border-radius: 16px;
+    border-radius: var(--radius-md);
     padding: 16px;
     margin-bottom: 12px;
     border: 1px solid var(--border);
@@ -166,30 +187,35 @@
   .hero-card {
     background: linear-gradient(135deg, var(--primary), var(--primary-light));
     color: #fff;
-    padding: 20px;
+    padding: 24px 20px 20px;
     border: 0;
+    border-radius: var(--radius-lg);
   }
   .hero-card .card-title {
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.7);
     margin-bottom: 6px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
   }
   .hero-card .workout-name {
-    font-size: 22px;
-    font-weight: 800;
-    line-height: 1.2;
-    letter-spacing: -0.3px;
+    font-family: var(--font-heading);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
     margin-bottom: 4px;
   }
   .hero-card .workout-duration {
-    font-size: 14px;
-    font-weight: 500;
-    opacity: 0.9;
+    font-size: 15px;
+    font-weight: 400;
+    opacity: 0.75;
+    margin-bottom: 2px;
   }
   .hero-card .why {
-    font-size: 14px;
+    font-size: 13px;
     margin-top: 14px;
     line-height: 1.55;
-    opacity: 0.95;
+    opacity: 0.8;
   }
   .hero-actions {
     display: flex;
@@ -197,38 +223,44 @@
     margin-top: 16px;
   }
   .btn {
-    padding: 12px 16px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 600;
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 500;
     border: 0;
     cursor: pointer;
-    font-family: inherit;
-    transition: opacity 0.15s, transform 0.05s;
+    font-family: var(--font-body);
+    transition: opacity 0.15s, transform 0.08s ease;
+    min-height: 44px;
   }
   .btn:active { transform: scale(0.98); }
+  /* Primary — solid green, single most important action per screen */
   .btn-primary {
     background: var(--primary);
     color: #fff;
+    font-weight: 600;
   }
+  /* Hero card actions — white on green */
   .btn-on-hero {
     background: #fff;
     color: var(--primary);
     flex: 1;
+    font-weight: 600;
   }
   .btn-on-hero-ghost {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.18);
     color: #fff;
     flex: 1;
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid rgba(255,255,255,0.28);
   }
+  /* Ghost — no border, for tertiary actions */
   .btn-ghost {
-    background: transparent;
-    color: var(--primary);
-    border: 1px solid var(--primary);
+    background: rgba(0,0,0,0.05);
+    color: var(--text-soft);
+    border: none;
   }
   .btn-full { width: 100%; }
-  .btn-lg { padding: 16px; font-size: 16px; }
+  .btn-lg { padding: 16px; font-size: 16px; font-weight: 600; }
   .signals {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -264,12 +296,12 @@
      not a tiny caption. Mixed-case + dark text + 16px so it reads as a divider.
      Includes a small primary-color dot accent for visual organization. */
   .section-label {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-soft);
     text-transform: none;
-    letter-spacing: -0.2px;
-    margin: 22px 2px 10px;
+    letter-spacing: 0.01em;
+    margin: 24px 2px 10px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -277,11 +309,12 @@
   .section-label::before {
     content: '';
     display: inline-block;
-    width: 4px;
-    height: 18px;
+    width: 3px;
+    height: 14px;
     background: var(--primary);
     border-radius: 2px;
     flex-shrink: 0;
+    opacity: 0.6;
   }
   /* Color-coded section accents — visually segment the page by purpose */
   .section-label.s-today::before    { background: var(--primary); }
@@ -295,50 +328,70 @@
   .week-strip {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
+    gap: 4px;
     margin-bottom: 14px;
   }
   .day-pill {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 8px 4px;
     text-align: center;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
   }
   .day-pill.today {
     background: var(--primary);
     color: #fff;
     border-color: var(--primary);
   }
+  /* Upcoming (not today) day with training — subtle tint */
+  .day-pill.has-session:not(.today):not(.done) {
+    border-color: var(--primary-soft);
+  }
   .day-pill.done {
     background: var(--secondary-soft);
-    border-color: var(--secondary);
+    border-color: transparent;
   }
   .day-pill .dow {
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
-    opacity: 0.7;
+    letter-spacing: 0.04em;
+    color: #aaa;
   }
+  .day-pill.today .dow { color: rgba(255,255,255,0.7); }
   .day-pill .dnum {
-    font-size: 15px;
-    font-weight: 700;
-    margin-top: 2px;
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .day-pill.today .dnum { color: #fff; font-weight: 600; }
+  /* Today's date when NOT selected — green number */
+  .day-pill.is-today:not(.today) .dnum {
+    color: var(--primary);
+    font-weight: 600;
   }
   .day-pill .dot {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: currentColor;
-    margin: 3px auto 0;
-    opacity: 0.5;
+    background: var(--primary);
+    margin: 0 auto;
+    opacity: 0.6;
   }
+  .day-pill.today .dot { background: rgba(255,255,255,0.6); }
   .session-row {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
     padding: 14px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -392,11 +445,11 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: #fff;
-    border-top: 1px solid var(--border);
+    background: var(--bg);
+    border-top: 0.5px solid rgba(0,0,0,0.1);
     display: flex;
     /* Bottom inset accounts for iOS home-indicator on devices with safe areas. */
-    padding: 10px 0 calc(20px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 0 calc(18px + env(safe-area-inset-bottom, 0px));
   }
   /* Loading-dots animation used by the plan-building screen. */
   @keyframes adapt-pulse {
@@ -410,15 +463,27 @@
     padding: 6px;
     cursor: pointer;
     font-family: inherit;
-    color: var(--text-soft);
-    font-size: 11px;
-    font-weight: 600;
+    color: #999;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 3px;
+    position: relative;
   }
   .nav-btn.active { color: var(--primary); }
+  .nav-btn.active::before {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--primary);
+    position: absolute;
+    top: -8px;
+  }
   .nav-btn svg { width: 22px; height: 22px; }
   /* Onboarding */
   .onboard {
@@ -428,9 +493,10 @@
     flex-direction: column;
   }
   .onboard h1 {
-    font-size: 30px;
-    font-weight: 800;
-    letter-spacing: -0.8px;
+    font-family: var(--font-heading);
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     line-height: 1.1;
     margin-bottom: 14px;
   }
@@ -1008,13 +1074,31 @@
     cursor: pointer;
   }
   .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    padding: 30px 20px;
-    color: var(--text-soft);
-    font-size: 14px;
-    line-height: 1.5;
+    padding: 40px 24px;
+    gap: 8px;
   }
-  .empty-state .emoji { font-size: 32px; margin-bottom: 8px; display: block; }
+  .empty-state .emoji {
+    font-size: 32px;
+    margin-bottom: 4px;
+    display: block;
+    opacity: 0.4;
+  }
+  .empty-state-title {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 500;
+    color: #555;
+  }
+  .empty-state-body {
+    font-size: 14px;
+    color: #999;
+    line-height: 1.5;
+    max-width: 260px;
+  }
   .zone-bar {
     display: flex;
     height: 24px;
@@ -1049,29 +1133,31 @@
     gap: 8px;
   }
   .stat-tile {
-    background: var(--bg);
-    padding: 10px;
-    border-radius: 10px;
+    background: var(--card);
+    padding: 12px;
+    border-radius: var(--radius-md);
     text-align: center;
+    border: 0.5px solid var(--border);
   }
   .stat-tile .stat-label {
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     color: var(--text-soft);
-    letter-spacing: 0.4px;
+    letter-spacing: 0.06em;
   }
   .stat-tile .stat-value {
-    font-size: 18px;
-    font-weight: 800;
-    margin-top: 2px;
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 3px;
     color: var(--text);
-    letter-spacing: -0.3px;
+    letter-spacing: -0.02em;
   }
   .stat-tile .stat-sub {
     font-size: 10px;
     color: var(--text-soft);
-    margin-top: 1px;
+    margin-top: 2px;
   }
   .segment-row {
     display: flex;
@@ -1371,23 +1457,227 @@
     margin-top: -8px;
     margin-bottom: 10px;
   }
-  .logo-mark {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .logo-mark { display: none; /* replaced by wordmark */ }
+  .logo-name { display: none; /* replaced by wordmark */ }
+  /* Wordmark — lowercase "adapt" in DM Sans, no icon needed */
+  .wordmark {
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--primary);
+    line-height: 1;
+    display: block;
+    margin-bottom: 28px;
+  }
+
+  /* ── DESIGN SYSTEM v2 ─────────────────────────────────────────────── */
+
+  /* Race countdown banner — hero treatment with large number */
+  #todayRaceBanner {
+    border-radius: var(--radius-lg) !important;
+  }
+  #raceDaysCount {
+    font-family: var(--font-heading);
+    font-size: 26px !important;
+    font-weight: 600 !important;
+    background: rgba(255,255,255,0.22) !important;
+    border-radius: 10px !important;
+    padding: 6px 12px !important;
+    min-width: 52px !important;
+    text-align: center;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  #raceLabelTop {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+  }
+  #raceLabelBottom {
+    font-size: 12px !important;
+    opacity: 0.75 !important;
+  }
+
+  /* Today readiness card */
+  #todayReadinessCard {
+    border-radius: var(--radius-md) !important;
+  }
+
+  /* Hero card prescription block */
+  #heroPrescription {
+    border-radius: var(--radius-sm) !important;
+    background: rgba(255,255,255,0.15) !important;
+  }
+
+  /* Quick action footer — morning check-in + weekly review */
+  #checkinToggle,
+  #weeklyReviewBtn {
+    border-radius: var(--radius-md) !important;
+    border: 0.5px solid rgba(0,0,0,0.06) !important;
+  }
+
+  /* Screen inner — slightly more breathing room */
+  .screen-inner {
+    padding: 12px 20px 110px;
+  }
+
+  /* Stats grid — 2-col on the summary row */
+  .stat-grid {
+    gap: 8px;
+  }
+
+  /* Chat input area */
+  .chat-input-wrap {
+    background: var(--bg) !important;
+    border-top: 0.5px solid rgba(0,0,0,0.1) !important;
+  }
+
+  /* Chip base — tighten and polish */
+  .chip {
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    border: 1px solid rgba(0,0,0,0.12);
+    padding: 9px 16px;
+    transition: all 0.12s ease;
+  }
+  .chip.active {
+    background: var(--primary);
     color: #fff;
-    font-weight: 800;
-    font-size: 18px;
+    border-color: var(--primary);
   }
-  .logo-name {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.4px;
+  .chip:active { transform: scale(0.97); }
+
+  /* Check-in save button */
+  #checkinCard .btn-primary,
+  #weeklyReviewCard .btn-primary {
+    border-radius: var(--radius-md);
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 500;
+    padding: 16px;
   }
+
+  /* Modal — slightly bigger corner radius */
+  .modal {
+    border-radius: 24px 24px 0 0;
+  }
+  .modal h2 {
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Onboarding welcome headline */
+  #onb-welcome h1 {
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+
+  /* Onboarding CTA button */
+  #onb-welcome .btn-primary {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: 500;
+    padding: 18px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Section heading in Today screen — lighter treatment */
+  #heroSectionLabel {
+    margin-top: 14px;
+  }
+
+  /* Auth screen header */
+  .auth-tabs {
+    background: rgba(0,0,0,0.04);
+    border-radius: var(--radius-pill);
+  }
+  .auth-tab.active {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  /* Session icon — rounder */
+  .session-icon {
+    border-radius: 10px;
+  }
+
+  /* Notification card — use radius-md */
+  .notif-card {
+    border-radius: var(--radius-md);
+    background: var(--card);
+  }
+
+  /* Today screen: remove hero sync note to reduce clutter */
+  #heroSyncNote {
+    display: none !important;
+  }
+
+  /* "Tap for full workout" link — more subtle */
+  #heroCard [style*="font-size: 11px"] {
+    opacity: 0.55;
+  }
+
+  /* Info banner radius */
+  .info-banner {
+    border-radius: var(--radius-md);
+  }
+
+  /* Change banner */
+  .change-banner {
+    border-radius: var(--radius-md);
+  }
+
+  /* Time options in crunch modal */
+  .time-opt {
+    border-radius: var(--radius-sm);
+  }
+
+  /* Feedback bubble in chat */
+  .bubble.bot {
+    border-radius: 18px 18px 18px 6px;
+  }
+  .bubble.user {
+    border-radius: 18px 18px 6px 18px;
+  }
+
+  /* Header area gets the page bg color */
+  .header {
+    background: var(--bg);
+  }
+
+  /* Readiness modal score display */
+  .readiness-score-big {
+    font-family: var(--font-heading);
+    font-size: 64px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  /* Plan tab — session rows get card styling */
+  #weekSessions .session-row {
+    background: var(--card);
+  }
+
+  /* Insight cards on today screen */
+  #todayInsights .card {
+    border-width: 0.5px;
+  }
+
+  /* Greeting text */
+  .greeting {
+    font-size: 12px;
+    letter-spacing: 0.01em;
+    font-weight: 400;
+  }
+
+  /* Stats time filter (if pill tabs exist) */
+  .time-filter-tab {
+    border-radius: var(--radius-pill);
+  }
+
 </style>
 </head>
 <body>
@@ -1398,10 +1688,7 @@
        default for non-logged-in users. -->
   <div id="screen-auth" class="screen">
     <div class="onboard">
-      <div class="logo">
-        <div class="logo-mark">A</div>
-        <div class="logo-name">Adapt</div>
-      </div>
+      <span class="wordmark">adapt</span>
 
       <div class="auth-tabs">
         <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log in</button>
@@ -1506,10 +1793,7 @@
   <!-- ONBOARDING -->
   <div id="screen-onboard" class="screen active">
     <div class="onboard">
-      <div class="logo">
-        <div class="logo-mark">A</div>
-        <div class="logo-name">Adapt</div>
-      </div>
+      <span class="wordmark">adapt</span>
 
       <div id="onb-welcome">
         <h1 style="margin-bottom: 14px;">The plan that bends<br>around your life.</h1>
@@ -2051,7 +2335,7 @@
       <div id="todayChangeBanner"></div>
 
       <!-- 1. Race countdown — slim strip, sets context without dominating -->
-      <div id="todayRaceBanner" onclick="showScreen('plan')" style="background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer;">
+      <div id="todayRaceBanner" onclick="showScreen('plan')" style="background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 14px 18px; border-radius: 20px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; cursor: pointer;">
         <div id="raceDaysCount" style="background: rgba(255,255,255,0.25); padding: 5px 12px; border-radius: 100px; font-size: 14px; font-weight: 800; min-width: 36px; text-align: center;">47</div>
         <div style="flex:1; min-width:0;">
           <div id="raceLabelTop" style="font-size: 14px; font-weight: 700; line-height: 1.25;">days to your race</div>
@@ -2100,7 +2384,7 @@
           <div id="heroPrescription" style="display:none; margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.18); border-radius: 10px; font-size: 13px; line-height: 1.5; font-weight: 500;"></div>
           <div id="heroTargets" style="display:none; margin-top: 6px; font-size: 12px; opacity: 0.92; line-height: 1.4;"></div>
           <div class="why" id="heroWhy"></div>
-          <div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-weight: 600;">Tap for full workout details →</div>
+          <div style="font-size: 11px; opacity: 0.45; margin-top: 8px;">Full workout details →</div>
         </div>
         <div id="heroDoneStats" style="display:none; margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
           <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">What you actually did</div>
@@ -2110,7 +2394,7 @@
             <div><div style="opacity:0.75; font-size: 11px;">Distance</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDistance">—</div></div>
           </div>
         </div>
-        <div style="font-size: 12px; opacity: 0.85; margin-top: 12px; line-height: 1.5;" id="heroSyncNote">Your watch will sync automatically when you're done. Log RPE + notes after to sharpen tomorrow's recommendation.</div>
+        <div style="display:none;" id="heroSyncNote"></div>
         <div id="heroActionsPending" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px;">
           <button onclick="quickMarkDone()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✓ Done</button>
           <button onclick="quickReschedule()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">⟲ Reschedule</button>
@@ -2410,21 +2694,21 @@
       <div class="card" id="perfSummary">
         <div class="card-title" id="perfSummaryTitle">Block summary</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Total time</div>
-            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfTotalTime">—</div>
+          <div style="padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Total time</div>
+            <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfTotalTime">—</div>
           </div>
-          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Sessions</div>
-            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfSessions">—</div>
+          <div style="padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Sessions</div>
+            <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfSessions">—</div>
           </div>
-          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;">Distance</div>
-            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfDistance">—</div>
+          <div style="padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Distance</div>
+            <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfDistance">—</div>
           </div>
-          <div style="padding: 10px 12px; background: var(--bg-soft); border-radius: 10px;">
-            <div style="font-size: 11px; color: var(--text-soft); font-weight: 700; text-transform: uppercase;" title="Average resting heart rate over this period. Lower = better recovery baseline.">Resting HR</div>
-            <div style="font-size: 22px; font-weight: 800; margin-top: 4px;" id="perfAvgHr">—</div>
+          <div style="padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);">
+            <div style="font-size: 10px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;" title="Average resting heart rate over this period. Lower = better recovery baseline.">Resting HR</div>
+            <div style="font-family: var(--font-heading); font-size: 22px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em;" id="perfAvgHr">—</div>
           </div>
         </div>
       </div>
@@ -2442,7 +2726,7 @@
           <div class="card-title" style="margin:0;" id="perfDisciplineTitle">By discipline</div>
           <div id="perfDisciplinePeriod" style="font-size:11px; color:var(--primary); font-weight:600; display:none;"></div>
         </div>
-        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Tap a volume bar above to zoom in, or a row here to see the workouts.</div>
+        <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;"></div>
         <div id="perfDisciplineBars"></div>
       </div>
 
@@ -2631,7 +2915,7 @@
         <div style="font-size:13px; color:var(--text); line-height:1.6; margin-bottom:14px;">
           <p style="margin-bottom:8px;"><strong>What gets shared:</strong> Your training plan, recent activities, and check-in data go to Mistral when you send a message. Your name doesn't.</p>
           <p style="margin-bottom:8px;"><strong>Where it goes:</strong> Mistral is hosted in the EU. Adapt sends your data through its own server. No one else sees it.</p>
-          <p style="margin-bottom:8px;"><strong>What it costs you:</strong> Nothing. Adapt covers the API cost during the prototype (capped at 50 messages/day per user).</p>
+          <p style="margin-bottom:8px;"><strong>Cost:</strong> Free during the prototype — 50 messages per day.</p>
           <p style="margin-bottom:0;"><strong>What it can do:</strong> Move sessions, shorten days, flag injuries, scale volume, and explain why. It cannot diagnose injuries or give medical/nutrition advice.</p>
         </div>
         <button class="btn btn-primary btn-full" onclick="acceptCoach()">Turn on Coach Chat</button>
@@ -10082,7 +10366,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         cooldown: '',
         targets: targetsArr,
         cues: [],
-        alternatives: ['Time crunch: tap "Adjust" on the home card and tell the coach how much time you have.', 'Constraint (gym, weather, etc.): tell Coach Chat what you have access to.'],
+        alternatives: ['Time crunch: tap Adjust on the home screen.', 'Constraint: tell Coach Chat what you have available.'],
       };
     }
 
@@ -11033,10 +11317,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const scoreBlock = (s, label, sublabel, isPending) => `
       <div style="flex:1; min-width:0; background:rgba(255,255,255,0.55); padding:10px 12px; border-radius:10px;">
         <div style="display:flex; align-items:baseline; gap:6px;">
-          <div style="font-size:22px; font-weight:800; color:${s.color}; line-height:1;">${isPending ? '—' : s.score}</div>
-          <div style="font-size:9px; font-weight:700; color:var(--text-soft); letter-spacing:0.3px;">${isPending ? '' : '/ 100'}</div>
+          <div style="font-family:var(--font-heading); font-size:26px; font-weight:600; color:${s.color}; line-height:1; letter-spacing:-0.02em;">${isPending ? '—' : s.score}</div>
+          <div style="font-size:9px; font-weight:500; color:var(--text-soft); letter-spacing:0.3px;">${isPending ? '' : '/ 100'}</div>
         </div>
-        <div style="font-size:11px; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; margin-top:5px; color:${s.color};">${escapeHtml(label)}</div>
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-top:5px; color:${s.color};">${escapeHtml(label)}</div>
         <div style="font-size:11.5px; line-height:1.35; margin-top:2px; color:var(--text-soft);">${escapeHtml(sublabel)}</div>
       </div>`;
 
@@ -11760,11 +12044,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-soft); margin-bottom:6px;">BODY TODAY</div>
       <div style="background:${b.color}; color:#fff; padding:14px 16px; border-radius:12px 12px 0 0;">
         <div style="display:flex; align-items:baseline; gap:8px;">
-          <div style="font-size:28px; font-weight:800; letter-spacing:-1px;">${hasCheckin ? b.score : '—'}</div>
-          <div style="font-size:11px; font-weight:700; opacity:0.8;">${hasCheckin ? '/ 100' : ''}</div>
-          <div style="margin-left:auto; font-size:13px; font-weight:700;">${b.label}</div>
+          <div style="font-family:var(--font-heading); font-size:32px; font-weight:600; letter-spacing:-0.02em;">${hasCheckin ? b.score : '—'}</div>
+          <div style="font-size:11px; font-weight:400; opacity:0.8;">${hasCheckin ? '/ 100' : ''}</div>
+          <div style="margin-left:auto; font-size:13px; font-weight:600;">${b.label}</div>
         </div>
-        <div style="font-size:13px; margin-top:4px; opacity:0.95;">${escapeHtml(b.verdict)}</div>
+        <div style="font-size:13px; margin-top:4px; opacity:0.9;">${escapeHtml(b.verdict)}</div>
       </div>
       <div style="padding:10px 14px; background:#fff; border:1px solid var(--border); border-top:0; border-radius:0 0 12px 12px;">
         <div style="font-size:11px; color:var(--text-soft); margin-bottom:6px;">Each factor's contribution to your score (base 100):</div>
@@ -11777,11 +12061,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
         <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
           <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
-            <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px;">${r.score}</div>
-            <div style="font-size: 11px; font-weight: 700; opacity: 0.8;">/ 100</div>
-            <div style="margin-left: auto; font-size: 13px; font-weight: 700;">${emoji} ${r.label}</div>
+            <div style="font-family:var(--font-heading); font-size: 36px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
+            <div style="font-size: 11px; font-weight: 400; opacity: 0.8;">/ 100</div>
+            <div style="margin-left: auto; font-size: 13px; font-weight: 600;">${emoji} ${r.label}</div>
           </div>
-          <div style="font-size: 13px; margin-top: 6px; opacity: 0.95;">${escapeHtml(simpleSummary)}</div>
+          <div style="font-size: 13px; margin-top: 6px; opacity: 0.9;">${escapeHtml(simpleSummary)}</div>
         </div>
         <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
           <button onclick="toggleReadinessDetail(this)" style="display:block; background:none; border:0; color:${r.color}; font-weight:600; font-size:13px; cursor:pointer; padding:0; font-family:inherit; text-align:left;">Tell me more →</button>
@@ -11798,11 +12082,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
       <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
         <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
-          <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px;">${r.score}</div>
-          <div style="font-size: 11px; font-weight: 700; opacity: 0.8;">/ 100</div>
-          <div style="margin-left: auto; font-size: 13px; font-weight: 700;">${emoji} ${r.label}</div>
+          <div style="font-family:var(--font-heading); font-size: 36px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
+          <div style="font-size: 11px; font-weight: 400; opacity: 0.8;">/ 100</div>
+          <div style="margin-left: auto; font-size: 13px; font-weight: 600;">${emoji} ${r.label}</div>
         </div>
-        <div style="font-size: 13px; margin-top: 6px; opacity: 0.95;">${escapeHtml(headline)}</div>
+        <div style="font-size: 13px; margin-top: 6px; opacity: 0.9;">${escapeHtml(headline)}</div>
       </div>
       <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
         ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('check',{size:12,color:'var(--primary)'})} WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
@@ -16067,7 +16351,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
       [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
-      bars.innerHTML = `<div style="font-size:13px; color:var(--text-soft); padding: 12px;">No activities in this range. ${cta}</div>`;
+      bars.innerHTML = `<div class="empty-state"><span class="emoji">📈</span><p class="empty-state-title">Your trends will appear here</p><p class="empty-state-body">${cta || 'Log a workout on the Home tab to see your training history.'}</p></div>`;
       if (axis) axis.innerHTML = '';
       if (discBars) discBars.innerHTML = '';
       if (topSess) topSess.innerHTML = '';
