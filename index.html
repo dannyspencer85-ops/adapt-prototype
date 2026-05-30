@@ -1529,7 +1529,7 @@
         <p class="sub" style="margin-bottom: 20px; font-style: italic;">You'll still cross the finish line. Just on terms that actually work.</p>
 
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-lg btn-full" onclick="showScreen('auth')">Get started</button>
+          <button class="btn btn-primary btn-lg btn-full" onclick="handleGetStarted()">Get started</button>
         </div>
         <div style="text-align:center; margin-top:12px; font-size:12px; color:var(--text-soft);">Already have an account? Same button — log in on the next screen.</div>
       </div>
@@ -13739,12 +13739,21 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginEmail','loginPassword','signupName','signupEmail','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
     if (document.getElementById('ciNotes')) document.getElementById('ciNotes').value = '';
     // Mark onboarding as not-complete so we don't accidentally route past it.
+    // Must set planState directly — enterApp() reads planState.onboardingComplete
+    // for Supabase users, so only patching the localStorage accounts object
+    // (getAccounts/saveAccounts) has no effect on the Supabase path.
+    planState.onboardingComplete = false;
     const username = currentUser();
     if (username) {
-      const accounts = getAccounts();
-      if (accounts[username] && accounts[username].data) {
-        accounts[username].data.onboardingComplete = false;
-        saveAccounts(accounts);
+      if (_isSupabase()) {
+        // Persist the reset to Supabase so it survives a page reload.
+        if (typeof saveUserData === 'function') saveUserData();
+      } else {
+        const accounts = getAccounts();
+        if (accounts[username] && accounts[username].data) {
+          accounts[username].data.onboardingComplete = false;
+          saveAccounts(accounts);
+        }
       }
     }
     showScreen('onboard');
@@ -13766,6 +13775,20 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (focus.strategy === 'focus') text.textContent = labels.focus[focus.limiter] || 'Custom focus';
     else if (focus.strategy === 'maintain') text.textContent = labels.maintain;
     else text.textContent = labels.balanced;
+  }
+
+  // ── Onboarding entry point ───────────────────────────────────────────────
+  // Called by the "Get started" button on the welcome panel (onb-0).
+  // If the user is already authenticated (e.g. they're doing a start-over
+  // via Profile → "Start over with a new plan"), skip the auth screen and
+  // go straight to step 1.  Only send unauthenticated visitors to auth.
+  function handleGetStarted() {
+    if (currentUser()) {
+      // Already logged in — go directly into onboarding step 1.
+      onbStep(1);
+    } else {
+      showScreen('auth');
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
