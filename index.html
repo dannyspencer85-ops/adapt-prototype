@@ -2495,7 +2495,7 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 13px;">
             <div><div style="opacity:0.75; font-size: 11px;">Duration</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDuration">—</div></div>
             <div><div style="opacity:0.75; font-size: 11px;">Avg HR</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneHr">—</div></div>
-            <div><div style="opacity:0.75; font-size: 11px;">Distance</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDistance">—</div></div>
+            <div><div style="opacity:0.75; font-size: 11px;" id="heroDoneDistLabel">Distance</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDistance">—</div></div>
           </div>
         </div>
         <div style="display:none;" id="heroSyncNote"></div>
@@ -13794,8 +13794,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dh = Math.floor(s.actualMins / 60);
         const dm = s.actualMins % 60;
         const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
-        // Distance: Strava km if synced, else manually-entered string.
-        const distStr = s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km'
+        // Gym sessions: skip distance in subtitle (no GPS distance), show HR only.
+        const isGym = s.type === 'strength' || s.type === 'mobility';
+        const distStr = isGym ? ''
+          : s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km'
           : s.actualDistance ? ' · ' + s.actualDistance : '';
         const hrStr = s.actualHr ? ' · ' + s.actualHr + ' bpm' : '';
         duration.textContent = `${dStr}${distStr}${hrStr}`;
@@ -13858,10 +13860,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dm = (s.actualMins || 0) % 60;
         const dStr = (s.actualMins || 0) > 0 ? (dh > 0 ? `${dh}h ${dm}m` : `${dm} min`) : '—';
         const hr = s.actualHr ? Math.round(s.actualHr) : '—';
-        const dist = s.stravaDistance_km ? s.stravaDistance_km.toFixed(1) + ' km' : '—';
+        // Gym/cross-training sessions: show Calories instead of Distance
+        const isGymSession = s.type === 'strength' || s.type === 'mobility';
+        const thirdLabel = isGymSession ? 'Calories' : 'Distance';
+        const thirdVal = isGymSession
+          ? (s.stravaCalories ? s.stravaCalories + ' kcal' : '—')
+          : (s.stravaDistance_km ? s.stravaDistance_km.toFixed(1) + ' km' : '—');
         const dur = document.getElementById('heroDoneDuration'); if (dur) dur.textContent = dStr;
         const hrEl = document.getElementById('heroDoneHr'); if (hrEl) hrEl.textContent = hr;
-        const distEl = document.getElementById('heroDoneDistance'); if (distEl) distEl.textContent = dist;
+        const distLabel = document.getElementById('heroDoneDistLabel'); if (distLabel) distLabel.textContent = thirdLabel;
+        const distEl = document.getElementById('heroDoneDistance'); if (distEl) distEl.textContent = thirdVal;
       } else {
         doneStats.style.display = 'none';
       }
@@ -15599,6 +15607,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           planned.stravaIds = null;
           planned.stravaName = null;
           planned.stravaDistance_km = null;
+          planned.stravaCalories = null;
         }
         return;
       }
@@ -15639,6 +15648,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ? primary.name
         : `${compatActs.length} workouts · ${compatActs.map(a => mapStravaTypeToSessionType(a.type)).join(' + ')}`;
       planned.stravaDistance_km = totalDist > 0.05 ? totalDist : null;
+      const totalCals = compatActs.reduce((s, a) => s + (a.calories_kcal || 0), 0);
+      planned.stravaCalories = totalCals > 0 ? Math.round(totalCals) : null;
       marked++;
     });
     if (marked > 0) saveUserData();
