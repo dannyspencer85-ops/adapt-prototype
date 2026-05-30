@@ -2868,11 +2868,7 @@
       <div class="card">
         <div class="card-title">Fitness signals</div>
         <div style="font-size:11px; color:var(--text-soft); margin-bottom:10px;">Training load (bars) vs your body's response (line). Volume going up while RHR drops = you're getting fitter.</div>
-        <div style="display:flex; gap:6px; margin-bottom:12px;">
-          <button class="chip active" data-fitness-metric="rhr" onclick="setFitnessMetric('rhr')">Resting HR</button>
-          <button class="chip" data-fitness-metric="hrv" onclick="setFitnessMetric('hrv')">HRV</button>
-          <button class="chip" data-fitness-metric="vo2" onclick="setFitnessMetric('vo2')">VO2 Max</button>
-        </div>
+        <div id="perfFitnessChips" style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;"></div>
         <div id="perfFitnessCallout" style="display:none; padding:10px 12px; background:var(--primary-soft); border-radius:10px; font-size:13px; line-height:1.5; margin-bottom:12px;"></div>
         <div id="perfFitnessChart"></div>
       </div>
@@ -2884,11 +2880,7 @@
         </div>
         <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Are you getting fitter? Each dot is one workout in this range.</div>
         <div id="trendDiscChips" style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;"></div>
-        <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
-          <button class="chip active" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>
-          <button class="chip" data-trend-metric="duration" onclick="setTrendMetric('duration')">Long sessions</button>
-          <button class="chip" data-trend-metric="avgHr" onclick="setTrendMetric('avgHr')">Avg HR (easy)</button>
-        </div>
+        <div id="trendMetricChips" style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;"></div>
         <div id="perfTrendCallout" style="display: none; padding: 10px 12px; background: var(--primary-soft); border-radius: 10px; font-size: 13px; line-height: 1.5; margin-bottom: 12px;"></div>
         <div id="perfTrendChart"></div>
         <div id="perfTrendEmpty" style="display: none; font-size: 13px; color: var(--text-soft); padding: 14px; text-align: center;"></div>
@@ -15992,7 +15984,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function setTrendMetric(m) {
     localStorage.setItem('trend-metric', m);
-    document.querySelectorAll('[data-trend-metric]').forEach(b => b.classList.toggle('active', b.dataset.trendMetric === m));
     renderProgressTrends();
   }
   // Compute the metric value for one activity based on the metric
@@ -16016,7 +16007,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function getFitnessMetric() { return localStorage.getItem('fitness-metric') || 'rhr'; }
   function setFitnessMetric(m) {
     localStorage.setItem('fitness-metric', m);
-    document.querySelectorAll('[data-fitness-metric]').forEach(b => b.classList.toggle('active', b.dataset.fitnessMetric === m));
     renderFitnessSignals();
   }
 
@@ -16025,14 +16015,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const calloutEl = document.getElementById('perfFitnessCallout');
     if (!chartEl) return;
 
-    const metric = getFitnessMetric();
-    document.querySelectorAll('[data-fitness-metric]').forEach(b => b.classList.toggle('active', b.dataset.fitnessMetric === metric));
-
     const days = getPerfRange();
     const { buckets, bucketSize } = _perfBucketCache || bucketActivities(getActivitiesInRangeDays(days), days);
 
     // Source: Apple Health global daily readings for the selected metric
     const hk = planState.healthKit || {};
+
+    // Only show chips for signals that have actual Apple Health data
+    const hasRhr = (hk.restingHeartRate || []).some(r => r && r.value > 20 && r.value < 120);
+    const hasHrv = (hk.hrv || []).some(r => r && r.value > 0 && r.value < 250);
+    const hasVo2 = (hk.vo2max || []).some(r => r && r.value > 10 && r.value < 80);
+    const fitnessChipsEl = document.getElementById('perfFitnessChips');
+    let metric = getFitnessMetric();
+    // Fall back if current selection has no data
+    if ((metric === 'rhr' && !hasRhr) || (metric === 'hrv' && !hasHrv) || (metric === 'vo2' && !hasVo2)) {
+      metric = hasRhr ? 'rhr' : hasHrv ? 'hrv' : hasVo2 ? 'vo2' : 'rhr';
+      localStorage.setItem('fitness-metric', metric);
+    }
+    if (fitnessChipsEl) {
+      fitnessChipsEl.innerHTML = [
+        hasRhr ? `<button class="chip${metric === 'rhr' ? ' active' : ''}" data-fitness-metric="rhr" onclick="setFitnessMetric('rhr')">Resting HR</button>` : '',
+        hasHrv ? `<button class="chip${metric === 'hrv' ? ' active' : ''}" data-fitness-metric="hrv" onclick="setFitnessMetric('hrv')">HRV</button>` : '',
+        hasVo2 ? `<button class="chip${metric === 'vo2' ? ' active' : ''}" data-fitness-metric="vo2" onclick="setFitnessMetric('vo2')">VO2 Max</button>` : '',
+      ].join('');
+    }
     const rawData = metric === 'rhr'
       ? (hk.restingHeartRate || []).filter(r => r && r.value > 20 && r.value < 120)
       : metric === 'vo2'
@@ -16237,38 +16243,51 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     let userDiscs = [];
     try { userDiscs = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
     // Normalise: trainer → bike, keep known types
-    const declaredSet = new Set(
-      userDiscs.map(d => d === 'trainer' ? 'bike' : d).filter(d => DISC_META[d])
-    );
-    // Also include any discipline with actual workouts in this range
+    // Only show disciplines that have actual data in the selected range
+    const discsWithData = new Set();
     allRangeActs.forEach(a => {
       const t = mapStravaTypeToSessionType(a.type);
-      if (DISC_META[t]) declaredSet.add(t);
+      if (DISC_META[t]) discsWithData.add(t);
     });
-    // Render chips in a fixed order
     const chipOrder = ['run', 'bike', 'swim', 'cross', 'strength'];
-    const availDiscs = chipOrder.filter(d => declaredSet.has(d));
+    const availDiscs = chipOrder.filter(d => discsWithData.has(d));
     const chipsEl = document.getElementById('trendDiscChips');
-    if (chipsEl && availDiscs.length > 0) {
-      // Ensure saved selection is valid; fall back to first available
-      let savedDisc = getTrendDiscipline();
-      if (!availDiscs.includes(savedDisc)) {
-        savedDisc = availDiscs[0];
-        localStorage.setItem('trend-disc', savedDisc);
+    if (chipsEl) {
+      if (availDiscs.length === 0) {
+        chipsEl.innerHTML = '';
+      } else {
+        let savedDisc = getTrendDiscipline();
+        if (!availDiscs.includes(savedDisc)) {
+          savedDisc = availDiscs[0];
+          localStorage.setItem('trend-disc', savedDisc);
+        }
+        chipsEl.innerHTML = availDiscs.map(d =>
+          `<button class="chip${d === savedDisc ? ' active' : ''}" data-trend-disc="${d}" onclick="setTrendDiscipline('${d}')">${DISC_META[d].label}</button>`
+        ).join('');
       }
-      chipsEl.innerHTML = availDiscs.map(d =>
-        `<button class="chip${d === savedDisc ? ' active' : ''}" data-trend-disc="${d}" onclick="setTrendDiscipline('${d}')">${DISC_META[d].label}</button>`
-      ).join('');
     }
 
-    const metric = getTrendMetric();
-    document.querySelectorAll('[data-trend-metric]').forEach(b => b.classList.toggle('active', b.dataset.trendMetric === metric));
-
     let disc = getTrendDiscipline();
-    // Guard: if chips updated the stored disc above, re-read it
     if (chipsEl) {
       const activeChip = chipsEl.querySelector('.chip.active');
       if (activeChip) disc = activeChip.dataset.trendDisc;
+    }
+
+    // Metric chips — hide Pace for disciplines without GPS distance
+    const NO_PACE_DISCS = new Set(['cross', 'strength', 'mobility']);
+    const hasPace = !NO_PACE_DISCS.has(disc);
+    const metricChipsEl = document.getElementById('trendMetricChips');
+    let metric = getTrendMetric();
+    if (!hasPace && metric === 'pace') {
+      metric = 'duration';
+      localStorage.setItem('trend-metric', metric);
+    }
+    if (metricChipsEl) {
+      metricChipsEl.innerHTML = [
+        hasPace ? `<button class="chip${metric === 'pace' ? ' active' : ''}" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>` : '',
+        `<button class="chip${metric === 'duration' ? ' active' : ''}" data-trend-metric="duration" onclick="setTrendMetric('duration')">Duration</button>`,
+        `<button class="chip${metric === 'avgHr' ? ' active' : ''}" data-trend-metric="avgHr" onclick="setTrendMetric('avgHr')">Avg HR (easy)</button>`,
+      ].join('');
     }
     const acts = allRangeActs.filter(a => mapStravaTypeToSessionType(a.type) === disc);
 
