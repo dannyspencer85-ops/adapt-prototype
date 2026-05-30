@@ -7812,7 +7812,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const sAfter = (typeof _sessionForDate === 'function') ? _sessionForDate(dayAfter) : null;
 
     const isQuality = (s) => s && (s.type === 'quality' || s.type === 'brick' || /interval|tempo|threshold|race[\s-]*pace|hill/i.test(s.name || ''));
-    const isLong = (s) => s && (s.duration || 0) >= 75;
+    const isLong = (s) => s && (s.duration || 0) >= _longRunThreshold();
 
     let reason = '';
     if (isLong(sBefore)) {
@@ -8303,6 +8303,45 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const m = Math.round(mins % 60);
     return (h > 0 ? h + 'h ' : '') + (m > 0 ? m + 'm' : (h === 0 ? '0m' : '')).trim();
   }
+  // Returns the minimum session duration that counts as a "long session" for
+  // a given event. The old universal 75-min threshold was correct for HM/
+  // Olympic Tri but nonsensical for 5K (where 35 min IS the long run) and
+  // too low for Ironman. Used in readiness scoring, weekly insights, and
+  // rest-day context messaging.
+  function _longRunThreshold(ev) {
+    const e = (ev || (planState && planState.raceEvent) || localStorage.getItem('race-event') || '').toLowerCase();
+    if (/full ironman/i.test(e))                          return 120;
+    if (/half ironman/i.test(e))                          return 90;
+    if (/olympic tri/i.test(e))                           return 75;
+    if (/sprint tri/i.test(e))                            return 55;
+    if (/marathon/i.test(e) && !/half/i.test(e))         return 90;
+    if (/half marathon/i.test(e))                         return 65;
+    if (/10k/i.test(e))                                   return 45;
+    if (/5k/i.test(e))                                    return 35;
+    return 75; // sensible default for unknown events
+  }
+  // Returns the target duration to suggest when a long session is missing.
+  function _longRunTarget(ev) {
+    const e = (ev || (planState && planState.raceEvent) || localStorage.getItem('race-event') || '').toLowerCase();
+    if (/full ironman/i.test(e))                          return 150;
+    if (/half ironman/i.test(e))                          return 105;
+    if (/olympic tri/i.test(e))                           return 90;
+    if (/sprint tri/i.test(e))                            return 70;
+    if (/marathon/i.test(e) && !/half/i.test(e))         return 110;
+    if (/half marathon/i.test(e))                         return 80;
+    if (/10k/i.test(e))                                   return 55;
+    if (/5k/i.test(e))                                    return 45;
+    return 90;
+  }
+  // Suppress the long-session check entirely for short events — a 5K plan
+  // doesn't need a "long session" warning since every session is short by design.
+  function _longRunCheckEnabled(ev) {
+    const e = (ev || (planState && planState.raceEvent) || localStorage.getItem('race-event') || '').toLowerCase();
+    // For 5K plans only suppress the check — every session in a 5K plan is
+    // intentionally short, so "no long session" is expected, not a flaw.
+    return !/^5k$/i.test(e.trim()) && !/\b5k\b/i.test(e);
+  }
+  }
 
   function runAdaptiveEngine() {
     const insights = [];
@@ -8336,21 +8375,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const aiPlanProtected = noHistoryYet || aiPlanIntact || planIsNew;
 
     // 1. Key session coverage (plan-structure — gated)
-    const hasLong = activeSessions.some(x => x.s.duration >= 75);
+    const _raceEvent = (planState.raceEvent || localStorage.getItem('race-event') || '');
+    const _longMin  = _longRunThreshold(_raceEvent);
+    const _longTgt  = _longRunTarget(_raceEvent);
+    const _longTgtLabel = formatMins(_longTgt);
+    const hasLong = activeSessions.some(x => x.s.duration >= _longMin);
     const hasQuality = activeSessions.some(x => x.s.type === 'quality' || x.s.type === 'brick');
-    if (!aiPlanProtected && !hasLong) {
+    if (!aiPlanProtected && !hasLong && _longRunCheckEnabled(_raceEvent)) {
       const weekend = sessions.Sat && sessions.Sat.type === 'rest' ? 'Sat' : sessions.Sun && sessions.Sun.type === 'rest' ? 'Sun' : null;
       const longest = weekSessions.filter(x => x.s.type !== 'rest').sort((a, b) => b.s.duration - a.s.duration)[0];
       insights.push({
         severity: 'alert',
         title: 'You don\'t have a long workout this week',
-        simpleMessage: "No long session this week. That's the biggest fitness driver — add one back.",
-        message: 'This week has no long session (75+ min). The long session is the single biggest driver of endurance fitness — without one, the week won\'t build toward race day.',
-        suggestion: 'Try: "move [day] to Saturday" or "only 90 min Saturday" to reinstate it.',
+        simpleMessage: `No long session this week. That's the biggest fitness driver — add one back.`,
+        message: `This week has no long session (${_longMin}+ min for ${_raceEvent || 'your event'}). The long session is the single biggest driver of endurance fitness — without one, the week won't build toward race day.`,
+        suggestion: `Try: "move [day] to Saturday" or "only ${_longTgtLabel} Saturday" to reinstate it.`,
         fix: weekend
-          ? { label: `Add 90-min long run on ${weekend}`, tool: 'shortenSession', input: { day: weekend, newMinutes: 90, newName: 'Long easy run', newMeta: '1:30 · Zone 2', reason: 'restore long session' }}
+          ? { label: `Add ${_longTgtLabel} long run on ${weekend}`, tool: 'shortenSession', input: { day: weekend, newMinutes: _longTgt, newName: 'Long easy run', newMeta: `${_longTgtLabel} · Zone 2`, reason: 'restore long session' }}
           : longest
-          ? { label: `Extend ${longest.day}'s session to 90 min`, tool: 'shortenSession', input: { day: longest.day, newMinutes: 90, newName: longest.s.name, newMeta: longest.s.meta, reason: 'extend to hit long-session minimum' }}
+          ? { label: `Extend ${longest.day}'s session to ${_longTgtLabel}`, tool: 'shortenSession', input: { day: longest.day, newMinutes: _longTgt, newName: longest.s.name, newMeta: longest.s.meta, reason: 'extend to hit long-session minimum' }}
           : null
       });
     }
@@ -10617,15 +10660,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return { score: 75, status: 'pending', label: 'PLAN PENDING', color: '#D9A94A', issues: [], wins: [] };
     }
     const activeSessions = Object.values(planState.sessions).filter(s => s.type !== 'rest');
-    const hasLong = activeSessions.some(s => s.duration >= 75);
+    const _rrEvent   = (planState.raceEvent || localStorage.getItem('race-event') || '');
+    const _rrLongMin = _longRunThreshold(_rrEvent);
+    const hasLong = activeSessions.some(s => s.duration >= _rrLongMin);
     const hasQuality = activeSessions.some(s => s.type === 'quality' || s.type === 'brick');
     const total = activeSessions.reduce((a, s) => a + s.duration, 0);
     const currentArc = planState.weekArc.find(w => w.current) || planState.weekArc[0];
     const targetMins = currentArc ? parseWeekHours(currentArc.hours) * 60 : 0;
     const ratio = targetMins > 0 ? total / targetMins : 1;
 
-    if (!hasLong) { score -= 25; issues.push('No long session (75+ min) this week — biggest fitness driver is missing'); }
-    else { wins.push(`Long session scheduled (${Math.max(...activeSessions.map(s => s.duration))} min)`); }
+    if (!hasLong && _longRunCheckEnabled(_rrEvent)) { score -= 25; issues.push(`No long session (${_rrLongMin}+ min) this week — biggest fitness driver is missing`); }
+    else if (hasLong) { wins.push(`Long session scheduled (${Math.max(...activeSessions.map(s => s.duration))} min)`); }
     if (!hasQuality) { score -= 15; issues.push('No quality session this week — intensity drives adaptation'); }
     else { wins.push('Quality session scheduled'); }
     if (ratio < 0.7) { score -= 20; issues.push(`Volume ${Math.round((1 - ratio) * 100)}% under target (${formatMins(total)} of ${formatMins(targetMins)} planned)`); }
@@ -13372,7 +13417,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const moments = {
       'first-session': { emoji: icon('trophy',    { size: 48, color: '#D9A94A', stroke: 1.5 }), title: 'First session logged!', text: 'Consistency beats heroics. One down — keep stacking.' },
       'first-brick':   { emoji: icon('bike',      { size: 48, color: '#7E5BB6', stroke: 1.5 }), title: 'Your first brick is done!', text: 'The brick is the single most important session for a half IM. You just did the one that matters most.' },
-      'first-long-run':{ emoji: icon('run',       { size: 48, color: '#3B8968', stroke: 1.5 }), title: 'First 75+ min long run!', text: "The long session is the engine of endurance fitness. You're building what actually gets you to the finish line." },
+      'first-long-run':{ emoji: icon('run',       { size: 48, color: '#3B8968', stroke: 1.5 }), title: `First ${_longRunThreshold()}+ min long run!`, text: "The long session is the engine of endurance fitness. You're building what actually gets you to the finish line." },
       'streak-3':      { emoji: icon('flame',     { size: 48, color: '#E8941F', stroke: 1.5 }), title: '3-day streak!', text: 'Consistency is the #1 driver of endurance gains. Keep it going.' },
       'streak-7':      { emoji: icon('intervals', { size: 48, color: '#C44545', stroke: 1.5 }), title: '7 days in a row!', text: "A full week of consistency. You're building a real training pattern." },
       'checkin-streak':{ emoji: icon('sun',       { size: 48, color: '#D9A94A', stroke: 1.5 }), title: 'Morning check-in habit', text: "You're building the ritual. The daily signal lets the engine make sharper recommendations." }
@@ -17695,7 +17740,7 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
       setTimeout(() => {
         maybeCelebrate('first-session');
         if (s.type === 'brick') maybeCelebrate('first-brick');
-        if (s.type === 'run' && s.duration >= 75) maybeCelebrate('first-long-run');
+        if (s.type === 'run' && s.duration >= _longRunThreshold()) maybeCelebrate('first-long-run');
         const streak = computeStreak();
         if (streak.days === 3) maybeCelebrate('streak-3');
         if (streak.days === 7) maybeCelebrate('streak-7');
