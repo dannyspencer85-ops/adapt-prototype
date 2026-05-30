@@ -1607,14 +1607,6 @@
           </div>
         </div>
         <div class="field">
-          <label>Any current injuries or pain?</label>
-          <div class="chip-row" id="injuryChips">
-            <button class="chip active" data-val="none" onclick="singleChipVal(this)">None</button>
-            <button class="chip" data-val="minor" onclick="singleChipVal(this)">Minor / managed</button>
-            <button class="chip" data-val="serious" onclick="singleChipVal(this)">Yes — get cleared first</button>
-          </div>
-        </div>
-        <div class="field">
           <label>Average sleep per night</label>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Rough estimate is fine. Helps us adjust intensity if your schedule doesn't leave room for full recovery.</div>
           <div class="chip-row" id="sleepChips">
@@ -4131,7 +4123,6 @@
     if (!p) return;
     if (p.freq) setActiveChipVal('freqChips', p.freq);
     if (p.exp) setActiveChipVal('bgChips', p.exp);
-    if (p.injury) setActiveChipVal('injuryChips', p.injury);
     if (p.sleep) {
       const wrap = document.getElementById('sleepChips');
       if (wrap) [...wrap.children].forEach(ch => ch.classList.toggle('active', ch.dataset.sleep === p.sleep));
@@ -4176,10 +4167,9 @@
   // moment the user advances, not only when the full plan is built.
   function advanceFromStep2() {
     const profile = {
-      freq:   getActiveChipVal('freqChips')   || 'mid',
-      exp:    getActiveChipVal('bgChips')     || 'some',
-      injury: getActiveChipVal('injuryChips') || 'none',
-      sleep:  document.querySelector('#sleepChips .chip.active')?.dataset.sleep || '7to8',
+      freq:  getActiveChipVal('freqChips') || 'mid',
+      exp:   getActiveChipVal('bgChips')   || 'some',
+      sleep: document.querySelector('#sleepChips .chip.active')?.dataset.sleep || '7to8',
     };
     localStorage.setItem('user-profile', JSON.stringify(profile));
     planState.profile = profile;
@@ -4594,38 +4584,40 @@
     const isGeneral = /General fitness/.test(event);
     let set;
     if (isBike) {
-      // Bike race — bike-dominant. Bike + trainer + strength on by default;
-      // cross-training (run, elliptical, etc.) optional.
+      // Bike race — bike-dominant. Bike + trainer + strength on by default.
       set = [
-        { disc: 'bike',     label: 'Bike',            active: true  },
-        { disc: 'trainer',  label: 'Indoor trainer',  active: true  },
-        { disc: 'strength', label: 'Strength / gym',  active: true  },
-        { disc: 'cross',    label: 'Cross-training',  active: false },
-        { disc: 'run',      label: 'Run',             active: false },
+        { disc: 'bike',     label: 'Bike',           active: true  },
+        { disc: 'trainer',  label: 'Indoor trainer', active: true  },
+        { disc: 'strength', label: 'Strength / gym', active: true  },
+        { disc: 'run',      label: 'Run',            active: false },
       ];
     } else if (isTri) {
+      // Triathlon — all three plus strength. Cross-training is uncommon at
+      // tri volume but offered as an optional recovery tool.
       set = [
-        { disc: 'run', label: 'Run', active: true },
-        { disc: 'bike', label: 'Bike', active: true },
-        { disc: 'trainer', label: 'Indoor trainer', active: true },
-        { disc: 'swim', label: 'Swim', active: true },
-        { disc: 'strength', label: 'Strength / gym', active: true }
+        { disc: 'run',      label: 'Run',             active: true  },
+        { disc: 'bike',     label: 'Bike',            active: true  },
+        { disc: 'trainer',  label: 'Indoor trainer',  active: true  },
+        { disc: 'swim',     label: 'Swim',            active: true  },
+        { disc: 'strength', label: 'Strength / gym',  active: true  },
+        { disc: 'cross',    label: 'Cross-training',  active: false },
       ];
     } else if (isRun) {
+      // Run events — cross-training is its own discipline, separate from bike.
       set = [
-        { disc: 'run',      label: 'Run',              active: true  },
-        { disc: 'cross',    label: 'Cross-training',   active: true  },
-        { disc: 'strength', label: 'Strength / gym',   active: true  },
-        { disc: 'bike',     label: 'Bike',             active: false },
-        { disc: 'trainer',  label: 'Indoor trainer',   active: false },
+        { disc: 'run',      label: 'Run',             active: true  },
+        { disc: 'cross',    label: 'Cross-training',  active: true  },
+        { disc: 'strength', label: 'Strength / gym',  active: true  },
+        { disc: 'bike',     label: 'Bike',            active: false },
+        { disc: 'trainer',  label: 'Indoor trainer',  active: false },
       ];
     } else {
       set = [
-        { disc: 'run', label: 'Run', active: true },
-        { disc: 'bike', label: 'Bike', active: true },
-        { disc: 'trainer', label: 'Indoor trainer', active: true },
-        { disc: 'swim', label: 'Swim', active: false },
-        { disc: 'strength', label: 'Strength / gym', active: true }
+        { disc: 'run',      label: 'Run',             active: true  },
+        { disc: 'bike',     label: 'Bike',            active: true  },
+        { disc: 'trainer',  label: 'Indoor trainer',  active: true  },
+        { disc: 'swim',     label: 'Swim',            active: false },
+        { disc: 'strength', label: 'Strength / gym',  active: true  },
       ];
     }
     const container = document.getElementById('discChips');
@@ -4635,11 +4627,11 @@
     const hint = document.getElementById('discHint');
     if (hint) {
       hint.textContent = isTri
-        ? 'Triathlon needs swim + bike + run. Strength training reduces injury risk. Deselect any you don\'t have access to.'
+        ? 'Triathlon needs swim + bike + run. Strength reduces injury risk. Cross-training (elliptical, row) is optional for recovery days. Deselect any you don\'t have access to.'
         : isBike
-        ? 'Bike races are built on riding (outdoor + indoor trainer) plus strength. Cross-training (elliptical, row, run) is optional recovery variety. Deselect any you don\'t have.'
+        ? 'Bike races are built on riding (outdoor + indoor trainer) plus strength. Deselect any you don\'t have access to.'
         : isRun
-        ? 'Run events benefit from cross-training (elliptical, rowing, pool running) for low-impact recovery days, plus strength for injury prevention. Deselect any you don\'t have.'
+        ? 'Run events benefit from cross-training (elliptical, rowing, pool running) on recovery days, plus strength for injury prevention. Deselect any you don\'t have.'
         : 'Typical disciplines for your event. Deselect any you don\'t have access to.';
     }
   }
@@ -4693,9 +4685,8 @@
     // time, so planState.profile was null for real users — which silently
     // disabled the freq/exp branches in the starting-fitness heuristics.
     const _onbProfile = {
-      exp: getActiveChipVal('bgChips') || 'some',
-      freq: getActiveChipVal('freqChips') || 'mid',
-      injury: getActiveChipVal('injuryChips') || 'none',
+      exp:   getActiveChipVal('bgChips')   || 'some',
+      freq:  getActiveChipVal('freqChips') || 'mid',
       sleep: (document.querySelector('#sleepChips .chip.active')?.dataset.sleep) || '7to8',
     };
     planState.profile = _onbProfile;
@@ -4815,13 +4806,9 @@
   // out after 60s — Mistral Large can take 15-30s for a full plan.
   async function generatePlanWithAI({ event, eventDate, eventLocation, hours, days, complexity }) {
     const profile = {
-      exp: getActiveChipVal('bgChips'),
-      freq: getActiveChipVal('freqChips'),
-      injury: getActiveChipVal('injuryChips'),
-      sleep: (() => {
-        const a = document.querySelector('#sleepChips .chip.active');
-        return a ? (a.dataset.sleep || '') : '';
-      })(),
+      exp:   getActiveChipVal('bgChips'),
+      freq:  getActiveChipVal('freqChips'),
+      sleep: (() => { const a = document.querySelector('#sleepChips .chip.active'); return a ? (a.dataset.sleep || '') : ''; })(),
     };
     const courseIntel = (typeof readCourseIntelFromInputs === 'function') ? readCourseIntelFromInputs() : null;
     // Triathlon focus: which discipline is the user's limiter (weakest /
@@ -5660,7 +5647,6 @@
 
     const FREQ = { low: 'Not much', mid: '1–2× / week', high: '3+× / week' };
     const EXP = { new: 'New to this', some: 'Some experience', veteran: '5+ years' };
-    const INJ = { none: 'No injuries', minor: 'Minor / managed', serious: 'Injury — getting cleared' };
     const SLEEP = { under5: 'Under 5h', '5to6': '5–6h', '6to7': '6–7h', '7to8': '7–8h', '8plus': '8h+' };
     const RUNABLE = { 'walk-run': 'Walk + short jogs', 'under-15': 'Up to 15 min', '15-30': '15–30 min', '30-60': '30–60 min', '60-plus': '60 min or more' };
 
@@ -5678,7 +5664,6 @@
     const bgParts = [];
     if (prof.freq && FREQ[prof.freq]) bgParts.push(FREQ[prof.freq]);
     if (prof.exp && EXP[prof.exp]) bgParts.push(EXP[prof.exp]);
-    if (prof.injury && prof.injury !== 'none' && INJ[prof.injury]) bgParts.push(INJ[prof.injury]);
     if (prof.sleep && SLEEP[prof.sleep]) bgParts.push('Sleep ' + SLEEP[prof.sleep]);
 
     // Step-5 fitness-markers summary.
@@ -13898,8 +13883,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function startFreshOnboarding(skipConfirm) {
-    if (!skipConfirm && !confirm('Start over? You\'ll rebuild your plan from scratch — first name, race, schedule, Coach Chat history, all reset.')) return;
-    // Clear every plan-input + every user-scoped key so nothing bleeds in.
+    if (!skipConfirm && !confirm('Pick a new race and rebuild your plan? Your name, background, and fitness profile carry over — just the race, schedule, and training history reset.')) return;
+    // ── Save stable, non-race data before the wipe ──────────────────────────
+    // Name, endurance background, training frequency, and sleep are personal
+    // attributes that don't change when you pick a new race. Pre-populate them
+    // on the new onboarding pass so the user doesn't re-enter them.
+    const _savedName    = (typeof getFirstName === 'function') ? getFirstName() : '';
+    const _savedProfile = (typeof readUserProfile === 'function') ? readUserProfile() : null;
+    // ── Clear every plan-input + every user-scoped key ───────────────────────
     ['race-event','race-date','race-location','hours-per-week','training-days','tri-limiter','tri-strategy','plan-choice','course-intel'].forEach(k => localStorage.removeItem(k));
     if (typeof _clearUserScopedLocal === 'function') _clearUserScopedLocal();
     if (typeof chatMessages !== 'undefined') chatMessages.length = 0;
@@ -13916,7 +13907,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     document.querySelectorAll('#onb-1 .chip, #onb-2 .chip, #onb-3 .chip, #onb-4 .chip, #hoursChips .chip, #daysChips .chip, #discChips .chip, #complexityChips .chip, #themeChips .chip, #ciBody .chip, #ciSleep .chip, #ciStress .chip').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginEmail','loginPassword','signupName','signupEmail','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
     if (document.getElementById('ciNotes')) document.getElementById('ciNotes').value = '';
-    // Mark onboarding as not-complete so we don't accidentally route past it.
+    // ── Restore stable data so onbStep(1) / onbStep(2) pre-fill correctly ───
+    if (_savedName) {
+      localStorage.setItem('first-name', _savedName);
+    }
+    if (_savedProfile) {
+      // Keep only the stable fields — drop any stale injury data.
+      const stableProfile = { freq: _savedProfile.freq, exp: _savedProfile.exp, sleep: _savedProfile.sleep };
+      localStorage.setItem('user-profile', JSON.stringify(stableProfile));
+      planState.profile = stableProfile;
+    }
+    // ── Mark onboarding incomplete ───────────────────────────────────────────
     // Must set planState directly — enterApp() reads planState.onboardingComplete
     // for Supabase users, so only patching the localStorage accounts object
     // (getAccounts/saveAccounts) has no effect on the Supabase path.
