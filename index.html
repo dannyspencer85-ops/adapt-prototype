@@ -2878,12 +2878,7 @@
           <span>Progress trends</span>
         </div>
         <div style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;">Are you getting fitter? Each dot is one workout in this range.</div>
-        <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
-          <button class="chip active" data-trend-disc="run" onclick="setTrendDiscipline('run')">Run</button>
-          <button class="chip" data-trend-disc="bike" onclick="setTrendDiscipline('bike')">Bike</button>
-          <button class="chip" data-trend-disc="swim" onclick="setTrendDiscipline('swim')">Swim</button>
-          <button class="chip" data-trend-disc="cross" onclick="setTrendDiscipline('cross')">Cross</button>
-        </div>
+        <div id="trendDiscChips" style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;"></div>
         <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
           <button class="chip active" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>
           <button class="chip" data-trend-metric="duration" onclick="setTrendMetric('duration')">Long sessions</button>
@@ -16180,15 +16175,54 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const emptyEl = document.getElementById('perfTrendEmpty');
     if (!chartEl) return;
 
-    // Reflect saved selections in the chips
-    const disc = getTrendDiscipline();
+    // Build discipline chips from user's available disciplines + actual data in range
+    const days = getPerfRange();
+    const allRangeActs = getActivitiesInRangeDays(days);
+    const DISC_META = {
+      run:      { label: 'Run' },
+      bike:     { label: 'Bike' },
+      swim:     { label: 'Swim' },
+      cross:    { label: 'Cross' },
+      strength: { label: 'Strength' },
+    };
+    // User's declared disciplines from onboarding/profile
+    let userDiscs = [];
+    try { userDiscs = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
+    // Normalise: trainer → bike, keep known types
+    const declaredSet = new Set(
+      userDiscs.map(d => d === 'trainer' ? 'bike' : d).filter(d => DISC_META[d])
+    );
+    // Also include any discipline with actual workouts in this range
+    allRangeActs.forEach(a => {
+      const t = mapStravaTypeToSessionType(a.type);
+      if (DISC_META[t]) declaredSet.add(t);
+    });
+    // Render chips in a fixed order
+    const chipOrder = ['run', 'bike', 'swim', 'cross', 'strength'];
+    const availDiscs = chipOrder.filter(d => declaredSet.has(d));
+    const chipsEl = document.getElementById('trendDiscChips');
+    if (chipsEl && availDiscs.length > 0) {
+      // Ensure saved selection is valid; fall back to first available
+      let savedDisc = getTrendDiscipline();
+      if (!availDiscs.includes(savedDisc)) {
+        savedDisc = availDiscs[0];
+        localStorage.setItem('trend-disc', savedDisc);
+      }
+      chipsEl.innerHTML = availDiscs.map(d =>
+        `<button class="chip${d === savedDisc ? ' active' : ''}" data-trend-disc="${d}" onclick="setTrendDiscipline('${d}')">${DISC_META[d].label}</button>`
+      ).join('');
+    }
+
     const metric = getTrendMetric();
-    document.querySelectorAll('[data-trend-disc]').forEach(b => b.classList.toggle('active', b.dataset.trendDisc === disc));
     document.querySelectorAll('[data-trend-metric]').forEach(b => b.classList.toggle('active', b.dataset.trendMetric === metric));
 
-    const days = getPerfRange();
-    const acts = getActivitiesInRangeDays(days)
-      .filter(a => mapStravaTypeToSessionType(a.type) === disc);
+    let disc = getTrendDiscipline();
+    // Guard: if chips updated the stored disc above, re-read it
+    if (chipsEl) {
+      const activeChip = chipsEl.querySelector('.chip.active');
+      if (activeChip) disc = activeChip.dataset.trendDisc;
+    }
+    const acts = allRangeActs.filter(a => mapStravaTypeToSessionType(a.type) === disc);
 
     const points = acts
       .map(a => {
