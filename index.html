@@ -2118,10 +2118,15 @@
           </div>
           <div class="field">
             <label>Altitude</label>
-            <div class="chip-row" id="courseAltitudeChips">
-              <button type="button" class="chip active" data-val="sea" onclick="singleChipVal(this)">Sea level</button>
-              <button type="button" class="chip" data-val="moderate" onclick="singleChipVal(this)">Moderate (2,000–6,500ft)</button>
-              <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+            <div class="chip-row" id="courseAltitudeToggle">
+              <button type="button" class="chip active" data-val="no" onclick="setAltitudeApplies('course', false)">Not applicable</button>
+              <button type="button" class="chip" data-val="yes" onclick="setAltitudeApplies('course', true)">Applies to my race</button>
+            </div>
+            <div id="courseAltitudeLevelWrap" style="display:none; margin-top: 10px;">
+              <div class="chip-row" id="courseAltitudeChips">
+                <button type="button" class="chip active" data-val="moderate" onclick="singleChipVal(this)">Moderate (2,000–6,500ft)</button>
+                <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+              </div>
             </div>
           </div>
           <div class="field">
@@ -3568,10 +3573,15 @@
       </div>
       <div class="field">
         <label>Altitude</label>
-        <div class="chip-row" id="cieAltitudeChips">
-          <button type="button" class="chip" data-val="sea" onclick="singleChipVal(this)">Sea level</button>
-          <button type="button" class="chip" data-val="moderate" onclick="singleChipVal(this)">Moderate</button>
-          <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+        <div class="chip-row" id="cieAltitudeToggle">
+          <button type="button" class="chip active" data-val="no" onclick="setAltitudeApplies('cie', false)">Not applicable</button>
+          <button type="button" class="chip" data-val="yes" onclick="setAltitudeApplies('cie', true)">Applies to my race</button>
+        </div>
+        <div id="cieAltitudeLevelWrap" style="display:none; margin-top: 10px;">
+          <div class="chip-row" id="cieAltitudeChips">
+            <button type="button" class="chip active" data-val="moderate" onclick="singleChipVal(this)">Moderate (2,000–6,500ft)</button>
+            <button type="button" class="chip" data-val="high" onclick="singleChipVal(this)">High (6,500ft+)</button>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -4346,7 +4356,7 @@
         _restoreChip('courseBikeChips',     savedIntel.bikeProfile);
         _restoreChip('courseSwimChips',     savedIntel.swim);
         _restoreChip('courseClimateChips',  savedIntel.climate);
-        _restoreChip('courseAltitudeChips', savedIntel.altitude);
+        restoreAltitudeChip('course', savedIntel.altitude);
         const notesEl = document.getElementById('courseNotes');
         if (notesEl && savedIntel.notes && !notesEl.value) notesEl.value = savedIntel.notes;
       }
@@ -5838,6 +5848,29 @@
     if (!c) return;
     [...c.children].forEach(ch => ch.classList.toggle('active', ch.dataset.val === val));
   }
+  // Toggle altitude "applies" section — shared by onboarding + Course Intel Editor
+  function setAltitudeApplies(prefix, applies) {
+    const toggle = document.getElementById(prefix + 'AltitudeToggle');
+    const wrap   = document.getElementById(prefix + 'AltitudeLevelWrap');
+    if (toggle) {
+      [...toggle.children].forEach(c => c.classList.toggle('active', (c.dataset.val === 'yes') === applies));
+    }
+    if (wrap) wrap.style.display = applies ? 'block' : 'none';
+  }
+  // Restore altitude from a saved value ('sea' | 'moderate' | 'high')
+  function restoreAltitudeChip(prefix, val) {
+    const applies = val && val !== 'sea';
+    setAltitudeApplies(prefix, applies);
+    if (applies) setActiveChipVal(prefix + 'AltitudeChips', val);
+  }
+  // Read current altitude value from the two-step UI
+  function getAltitudeVal(prefix) {
+    const toggle = document.getElementById(prefix + 'AltitudeToggle');
+    if (!toggle) return 'sea';
+    const active = toggle.querySelector('.chip.active');
+    if (!active || active.dataset.val === 'no') return 'sea';
+    return getActiveChipVal(prefix + 'AltitudeChips') || 'moderate';
+  }
   // Toggle the morning check-in card open/closed on Today screen
   // ──────────────────────────────────────────────────────────────────────
   // SCHEDULE PREFERENCES — per-day availability + allowed disciplines
@@ -6426,7 +6459,7 @@
       bikeProfile: isTri ? (getActiveChipVal('courseBikeChips') || 'rolling') : 'none',
       swim: isTri ? (getActiveChipVal('courseSwimChips') || 'lake') : 'none',
       climate: getActiveChipVal('courseClimateChips') || 'temperate',
-      altitude: getActiveChipVal('courseAltitudeChips') || 'sea',
+      altitude: getAltitudeVal('course'),
       notes: document.getElementById('courseNotes')?.value.trim() || '',
       source: raceId ? 'curated' : 'manual'
     };
@@ -12467,7 +12500,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setActiveChipVal('cieSurfaceChips', intel.surface);
     setActiveChipVal('cieSwimChips', intel.swim);
     setActiveChipVal('cieClimateChips', intel.climate);
-    setActiveChipVal('cieAltitudeChips', intel.altitude);
+    restoreAltitudeChip('cie', intel.altitude);
     const n = document.getElementById('cieNotes');
     if (n) n.value = intel.notes || '';
     modal.classList.add('show');
@@ -12483,7 +12516,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       surface: getActiveChipVal('cieSurfaceChips') || 'road',
       swim: getActiveChipVal('cieSwimChips') || 'none',
       climate: getActiveChipVal('cieClimateChips') || 'temperate',
-      altitude: getActiveChipVal('cieAltitudeChips') || 'sea',
+      altitude: getAltitudeVal('cie'),
       notes: document.getElementById('cieNotes')?.value.trim() || '',
       source: 'manual'
     };
@@ -15134,7 +15167,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const data = await fetchStravaCourseData(url);
       const attrs = inferCourseAttrsFromStrava(data);
       setActiveChipVal('cieTerrainChips', attrs.terrain);
-      setActiveChipVal('cieAltitudeChips', attrs.altitude);
+      restoreAltitudeChip('cie', attrs.altitude);
       const km = data.distance_km.toFixed(1);
       const ft = Math.round(data.elevation_gain_m * 3.28084);
       msg.innerHTML = `✅ ${escapeHtml(data.name)} · ${km} km · ${ft} ft elevation gain → terrain set to <strong>${attrs.terrain}</strong>${attrs.altitude !== 'sea' ? ', altitude to <strong>' + attrs.altitude + '</strong>' : ''}.`;
