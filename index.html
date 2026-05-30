@@ -2882,6 +2882,7 @@
           <button class="chip active" data-trend-disc="run" onclick="setTrendDiscipline('run')">Run</button>
           <button class="chip" data-trend-disc="bike" onclick="setTrendDiscipline('bike')">Bike</button>
           <button class="chip" data-trend-disc="swim" onclick="setTrendDiscipline('swim')">Swim</button>
+          <button class="chip" data-trend-disc="cross" onclick="setTrendDiscipline('cross')">Cross</button>
         </div>
         <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
           <button class="chip active" data-trend-metric="pace" onclick="setTrendMetric('pace')">Pace</button>
@@ -4798,7 +4799,26 @@
     const today = (typeof getTodayDay === 'function') ? getTodayDay() : null;
     const s = today && planState.sessions && planState.sessions[today];
 
-    if (!s || s.type === 'rest' || s.duration === 0) {
+    const isRestPlanned = !s || s.type === 'rest' || s.duration === 0;
+    // If a workout was actually completed on a planned rest day, show what was done
+    if (isRestPlanned && s && s.completed && s.stravaName) {
+      const dh = Math.floor((s.actualMins || 0) / 60);
+      const dm = (s.actualMins || 0) % 60;
+      const dStr = s.actualMins > 0 ? (dh > 0 ? `${dh}h ${dm}m` : `${dm} min`) : '';
+      const hrStr = s.actualHr ? ` · avg HR ${Math.round(s.actualHr)}` : '';
+      container.innerHTML = `
+        <div class="section-label">Today</div>
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <div style="font-weight:700; font-size:16px;">${escapeHtml(s.stravaName)}</div>
+            <div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">✓ Done</div>
+          </div>
+          <div style="color:var(--text-soft); font-size:13px; margin-bottom:12px;">${today ? (DAY_FULL[today] || today) : 'Today'}${dStr ? ' · ' + dStr : ''}${hrStr}</div>
+          <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">Plan said rest, but you trained anyway. Recovery tomorrow will matter more.</div>
+        </div>`;
+      return;
+    }
+    if (isRestPlanned) {
       container.innerHTML = `
         <div class="section-label">Today</div>
         <div class="card">
@@ -13810,7 +13830,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dm = s.actualMins % 60;
         const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
         // Gym sessions: skip distance in subtitle (no GPS distance), show HR only.
-        const isGym = s.type === 'strength' || s.type === 'mobility';
+        const _GYM_NAME = /crosstraining|cross.training|weight|strength|yoga|pilates|hiit|functional|crossfit/i;
+        const isGym = s.type === 'strength' || s.type === 'mobility' || s.type === 'cross'
+          || (s.stravaName && _GYM_NAME.test(s.stravaName));
         const distStr = isGym ? ''
           : s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km'
           : s.actualDistance ? ' · ' + s.actualDistance : '';
@@ -13876,7 +13898,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const dStr = (s.actualMins || 0) > 0 ? (dh > 0 ? `${dh}h ${dm}m` : `${dm} min`) : '—';
         const hr = s.actualHr ? Math.round(s.actualHr) : '—';
         // Gym/cross-training sessions: show Calories instead of Distance
-        const isGymSession = s.type === 'strength' || s.type === 'mobility';
+        const _GYM_NAME2 = /crosstraining|cross.training|weight|strength|yoga|pilates|hiit|functional|crossfit/i;
+        const isGymSession = s.type === 'strength' || s.type === 'mobility' || s.type === 'cross'
+          || (s.stravaName && _GYM_NAME2.test(s.stravaName));
         const thirdLabel = isGymSession ? 'Calories' : 'Distance';
         const thirdVal = isGymSession
           ? (s.stravaCalories ? s.stravaCalories + ' kcal' : '—')
@@ -15413,8 +15437,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (t.includes('run') || t.includes('jog'))                                                 return 'run';
     if (t.includes('ride') || t.includes('bike') || t.includes('cycl'))                        return 'bike';
     if (t.includes('swim'))                                                                     return 'swim';
-    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit') ||
-        t.includes('crosstraining') || t.includes('hiit') || t.includes('functional'))         return 'strength';
+    if (t.includes('crosstraining') || t.includes('hiit') || t.includes('functional'))         return 'cross';
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit'))             return 'strength';
     if (t.includes('walk') || t.includes('hike'))                                              return 'walk';
     if (t.includes('yoga') || t.includes('mobil'))                                             return 'mobility';
     if (t.includes('row'))                                                                      return 'swim';
@@ -15454,7 +15478,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (t.includes('run'))                            return icon('run',       { size: 16 });
     if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return icon('bike', { size: 16 });
     if (t.includes('swim'))                           return icon('swim',      { size: 16 });
-    if (t.includes('weight') || t.includes('strength') || t.includes('crosstraining') || t.includes('hiit') || t.includes('functional')) return icon('strength', { size: 16 });
+    if (t.includes('crosstraining') || t.includes('hiit') || t.includes('functional')) return icon('cross', { size: 16 });
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit'))     return icon('strength', { size: 16 });
     if (t.includes('walk') || t.includes('hike'))     return icon('walk',      { size: 16 });
     if (t.includes('yoga') || t.includes('mobil'))    return icon('mobility',  { size: 16 });
     if (t.includes('row'))                            return icon('swim',      { size: 16 });
@@ -15584,9 +15609,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (t.includes('run') || t.includes('jog') || t.includes('virtualrun')) return 'run';
     if (t.includes('ride') || t.includes('bike') || t.includes('cycl') || t.includes('virtualride') || t.includes('ebike')) return 'bike';
     if (t.includes('swim')) return 'swim';
-    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit') || t.includes('crosstraining')) return 'strength';
+    if (t.includes('crosstraining') || t.includes('hiit') || t.includes('functional')) return 'cross';
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit')) return 'strength';
     if (t.includes('walk') || t.includes('hike')) return 'walk';
-    if (t.includes('yoga')) return 'mobility';
+    if (t.includes('yoga') || t.includes('mobil')) return 'mobility';
     return 'other';
   }
   // Find a Strava activity matching a YYYY-MM-DD date string (returns first match for that day)
@@ -15631,7 +15657,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const t = mapStravaTypeToSessionType(a.type);
         return plannedType === 'rest' || plannedType === 'brick' ||
           t === plannedType ||
-          (plannedType === 'quality' && (t === 'run' || t === 'bike' || t === 'swim'));
+          (plannedType === 'quality' && (t === 'run' || t === 'bike' || t === 'swim')) ||
+          (plannedType === 'cross' && (t === 'cross' || t === 'strength'));
       });
       if (compatActs.length === 0) return;
 
@@ -16641,6 +16668,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       { id: 'run',      label: 'Run',            icon: icon('run',      {size:14}), color: 'var(--primary)' },
       { id: 'bike',     label: 'Bike',           icon: icon('bike',     {size:14}), color: '#5DA985' },
       { id: 'swim',     label: 'Swim',           icon: icon('swim',     {size:14}), color: '#2980B9' },
+      { id: 'cross',    label: 'Cross-training', icon: icon('cross',    {size:14}), color: '#C0714A' },
       { id: 'strength', label: 'Strength',       icon: icon('strength', {size:14}), color: '#D9A94A' },
       { id: 'walk',     label: 'Walk / Hike',    icon: icon('walk',     {size:14}), color: '#A89878' },
       { id: 'mobility', label: 'Yoga / Mobility',icon: icon('mobility', {size:14}), color: '#8E44AD' },
