@@ -1626,7 +1626,7 @@
           </div>
         </div>
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-full btn-lg" onclick="onbStep(3)">Next</button>
+          <button class="btn btn-primary btn-full btn-lg" onclick="advanceFromStep2()">Next</button>
         </div>
       </div>
 
@@ -1804,7 +1804,7 @@
         </div>
 
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-full btn-lg" onclick="onbStep(4)">Next</button>
+          <button class="btn btn-primary btn-full btn-lg" onclick="advanceFromStep3()">Next</button>
         </div>
       </div>
 
@@ -3858,6 +3858,19 @@
         if (!ok) return;
       }
     }
+    // Persist step 4 selections before advancing so returning users see their
+    // choices restored even if they close the app before building the plan.
+    const hoursChip = document.querySelector('#hoursChips .chip.active');
+    if (hoursChip) localStorage.setItem('hours-per-week', hoursChip.dataset.hours);
+    const days = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent.trim());
+    if (days.length) localStorage.setItem('training-days', JSON.stringify(days));
+    const disc = [...document.querySelectorAll('#discChips .chip.active')].map(c => c.dataset.disc).filter(Boolean);
+    if (disc.length) localStorage.setItem('available-disciplines', JSON.stringify(disc));
+    const cm = document.querySelector('#complexityChips .chip.active')?.dataset.mode;
+    if (cm) localStorage.setItem('complexity-mode', cm);
+    const sm = document.querySelector('#scheduleModeChips .chip.active')?.dataset.mode;
+    if (sm) localStorage.setItem('schedule-mode', sm);
+    if (typeof saveUserData === 'function') saveUserData();
     onbStep(5);
   }
 
@@ -3913,6 +3926,28 @@
       if (dateEl && savedDate && !dateEl.value) dateEl.value = savedDate;
       updateTriFocusVisibility();
       adjustCourseDetailsForEvent();
+      // Restore course intel chips from saved data so returning users see
+      // exactly what they entered previously.
+      const _restoreChip = (groupId, val) => {
+        if (!val || val === 'none') return;
+        const wrap = document.getElementById(groupId);
+        if (!wrap) return;
+        const target = wrap.querySelector(`[data-val="${val}"]`);
+        if (!target) return;
+        [...wrap.children].forEach(c => c.classList.remove('active'));
+        target.classList.add('active');
+      };
+      const savedIntel = (() => { try { return JSON.parse((planState.courseIntel && JSON.stringify(planState.courseIntel)) || localStorage.getItem('course-intel') || 'null'); } catch (e) { return null; } })();
+      if (savedIntel) {
+        _restoreChip('courseTerrainChips',  savedIntel.terrain);
+        _restoreChip('courseSurfaceChips',  savedIntel.surface);
+        _restoreChip('courseBikeChips',     savedIntel.bikeProfile);
+        _restoreChip('courseSwimChips',     savedIntel.swim);
+        _restoreChip('courseClimateChips',  savedIntel.climate);
+        _restoreChip('courseAltitudeChips', savedIntel.altitude);
+        const notesEl = document.getElementById('courseNotes');
+        if (notesEl && savedIntel.notes && !notesEl.value) notesEl.value = savedIntel.notes;
+      }
     }
     if (n === 2) { prefillStep2Profile(); }
     if (n === 5) { prefillFitnessMarkers(); adjustFmAdvancedVisibility(); }
@@ -4131,7 +4166,40 @@
     if (errEl) errEl.style.display = 'none';
     if (typeof renderTodayGreetingAndRace === 'function') renderTodayGreetingAndRace();
     if (typeof renderProfileScreen === 'function') renderProfileScreen();
+    if (typeof saveUserData === 'function') saveUserData(); // persist name to cloud
     onbStep(2);
+  }
+
+  // Advance step 2 → 3: persist fitness/background answers before moving on.
+  // Step 2's "Next" button calls this instead of onbStep(3) directly so the
+  // profile chips are saved to localStorage (and synced to Supabase) at the
+  // moment the user advances, not only when the full plan is built.
+  function advanceFromStep2() {
+    const profile = {
+      freq:   getActiveChipVal('freqChips')   || 'mid',
+      exp:    getActiveChipVal('bgChips')     || 'some',
+      injury: getActiveChipVal('injuryChips') || 'none',
+      sleep:  document.querySelector('#sleepChips .chip.active')?.dataset.sleep || '7to8',
+    };
+    localStorage.setItem('user-profile', JSON.stringify(profile));
+    planState.profile = profile;
+    if (typeof saveUserData === 'function') saveUserData();
+    onbStep(3);
+  }
+
+  // Advance step 3 → 4: persist race event, date, and course intel.
+  function advanceFromStep3() {
+    const event = document.getElementById('eventSelect')?.value || '';
+    const date  = document.getElementById('eventDate')?.value  || '';
+    if (event) { localStorage.setItem('race-event', event); planState.raceEvent = event; }
+    if (date)  { localStorage.setItem('race-date',  date);  planState.raceDate  = date;  }
+    if (typeof readCourseIntelFromInputs === 'function') {
+      const intel = readCourseIntelFromInputs();
+      localStorage.setItem('course-intel', JSON.stringify(intel));
+      planState.courseIntel = intel;
+    }
+    if (typeof saveUserData === 'function') saveUserData();
+    onbStep(4);
   }
 
   // ── Integrations (Apple Health only for v1) ──
@@ -13836,12 +13904,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // via Profile → "Start over with a new plan"), skip the auth screen and
   // go straight to step 1.  Only send unauthenticated visitors to auth.
   function handleGetStarted() {
-    if (currentUser()) {
-      // Already logged in — go directly into onboarding step 1.
-      onbStep(1);
-    } else {
-      showScreen('auth');
-    }
+    showScreen('auth');
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -16587,10 +16650,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const onboardingComplete = _isSupabase() ? !!planState.onboardingComplete : !!(acct?.data?.onboardingComplete);
     if (!onboardingComplete) {
       showScreen('onboard');
-      // Post-login: skip step 0 (welcome panel) — the user already saw it
-      // before tapping "Get started." Jump straight to step 1 (name +
-      // basics). Welcome is still reachable via the back button on step 1.
-      onbStep(1);
+      // Post-login: skip step 0 (welcome panel). Resume from the furthest
+      // step the user previously reached so they don't re-enter data they
+      // already gave us. We detect progress by checking what's already saved.
+      const _hasFm      = !!localStorage.getItem('fitness-markers');
+      const _hasSchedule = !!localStorage.getItem('hours-per-week');
+      const _hasRaceDate = !!(localStorage.getItem('race-date') || (planState && planState.raceDate));
+      const _hasRaceEvt  = !!(localStorage.getItem('race-event') || (planState && planState.raceEvent));
+      const _hasProfile  = !!localStorage.getItem('user-profile');
+      const _hasName     = !!(localStorage.getItem('first-name') || (planState && planState.profile));
+      const _resumeStep  = _hasFm ? 5 : _hasSchedule ? 5 : _hasRaceDate ? 4 : _hasRaceEvt ? 4 : _hasProfile ? 3 : _hasName ? 2 : 1;
+      onbStep(_resumeStep);
     } else if (!_hasRealPlan()) {
       // Account is "complete" but we have no real plan data (sessions all
       // empty/rest, no fullPlan). This happens if a previous plan-gen run
