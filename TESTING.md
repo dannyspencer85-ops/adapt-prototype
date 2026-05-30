@@ -65,9 +65,8 @@ After logging in you'll go through **onboarding** — pick a real race you'd act
 
 ## Known limits (don't waste your time reporting these)
 
-- **AI chat rate limit.** Coach Chat is capped at 50 messages/day per device and plan generation at 5 rebuilds/day per IP while we're in prototype.
+- **AI chat rate limit.** Coach Chat is capped at 50 messages/day per device and plan generation at 5 rebuilds/day per IP while we're in prototype. The app shows a warning when you're close to the daily limit.
 - **Notifications only fire when the app is open or recently focused.** Push notifications when the app is closed need a backend we haven't built yet.
-- **Strava tokens expire every ~6 hours.** Refresh is automatic; if it ever shows "Strava connection lost," tap Profile → reconnect.
 - **Apple HealthKit** syncs automatically on the native iOS build (TestFlight). On the web version, HealthKit data won't appear.
 - **iOS Safari notification permission requires installing to Home Screen first.** Inside the regular Safari browser, the notification prompt won't appear.
 - **General fitness (no event) is intentionally not supported yet** — pick a specific race.

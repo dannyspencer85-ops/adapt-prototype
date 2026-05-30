@@ -2683,6 +2683,7 @@
           Plan didn't update after the coach said it would? Tap to force a rebuild.
         </div>
       </div>
+      <div id="chatCapWarning" style="display:none; font-size:11px; color:#7a5a18; background:#fef6e0; border:1px solid #e8c46b; border-radius:8px; padding:6px 10px; margin:0 0 6px; text-align:center;"></div>
       <div class="chat-input-wrap">
         <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your plan…" onkeydown="if(event.key==='Enter') sendChat()">
         <button class="send-btn" onclick="sendChat()">
@@ -3252,10 +3253,10 @@
   <div class="modal-bg" id="readinessModal">
     <div class="modal" style="max-height: 85vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <h2 style="font-size: 20px; margin: 0;">Race readiness</h2>
+        <h2 style="font-size: 20px; margin: 0;">Readiness</h2>
         <button onclick="closeReadinessModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
       </div>
-      <div class="sub">Your current standing toward race day — updates live as you train and adjust.</div>
+      <div class="sub">Body score is based on your check-in today. Race score tracks your training plan progress.</div>
       <div id="readinessModalBody"></div>
     </div>
   </div>
@@ -5017,7 +5018,7 @@
     });
     document.getElementById('nav').style.display = (name === 'onboard' || name === 'auth') ? 'none' : 'flex';
     if (typeof trackEvent === 'function' && ['today','plan','data','profile','prep','ask','log','onboard','auth'].includes(name)) trackEvent('tab_view', { tab: name });
-    if (name === 'ask') updateChatState();
+    if (name === 'ask') { updateChatState(); if (typeof _updateChatCapWarning === 'function') _updateChatCapWarning(); }
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') autofillCheckin();
     if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); }
@@ -10598,36 +10599,39 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         borderSoft: '#e8c46b',
         textColor: '#7a5a18',
         notes: ['Body readiness needs your morning check-in to compute.'],
+        factors: [],
       };
     }
 
     let score = 100;
     const notes = [];
+    const factors = []; // { label, value, delta } — used in readiness modal breakdown
     const body = checkin && checkin.body ? checkin.body : null;
     const sleep = checkin && checkin.sleep ? checkin.sleep : null;
     const stress = checkin && checkin.stress ? checkin.stress : null;
 
     // Body field — biggest single signal.
-    if (body === 'Exhausted') { score -= 35; notes.push('Body: exhausted'); }
-    else if (body === 'Drained') { score -= 20; notes.push('Body: drained'); }
-    else if (body === 'OK') { score -= 5; notes.push('Body: OK'); }
-    else if (body === 'Fresh') { notes.push('Body: fresh'); }
+    if (body === 'Exhausted') { score -= 35; notes.push('Body: exhausted'); factors.push({ label: 'Body feel', value: 'Exhausted', delta: -35 }); }
+    else if (body === 'Drained') { score -= 20; notes.push('Body: drained'); factors.push({ label: 'Body feel', value: 'Drained', delta: -20 }); }
+    else if (body === 'OK') { score -= 5; notes.push('Body: OK'); factors.push({ label: 'Body feel', value: 'OK', delta: -5 }); }
+    else if (body === 'Fresh') { notes.push('Body: fresh'); factors.push({ label: 'Body feel', value: 'Fresh', delta: 0 }); }
 
     // Sleep — under 6 hours is a hard penalty.
-    if (sleep === 'Under 5h') { score -= 25; notes.push('Sleep: <5h'); }
-    else if (sleep === '5-6h') { score -= 12; notes.push('Sleep: 5-6h'); }
-    else if (sleep === '6-7h') { score -= 5; notes.push('Sleep: 6-7h'); }
-    else if (sleep === '7-8h') { notes.push('Sleep: 7-8h'); }
-    else if (sleep === '8h+') { score += 2; notes.push('Sleep: 8h+'); }
+    if (sleep === 'Under 5h') { score -= 25; notes.push('Sleep: <5h'); factors.push({ label: 'Sleep', value: 'Under 5 hrs', delta: -25 }); }
+    else if (sleep === '5-6h') { score -= 12; notes.push('Sleep: 5-6h'); factors.push({ label: 'Sleep', value: '5–6 hrs', delta: -12 }); }
+    else if (sleep === '6-7h') { score -= 5; notes.push('Sleep: 6-7h'); factors.push({ label: 'Sleep', value: '6–7 hrs', delta: -5 }); }
+    else if (sleep === '7-8h') { notes.push('Sleep: 7-8h'); factors.push({ label: 'Sleep', value: '7–8 hrs', delta: 0 }); }
+    else if (sleep === '8h+') { score += 2; notes.push('Sleep: 8h+'); factors.push({ label: 'Sleep', value: '8+ hrs', delta: 2 }); }
 
-    // Stress.
-    if (stress === 'High') { score -= 12; notes.push('Stress: high'); }
-    else if (stress === 'Moderate') { score -= 4; notes.push('Stress: moderate'); }
+    // Stress. Check-in chips: Low / Normal / High (also handle legacy 'Moderate').
+    if (stress === 'High') { score -= 12; notes.push('Stress: high'); factors.push({ label: 'Stress', value: 'High', delta: -12 }); }
+    else if (stress === 'Moderate') { score -= 4; notes.push('Stress: moderate'); factors.push({ label: 'Stress', value: 'Moderate', delta: -4 }); }
+    else if (stress) { notes.push('Stress: ' + stress.toLowerCase()); factors.push({ label: 'Stress', value: stress, delta: 0 }); }
 
     // Active injury.
-    if (inj && inj.severity === 'high') { score -= 40; notes.push(`Injury: ${inj.area} (severe)`); }
-    else if (inj && inj.severity === 'moderate') { score -= 20; notes.push(`Injury: ${inj.area} (moderate)`); }
-    else if (inj && inj.severity === 'low') { score -= 8; notes.push(`Injury: ${inj.area} (mild)`); }
+    if (inj && inj.severity === 'high') { score -= 40; notes.push(`Injury: ${inj.area} (severe)`); factors.push({ label: 'Injury', value: `${inj.area} — severe`, delta: -40 }); }
+    else if (inj && inj.severity === 'moderate') { score -= 20; notes.push(`Injury: ${inj.area} (moderate)`); factors.push({ label: 'Injury', value: `${inj.area} — moderate`, delta: -20 }); }
+    else if (inj && inj.severity === 'low') { score -= 8; notes.push(`Injury: ${inj.area} (mild)`); factors.push({ label: 'Injury', value: `${inj.area} — mild`, delta: -8 }); }
 
     score = Math.max(0, Math.min(100, score));
 
@@ -10646,7 +10650,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       verdict = 'Recovery beats stubbornness today';
       color = '#C44545'; bgSoft = '#fde8e8'; borderSoft = '#f5b5b5'; textColor = '#7a2828';
     }
-    return { score, label, verdict, color, bgSoft, borderSoft, textColor, notes };
+    return { score, label, verdict, color, bgSoft, borderSoft, textColor, notes, factors };
   }
 
   function computeRaceReadiness() {
@@ -11453,6 +11457,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const el = document.getElementById(containerId);
     if (!el) return;
     const r = computeRaceReadiness();
+    const b = computeBodyReadiness();
+    const hasCheckin = !!(planState.lastCheckin || planState.injury);
+
     const emoji = r.status === 'on-track' ? icon('check', { size: 14, color: 'var(--good)' }) : r.status === 'slightly-behind' ? icon('clock', { size: 14, color: 'var(--caution)' }) : icon('flag', { size: 14, color: 'var(--alert)' });
     const headline = r.status === 'on-track'
       ? 'You\'re ready to keep building.'
@@ -11467,10 +11474,36 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ? `A few things to fix this week — see below. Small corrections now keep you on track for race day.`
       : `Your training has fallen behind. Adjust now or we'll need to push the race date back.`;
 
+    // Body Today breakdown — shown at top of modal for both modes.
+    const _deltaStr = (d) => d > 0 ? '+' + d + ' pts' : d === 0 ? '—' : d + ' pts';
+    const _deltaColor = (d) => d < 0 ? '#C44545' : d > 0 ? '#3B8968' : 'var(--text-soft)';
+    const bodyFactorRows = b.factors.length > 0
+      ? b.factors.map((f, i) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0;${i < b.factors.length - 1 ? ' border-bottom:1px solid var(--bg);' : ''}">
+          <div style="font-size:13px; color:var(--text);">${escapeHtml(f.label)}: <span style="font-weight:600;">${escapeHtml(f.value)}</span></div>
+          <div style="font-size:12px; font-weight:700; color:${_deltaColor(f.delta)};">${_deltaStr(f.delta)}</div>
+        </div>`).join('')
+      : `<div style="font-size:13px; color:var(--text-soft); font-style:italic; padding:4px 0;">Complete your morning check-in to get a real body score.</div>`;
+
+    const bodySection = `<div style="margin-bottom:16px;">
+      <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-soft); margin-bottom:6px;">BODY TODAY</div>
+      <div style="background:${b.color}; color:#fff; padding:14px 16px; border-radius:12px 12px 0 0;">
+        <div style="display:flex; align-items:baseline; gap:8px;">
+          <div style="font-size:28px; font-weight:800; letter-spacing:-1px;">${hasCheckin ? b.score : '—'}</div>
+          <div style="font-size:11px; font-weight:700; opacity:0.8;">${hasCheckin ? '/ 100' : ''}</div>
+          <div style="margin-left:auto; font-size:13px; font-weight:700;">${b.label}</div>
+        </div>
+        <div style="font-size:13px; margin-top:4px; opacity:0.95;">${escapeHtml(b.verdict)}</div>
+      </div>
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--border); border-top:0; border-radius:0 0 12px 12px;">
+        <div style="font-size:11px; color:var(--text-soft); margin-bottom:6px;">Each factor's contribution to your score (base 100):</div>
+        ${bodyFactorRows}
+      </div>
+    </div>
+    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-soft); margin-bottom:6px;">RACE READINESS</div>`;
+
     if (mode === 'simple') {
-      el.innerHTML = `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
+      el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
         <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
-          <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.6px; opacity: 0.85;">RACE READINESS</div>
           <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
             <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px;">${r.score}</div>
             <div style="font-size: 11px; font-weight: 700; opacity: 0.8;">/ 100</div>
@@ -11490,9 +11523,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return;
     }
 
-    el.innerHTML = `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
+    el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
       <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
-        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.6px; opacity: 0.85;">RACE READINESS</div>
         <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
           <div style="font-size: 32px; font-weight: 800; letter-spacing: -1px;">${r.score}</div>
           <div style="font-size: 11px; font-weight: 700; opacity: 0.8;">/ 100</div>
@@ -17824,6 +17856,42 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     return { success: true, message: msg };
   }
 
+  // ── Chat daily cap tracker (client-side, best-effort) ──────────────────
+  // Counts messages sent per UTC day in localStorage. Used only for the UI
+  // warning badge — the server enforces the hard cap independently.
+  const _CHAT_DAILY_CAP = 50;
+  function _chatMsgsToday() {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const data = JSON.parse(localStorage.getItem('chat-daily-count') || '{}');
+      return data.date === today ? (data.count || 0) : 0;
+    } catch (e) { return 0; }
+  }
+  function _incrementChatCount() {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const data = JSON.parse(localStorage.getItem('chat-daily-count') || '{}');
+      const count = (data.date === today ? (data.count || 0) : 0) + 1;
+      localStorage.setItem('chat-daily-count', JSON.stringify({ date: today, count }));
+      return count;
+    } catch (e) { return 0; }
+  }
+  function _updateChatCapWarning() {
+    const el = document.getElementById('chatCapWarning');
+    if (!el) return;
+    const used = _chatMsgsToday();
+    const remaining = _CHAT_DAILY_CAP - used;
+    if (remaining <= 5 && remaining > 0) {
+      el.style.display = '';
+      el.textContent = `${remaining} message${remaining === 1 ? '' : 's'} left today — resets at midnight UTC.`;
+    } else if (remaining <= 0) {
+      el.style.display = '';
+      el.textContent = 'Daily chat limit reached (50/day). Resets at midnight UTC.';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
   async function sendChat() {
     if (!hasAcceptedCoach()) { updateChatState(); return; }
     const input = document.getElementById('chatInput');
@@ -17834,13 +17902,22 @@ For <strong>real thinking</strong> — "why is my plan structured this way?", "s
     const row = document.getElementById('suggestRow');
     if (row) row.style.display = 'none';
 
+    _incrementChatCount();
+    _updateChatCapWarning();
+
     // Coach Chat (Mistral): start an empty bubble that streams tokens in place.
     const bubble = addBubble('…', 'bot typing');
     try {
       await askMistral(text, bubble);
     } catch (err) {
       bubble.classList.remove('typing');
-      bubble.textContent = 'Something went wrong: ' + err.message;
+      // Surface rate-limit errors with a friendlier message.
+      const msg = err.message || '';
+      if (msg.includes('Daily limit') || msg.includes('429') || msg.includes('limit reached')) {
+        bubble.innerHTML = `<strong>Daily chat limit reached.</strong> You've used all 50 messages for today. Come back tomorrow (resets at midnight UTC) — your plan and all your data will still be here.`;
+      } else {
+        bubble.textContent = 'Something went wrong — ' + msg;
+      }
     }
     refreshSuggestions();
   }
