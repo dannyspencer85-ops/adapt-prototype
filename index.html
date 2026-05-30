@@ -1509,11 +1509,122 @@
     background: rgba(255,255,255,0.15) !important;
   }
 
-  /* Quick action footer — morning check-in + weekly review */
-  #checkinToggle,
-  #weeklyReviewBtn {
-    border-radius: var(--radius-md) !important;
-    border: 0.5px solid rgba(0,0,0,0.06) !important;
+  /* Quick action footer — morning check-in + weekly review as list rows */
+  .action-rows-wrap {
+    border-top: 0.5px solid rgba(0,0,0,0.08);
+    border-bottom: 0.5px solid rgba(0,0,0,0.08);
+  }
+  .action-list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 0.5px solid rgba(0,0,0,0.08);
+    padding: 14px 4px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text);
+    text-align: left;
+    transition: background 0.1s;
+  }
+  .action-list-row:last-child { border-bottom: none; }
+  .action-list-row:active { background: rgba(0,0,0,0.03); }
+  .action-row-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .action-row-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .action-row-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .action-row-sub {
+    font-size: 12px;
+    color: var(--text-soft);
+  }
+  .action-row-chevron {
+    color: #ccc;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Landing screen */
+  .landing-headline {
+    font-family: var(--font-heading);
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: #1a1a1a;
+    margin-bottom: 16px;
+  }
+  .landing-sub {
+    font-size: 16px;
+    color: #555;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+  .examples-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: #aaa;
+    margin-bottom: 14px;
+    margin-top: 28px;
+    text-transform: uppercase;
+  }
+  .examples-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .example-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 0.5px solid rgba(0,0,0,0.07);
+  }
+  .example-icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #EBF5F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .example-text {
+    font-size: 15px;
+    line-height: 1.4;
+    color: #333;
+  }
+  .landing-cta {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: 500;
+    padding: 18px;
+    border-radius: var(--radius-md);
+  }
+  .landing-secondary-cta {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    margin-top: 12px;
   }
 
   /* Screen inner — slightly more breathing room */
@@ -1566,23 +1677,6 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: -0.02em;
-  }
-
-  /* Onboarding welcome headline */
-  #onb-welcome h1 {
-    font-size: 36px;
-    font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-  }
-
-  /* Onboarding CTA button */
-  #onb-welcome .btn-primary {
-    font-family: var(--font-heading);
-    font-size: 17px;
-    font-weight: 500;
-    padding: 18px;
-    border-radius: var(--radius-md);
   }
 
   /* Section heading in Today screen — lighter treatment */
@@ -1796,26 +1890,36 @@
       <span class="wordmark">adapt</span>
 
       <div id="onb-welcome">
-        <h1 style="margin-bottom: 14px;">The plan that bends<br>around your life.</h1>
-        <p class="sub" style="margin-bottom: 14px;">Every other endurance plan assumes you sleep 8 hours, never miss a workout, and have unlimited time. You don't. We get that.</p>
-        <p class="sub" style="margin-bottom: 20px;">Adapt is for <strong style="color: var(--text);">working professionals and parents</strong>: people who want to finish endurance events without trying to live like full-time athletes.</p>
+        <h1 class="landing-headline">The plan that bends<br>around your life.</h1>
+        <p class="landing-sub">Every other endurance plan assumes you sleep 8 hours, never miss a workout, and have unlimited time. You don't. We get that.</p>
+        <p class="landing-sub">Adapt is for <strong style="color: var(--text);">working professionals and parents</strong>: people who want to finish endurance events without trying to live like full-time athletes.</p>
 
-        <div style="background: var(--bg); border-radius: 14px; padding: 14px 16px; margin-bottom: 22px;">
-          <div style="font-size: 11px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Real-life examples</div>
-          <div style="font-size: 13px; line-height: 1.6; color: var(--text); display:flex; flex-direction:column; gap:10px;">
-            <div style="display: flex; gap: 12px; align-items: center;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary-soft);flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span><strong>Bad night with the kids?</strong> Today's intervals ease.</span></div>
-            <div style="display: flex; gap: 12px; align-items: center;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary-soft);flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg></span><span><strong>Pool closed?</strong> Swim swaps to bike or run.</span></div>
-            <div style="display: flex; gap: 12px; align-items: center;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary-soft);flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.817l-2.172 1.138a.392.392 0 0 1-.568-.366l.998-5.172l-3.288-3.357l-4.2 1.098l-1.296-1.299l4.2-1.1l-2.102-2.148l-2.102.554l-1.298-1.302l2.1-.555l-.554-2.1l1.302-1.3l.554 2.1l2.144 2.103l1.1-4.2l1.297 1.296l-1.1 4.2l3.357 3.287l5.172-.998a.392.392 0 0 1 .366.568z"/></svg></span><span><strong>Travel week?</strong> Volume scales. No catch-up cramming.</span></div>
-            <div style="display: flex; gap: 12px; align-items: center;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--primary-soft);flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span><span><strong>Knee tight?</strong> Intensity adjusts automatically.</span></div>
+        <div class="examples-label">Real-life examples</div>
+        <div class="examples-list">
+          <div class="example-item">
+            <span class="example-icon-circle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+            <span class="example-text"><strong>Bad night with the kids?</strong> Today's intervals ease.</span>
+          </div>
+          <div class="example-item">
+            <span class="example-icon-circle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg></span>
+            <span class="example-text"><strong>Pool closed?</strong> Swim swaps to bike or run.</span>
+          </div>
+          <div class="example-item">
+            <span class="example-icon-circle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.817l-2.172 1.138a.392.392 0 0 1-.568-.366l.998-5.172l-3.288-3.357l-4.2 1.098l-1.296-1.299l4.2-1.1l-2.102-2.148l-2.102.554l-1.298-1.302l2.1-.555l-.554-2.1l1.302-1.3l.554 2.1l2.144 2.103l1.1-4.2l1.297 1.296l-1.1 4.2l3.357 3.287l5.172-.998a.392.392 0 0 1 .366.568z"/></svg></span>
+            <span class="example-text"><strong>Travel week?</strong> Volume scales. No catch-up cramming.</span>
+          </div>
+          <div class="example-item" style="border-bottom: none;">
+            <span class="example-icon-circle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+            <span class="example-text"><strong>Knee tight?</strong> Intensity adjusts automatically.</span>
           </div>
         </div>
 
-        <p class="sub" style="margin-bottom: 20px; font-style: italic;">You'll still cross the finish line. Just on terms that actually work.</p>
+        <p class="landing-sub" style="margin-top: 20px; font-style: italic;">You'll still cross the finish line. Just on terms that actually work.</p>
 
         <div class="onboard-actions">
-          <button class="btn btn-primary btn-lg btn-full" onclick="handleGetStarted()">Get started</button>
+          <button class="btn btn-primary btn-lg btn-full landing-cta" onclick="handleGetStarted()">Get started</button>
         </div>
-        <div style="text-align:center; margin-top:12px; font-size:12px; color:var(--text-soft);">Already have an account? Same button. Log in on the next screen.</div>
+        <div class="landing-secondary-cta">Already have an account? Same button. Log in on the next screen.</div>
       </div>
 
       <div id="onb-1" style="display:none;">
@@ -2425,15 +2529,27 @@
            function is now a no-op (kept callable for renderAll safety). -->
       <div id="todayComingUp" style="display:none;"></div>
 
-      <!-- 6. Quick actions footer — check-in + weekly review -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;">
-        <button onclick="showScreen('prep')" id="checkinToggle" style="background: var(--alert-soft); border: 1px solid transparent; color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
-          <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--alert)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Morning check-in</div>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">How's your body today?</div>
+      <!-- 6. Quick actions footer — check-in + weekly review (list rows) -->
+      <div class="action-rows-wrap" style="margin-top: 20px;">
+        <button onclick="showScreen('prep')" id="checkinToggle" class="action-list-row">
+          <span class="action-row-icon" style="background: #FEECEC;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--alert)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </span>
+          <span class="action-row-text">
+            <span class="action-row-title">Morning check-in</span>
+            <span class="action-row-sub">How's your body today?</span>
+          </span>
+          <span class="action-row-chevron">›</span>
         </button>
-        <button id="weeklyReviewBtn" onclick="runWeeklyRecalc()" style="background: var(--caution-soft); border: 1px solid transparent; color: var(--text); padding: 12px 14px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3;">
-          <div style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--caution)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></svg>Weekly review</div>
-          <div style="font-size: 11px; color: var(--text-soft); margin-top: 4px;">Reshape next week</div>
+        <button id="weeklyReviewBtn" onclick="runWeeklyRecalc()" class="action-list-row">
+          <span class="action-row-icon" style="background: #FEF3E2;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--caution)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></svg>
+          </span>
+          <span class="action-row-text">
+            <span class="action-row-title">Weekly review</span>
+            <span class="action-row-sub">Reshape next week</span>
+          </span>
+          <span class="action-row-chevron">›</span>
         </button>
       </div>
 
@@ -2835,7 +2951,7 @@
         <div class="card-title">Morning check-in</div>
         <div style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">15 seconds. Tells the engine how to shape today and adapt this week.</div>
 
-        <div id="watchAutofilledBanner" style="display:none; background: var(--primary-soft); border-left: 3px solid var(--primary); padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; color: var(--primary-dark); line-height: 1.5;"></div>
+        <div id="watchAutofilledBanner" style="display:none; background: #EBF5F0; border: none; border-left: 3px solid #3B8968; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #2D6B52; line-height: 1.5;"></div>
 
         <div class="field">
           <label>How's your body today?</label>
@@ -11149,7 +11265,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       return {
         score: 75,
         label: 'No check-in yet',
-        verdict: 'Tap morning check-in for a real number',
+        verdict: 'Check in for today\'s readiness',
         color: '#D9A94A',
         bgSoft: '#FBF0D3',
         borderSoft: '#e8c46b',
