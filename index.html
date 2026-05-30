@@ -2098,14 +2098,14 @@
         <div onclick="openTodaySessionDetails()" style="cursor: pointer; padding-bottom: 4px;">
           <div class="card-title" id="heroLabel">Wednesday · Quality day</div>
           <div class="workout-name" id="heroName" style="display: flex; align-items: center; gap: 8px;">
-            <span style="flex: 1;">Swim + Bike intervals</span>
+            <span style="flex: 1;">Loading…</span>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7; flex-shrink: 0;"><polyline points="9 6 15 12 9 18"/></svg>
           </div>
-          <div class="workout-duration" id="heroDuration">60 min · Moderate-Hard</div>
+          <div class="workout-duration" id="heroDuration"></div>
           <!-- AI prescription block: the actual workout structure (warmup / main set / cooldown). Populated from planState.sessions[today].prescription when present. -->
           <div id="heroPrescription" style="display:none; margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.18); border-radius: 10px; font-size: 13px; line-height: 1.5; font-weight: 500;"></div>
           <div id="heroTargets" style="display:none; margin-top: 6px; font-size: 12px; opacity: 0.92; line-height: 1.4;"></div>
-          <div class="why" id="heroWhy">3 days out from Saturday's long brick — today is the right day for sharpness.</div>
+          <div class="why" id="heroWhy"></div>
           <div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-weight: 600;">Tap for full workout details →</div>
         </div>
         <div id="heroDoneStats" style="display:none; margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
@@ -2277,8 +2277,8 @@
     <div class="screen-inner">
       <div class="card">
         <div class="card-title">Today's session</div>
-        <div style="font-size: 17px; font-weight: 700;" id="logSessionName">Swim + Bike intervals</div>
-        <div style="color: var(--text-soft); margin-top: 4px;" id="logSessionMeta">60 min · Planned</div>
+        <div style="font-size: 17px; font-weight: 700;" id="logSessionName">Today's session</div>
+        <div style="color: var(--text-soft); margin-top: 4px;" id="logSessionMeta">Loading…</div>
       </div>
 
       <div class="section-label plain">How did it feel?</div>
@@ -2564,7 +2564,7 @@
           <div class="chip-row" id="ciBody">
             <button class="chip" onclick="singleChip(this)">Fresh</button>
             <button class="chip" onclick="singleChip(this)">OK</button>
-            <button class="chip" onclick="singleChip(this)">Tight</button>
+            <button class="chip" onclick="singleChip(this)">Drained</button>
             <button class="chip" onclick="singleChip(this)">Exhausted</button>
           </div>
         </div>
@@ -2597,31 +2597,9 @@
         <button class="btn btn-primary btn-full" onclick="saveMorningCheckin()">Save check-in</button>
       </div>
 
-      <div class="section-label">Today's session prep</div>
-      <div class="card">
-        <div style="font-weight:700; font-size:16px;">Swim + Bike intervals</div>
-        <div style="color: var(--text-soft); font-size:13px; margin: 2px 0 12px;">60 min quality · starts soon</div>
-
-        <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Pre-flight checklist</div>
-        <div style="font-size:13px; line-height: 1.7;">
-          <div>☐ Hydrate — 20 oz water in the 30 min before</div>
-          <div>☐ Review main set — 6×2 min hard at 110% FTP, 1 min easy</div>
-          <div>☐ Warm-up — 10 min easy, then 3×30s pickups</div>
-          <div>☐ Mental cue: "First rep is the test — if it feels easy, push harder"</div>
-          <div>☐ Snack within 60 min before (nutrition — see dietitian)</div>
-        </div>
-      </div>
-
-      <div class="section-label">Last session reflection</div>
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
-          <div style="font-weight:700;">Saturday's long brick</div>
-          <div style="color: var(--secondary); background: var(--secondary-soft); padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700;">RPE 7</div>
-        </div>
-        <div style="color: var(--text-soft); font-size: 12px; margin-bottom: 12px;">Sat Apr 26 · 2h 28m · avg HR 142</div>
-        <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Your reflection</div>
-        <div style="font-size:13px; color:var(--text); line-height:1.5; padding: 10px 12px; background: var(--bg); border-radius: 8px;">"Felt strong, settled into Z2 bike easily, ran off easy. Legs tired at mile 2 but under control."</div>
-      </div>
+      <!-- Dynamic: populated by renderPrepScreen() when this tab is shown -->
+      <div id="prepTodaySession"></div>
+      <div id="prepLastSession"></div>
 
       <div class="section-label">Weekly review</div>
       <div class="card" id="weeklyReviewCard">
@@ -3551,7 +3529,9 @@
   ]);
   const _RUN_ABILITY_RANK = { 'walk-run': 0, 'under-15': 1, '15-30': 2, '30-plus': 3, '30-60': 3, '60-plus': 4 };
   const _HK_SLEEP_CHIP_MAP = { 'Under 5h':'Under 5h', '5-6h':'5-6h', '6-7h':'6-7h', '7-8h':'7-8h', '8h+':'8h+' };
-  const _HK_BODY_CHIP_MAP  = { 'Good':'Great', 'Solid':'OK', 'Tired':'Tired', 'Exhausted':'Exhausted' };
+  // Maps HealthKit-derived body feel ('Good'/'Solid'/'Tired'/'Exhausted') to
+  // the exact text of the check-in chip buttons (Fresh/OK/Drained/Exhausted).
+  const _HK_BODY_CHIP_MAP  = { 'Good':'Fresh', 'Solid':'OK', 'Tired':'Drained', 'Exhausted':'Exhausted' };
   const _PLAN_INTENSITY_NOTE = {
     easier:   'Easing it back — the plan starts extra gentle and builds slowly.',
     standard: 'Standard onramp — starts gentle and ramps to your full hours.',
@@ -4277,6 +4257,150 @@
         </div>
       </div>`;
     wraps.forEach(w => { w.innerHTML = html; w.style.display = 'block'; });
+  }
+
+  // ── Prep tab: dynamic session prep + last-session display ─────────────
+  // Replaces the former static "Swim + Bike intervals / Saturday's long
+  // brick" placeholder HTML with real data from planState.
+  function renderPrepScreen() {
+    _renderPrepTodaySession();
+    _renderPrepLastSession();
+  }
+
+  function _renderPrepTodaySession() {
+    const container = document.getElementById('prepTodaySession');
+    if (!container) return;
+    const today = (typeof getTodayDay === 'function') ? getTodayDay() : null;
+    const s = today && planState.sessions && planState.sessions[today];
+
+    if (!s || s.type === 'rest' || s.duration === 0) {
+      container.innerHTML = `
+        <div class="section-label">Today</div>
+        <div class="card">
+          <div style="font-weight:700; font-size:16px;">Rest day</div>
+          <div style="color:var(--text-soft); font-size:13px; margin:2px 0 12px;">${today ? (DAY_FULL[today] || today) : 'Today'} · Recovery</div>
+          <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Rest day checklist</div>
+          <div style="font-size:13px; line-height:1.9;">
+            <div>☐ Stay hydrated — aim for your usual water intake</div>
+            <div>☐ Short walk (15-20 min) if you feel restless — nothing more</div>
+            <div>☐ Foam roll or stretch any tight spots from yesterday</div>
+            <div>☐ Prioritize 7-9h sleep tonight — this is when you adapt</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const type = s.type || 'run';
+    const duration = s.duration || s.durationMin || 0;
+    const name = s.name || 'Today\'s session';
+    const meta = s.meta || (duration > 0 ? `${duration} min` : '');
+    const isDone = !!s.completed;
+    const checklist = _buildPrepChecklist(type, duration, s);
+
+    container.innerHTML = `
+      <div class="section-label">Today's session prep</div>
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div style="font-weight:700; font-size:16px;">${escapeHtml(name)}</div>
+          ${isDone ? `<div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">✓ Done</div>` : ''}
+        </div>
+        <div style="color:var(--text-soft); font-size:13px; margin:2px 0 14px;">${escapeHtml(meta)}</div>
+        <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Pre-session checklist</div>
+        <div style="font-size:13px; line-height:1.9;">
+          ${checklist.map(item => `<div>☐ ${escapeHtml(item)}</div>`).join('')}
+        </div>
+        ${s.prescription ? `<div style="margin-top:12px; padding:10px 12px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.6; color:var(--text-soft);">${escapeHtml(s.prescription.slice(0, 240))}${s.prescription.length > 240 ? '…' : ''}</div>` : ''}
+      </div>`;
+  }
+
+  // Build a session-type-appropriate pre-flight checklist.
+  function _buildPrepChecklist(type, duration, session) {
+    const items = ['Hydrate — 16 oz water in the 30 min before'];
+    if (type === 'run' || type === 'walk-run') {
+      if (duration <= 30) {
+        items.push('Easy warm-up — 5 min walk before you start running');
+        items.push('Keep the pace conversational — if you can\'t talk, slow down');
+        items.push('Listen to your body — walk whenever you need to');
+      } else if (duration <= 50) {
+        items.push('Warm-up — 5 min walk + light leg swings before the run');
+        items.push('Stay in Zone 2 (conversational pace) for easy runs');
+        items.push('Cool-down — 5 min walk at the end, don\'t just stop');
+      } else {
+        items.push('Warm-up — 10 min easy pace before picking up effort');
+        items.push('Fuel: light snack 60-90 min before if running over 60 min');
+        items.push('Plan your route — know where water is available');
+        items.push('Cool-down — 5-10 min easy walk/jog to finish');
+      }
+    } else if (type === 'quality') {
+      items.push('Review the target intervals — know the reps and recovery times');
+      items.push('Warm-up — 10 min easy + 2-3 short pickups before intervals');
+      items.push('Mental cue: the first rep is the test — if it feels hard, ease off');
+      items.push('Cool-down — 5-10 min easy after the last interval');
+    } else if (type === 'strength') {
+      items.push('5-min movement prep — leg swings, hip circles, arm swings');
+      items.push('Eat a light meal 1-2 hours before for energy');
+      items.push('Focus on form first — correct movement beats heavy weight');
+      items.push('Note any soreness before starting — skip moves that aggravate it');
+    } else if (type === 'mobility') {
+      items.push('Start with 5 min of gentle movement to warm the joints');
+      items.push('Hold each stretch for 30-60s — breathe, don\'t force it');
+      items.push('Foam roll any tight spots first if you have one');
+    } else if (type === 'bike') {
+      items.push('Check bike and tire pressure before heading out');
+      if (duration >= 60) {
+        items.push('Fuel: aim for 40-60g carbs/hr on rides over 60 min');
+        items.push('Pack enough water or plan water stops on the route');
+      }
+      items.push('Warm-up — 10 min easy spin before increasing effort');
+    } else if (type === 'swim') {
+      items.push('Check swim gear — goggles, cap, suit are ready');
+      items.push('Review today\'s set before entering the pool');
+      items.push('Warm-up — 200m easy at the start regardless of the set');
+    } else if (type === 'brick') {
+      items.push('Prepare transition area before you start');
+      items.push('Fuel: 60g carbs/hr on the bike, sip water on the run');
+      items.push('Run shoes + race belt ready for the transition');
+      items.push('Expect heavy legs for the first mile of the run — it\'s normal');
+    }
+    return items;
+  }
+
+  function _renderPrepLastSession() {
+    const container = document.getElementById('prepLastSession');
+    if (!container) return;
+    const days = (typeof DAYS !== 'undefined' ? DAYS : ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']);
+
+    // Find the most recently completed session this week.
+    const completed = days
+      .map(d => ({ day: d, s: planState.sessions && planState.sessions[d] }))
+      .filter(x => x.s && x.s.completed && x.s.type !== 'rest');
+
+    if (completed.length === 0) {
+      container.innerHTML = ''; // Nothing completed yet — hide
+      return;
+    }
+
+    const last = completed[completed.length - 1];
+    const s = last.s;
+    const dayLabel = (typeof DAY_FULL !== 'undefined' && DAY_FULL[last.day]) || last.day;
+    const dateStr = planState.dates && planState.dates[last.day] ? planState.dates[last.day] : '';
+    const durationStr = s.actualMins ? `${s.actualMins} min` : (s.duration ? `${s.duration} min` : '');
+    const hrStr = s.actualHr ? ` · avg HR ${s.actualHr}` : '';
+    const rpeStr = s.rpe != null ? ` · RPE ${s.rpe}` : '';
+
+    container.innerHTML = `
+      <div class="section-label">Last session</div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="font-weight:700;">${escapeHtml(s.name || 'Completed session')}</div>
+          ${s.rpe != null ? `<div style="color:var(--secondary); background:var(--secondary-soft); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">RPE ${s.rpe}</div>` : ''}
+        </div>
+        <div style="color:var(--text-soft); font-size:12px; margin-bottom:10px;">${escapeHtml(dayLabel)}${dateStr ? ' · ' + dateStr : ''}${durationStr ? ' · ' + durationStr : ''}${hrStr}</div>
+        ${s.actualFeel
+          ? `<div style="font-size:13px; padding:10px 12px; background:var(--bg); border-radius:8px; line-height:1.5;">${escapeHtml(s.actualFeel)}</div>`
+          : `<div style="font-size:13px; color:var(--text-soft); font-style:italic;">Tap "Log session" after your next workout to record how it felt.</div>`}
+        <button onclick="logSessionDay='${last.day}'; showScreen('log');" style="margin-top:12px; background:none; border:1px solid var(--border); color:var(--primary); padding:7px 14px; border-radius:100px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;">Edit log →</button>
+      </div>`;
   }
 
   // Send a message to the native iOS WKWebView bridge asking it to show
@@ -5020,7 +5144,7 @@
     if (typeof trackEvent === 'function' && ['today','plan','data','profile','prep','ask','log','onboard','auth'].includes(name)) trackEvent('tab_view', { tab: name });
     if (name === 'ask') { updateChatState(); if (typeof _updateChatCapWarning === 'function') _updateChatCapWarning(); }
     if (name === 'plan' || name === 'today') renderAll();
-    if (name === 'prep') autofillCheckin();
+    if (name === 'prep') { autofillCheckin(); if (typeof renderPrepScreen === 'function') renderPrepScreen(); }
     if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); }
   }
   function getPlanIntensity() {
@@ -8342,7 +8466,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // intentionally short, so "no long session" is expected, not a flaw.
     return !/^5k$/i.test(e.trim()) && !/\b5k\b/i.test(e);
   }
-  }
 
   function runAdaptiveEngine() {
     const insights = [];
@@ -8377,9 +8500,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     // 1. Key session coverage (plan-structure — gated)
     const _raceEvent = (planState.raceEvent || localStorage.getItem('race-event') || '');
-    const _longMin  = _longRunThreshold(_raceEvent);
+    // Progressive threshold: in early weeks of a plan the expected long session
+    // is shorter than the race-specific peak. Scale from ~55% in week 1 to 100%
+    // by week 4. This prevents flagging a beginner plan for not having a 90-min
+    // long run in week 1 when 45 min is completely appropriate.
+    const _currentWeekIdx = (typeof getCurrentWeekIdx === 'function') ? getCurrentWeekIdx() : 0;
+    const _totalWeeks = (planState.weekArc || []).length || 8;
+    const _progressFactor = Math.min(1, 0.55 + 0.45 * (_currentWeekIdx / Math.max(3, _totalWeeks * 0.5)));
+    const _longMinRaw  = _longRunThreshold(_raceEvent);
+    const _longMin  = Math.round(_longMinRaw * _progressFactor);
     const _longTgt  = _longRunTarget(_raceEvent);
-    const _longTgtLabel = formatMins(_longTgt);
+    const _longTgtLabel = formatMins(Math.round(_longRunTarget(_raceEvent) * _progressFactor));
     const hasLong = activeSessions.some(x => x.s.duration >= _longMin);
     const hasQuality = activeSessions.some(x => x.s.type === 'quality' || x.s.type === 'brick');
     if (!aiPlanProtected && !hasLong && _longRunCheckEnabled(_raceEvent)) {
@@ -8391,11 +8522,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         simpleMessage: `No long session this week. That's the biggest fitness driver — add one back.`,
         message: `This week has no long session (${_longMin}+ min for ${_raceEvent || 'your event'}). The long session is the single biggest driver of endurance fitness — without one, the week won't build toward race day.`,
         suggestion: `Try: "move [day] to Saturday" or "only ${_longTgtLabel} Saturday" to reinstate it.`,
-        fix: weekend
-          ? { label: `Add ${_longTgtLabel} long run on ${weekend}`, tool: 'shortenSession', input: { day: weekend, newMinutes: _longTgt, newName: 'Long easy run', newMeta: `${_longTgtLabel} · Zone 2`, reason: 'restore long session' }}
-          : longest
-          ? { label: `Extend ${longest.day}'s session to ${_longTgtLabel}`, tool: 'shortenSession', input: { day: longest.day, newMinutes: _longTgt, newName: longest.s.name, newMeta: longest.s.meta, reason: 'extend to hit long-session minimum' }}
-          : null
+        fix: (() => {
+          const _weekTgt = Math.round(_longTgt * _progressFactor);
+          const _weekTgtLabel = formatMins(_weekTgt);
+          return weekend
+            ? { label: `Add ${_weekTgtLabel} long run on ${weekend}`, tool: 'shortenSession', input: { day: weekend, newMinutes: _weekTgt, newName: 'Long easy run', newMeta: `${_weekTgtLabel} · Zone 2`, reason: 'restore long session' }}
+            : longest
+            ? { label: `Extend ${longest.day}'s session to ${_weekTgtLabel}`, tool: 'shortenSession', input: { day: longest.day, newMinutes: _weekTgt, newName: longest.s.name, newMeta: longest.s.meta, reason: 'extend to hit long-session minimum' }}
+            : null;
+        })()
       });
     }
     if (!aiPlanProtected && !hasQuality && activeSessions.length > 0) {
@@ -8598,7 +8733,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if ((intel.terrain === 'hilly' || intel.terrain === 'mountainous') && daysToRace > 14) {
         const longSat = planState.sessions.Sat;
         const longSun = planState.sessions.Sun;
-        const hasLongSession = (longSat && longSat.duration >= 90) || (longSun && longSun.duration >= 90);
+        const hasLongSession = (longSat && longSat.duration >= _longMinRaw) || (longSun && longSun.duration >= _longMinRaw);
         if (hasLongSession) {
           insights.push({
             severity: 'info',
@@ -16584,19 +16719,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       planState.fitnessMarkers.restingHr = latestRhr;
     }
 
+    // ── 4. HRV → store + use for body feel ─────────────────────────────
+    // Apple Watch records HRV nightly (SDNN, ms). Higher HRV = better recovered.
+    const latestHrv = (data.hrv || []).filter(h => h && h.value > 0)[0] || null;
+    if (latestHrv) {
+      planState.healthKit.latestHrvMs = Math.round(latestHrv.value);
+    }
+    // Build 7-day HRV baseline for comparison (median of last 7 readings).
+    const recentHrvVals = (data.hrv || []).filter(h => h && h.value > 0).slice(0, 7).map(h => h.value);
+    const baselineHrv = recentHrvVals.length >= 3
+      ? recentHrvVals.slice().sort((a, b) => a - b)[Math.floor(recentHrvVals.length / 2)]
+      : null;
+
     let bodyFeel = null; // 'Good' | 'Solid' | 'Tired' | 'Exhausted'
+    // Primary signal: RHR delta from baseline.
     if (latestRhr && baselineRhr) {
       const delta = latestRhr - baselineRhr;
       if      (delta >= 8)  bodyFeel = 'Exhausted';
       else if (delta >= 4)  bodyFeel = 'Tired';
-      else if (delta <= -2) bodyFeel = 'Good';      // lower than usual → extra recovered
+      else if (delta <= -2) bodyFeel = 'Good';
       else                  bodyFeel = 'Solid';
     }
-
-    // ── 4. HRV → store for coach context ───────────────────────────────
-    const latestHrv = (data.hrv || []).filter(h => h && h.value > 0)[0] || null;
-    if (latestHrv) {
-      planState.healthKit.latestHrvMs = Math.round(latestHrv.value);
+    // Secondary signal: HRV delta (overrides only when strong signal).
+    // Low HRV (>15% below baseline) → override toward more fatigued.
+    // High HRV (>15% above baseline) → override toward more fresh.
+    if (latestHrv && baselineHrv && baselineHrv > 0) {
+      const hrvPct = (latestHrv.value - baselineHrv) / baselineHrv;
+      if (hrvPct <= -0.20 && bodyFeel !== 'Exhausted') bodyFeel = bodyFeel === 'Solid' ? 'Tired' : bodyFeel || 'Tired';
+      else if (hrvPct >= 0.20 && bodyFeel !== 'Good')   bodyFeel = bodyFeel === 'Solid' ? 'Good' : bodyFeel || 'Good';
     }
 
     // ── 5. VO2 Max → fitness baseline ──────────────────────────────────
