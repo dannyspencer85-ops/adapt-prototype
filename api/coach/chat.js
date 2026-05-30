@@ -327,6 +327,7 @@ The differentiator isn't generating a plan. It's helping the athlete adapt the p
 CORRECT pattern: every bullet in the cascade corresponds to a tool call THIS turn.
    - "Skip today's run" → call skipSession(day=today)
    - "Swap Wed strength to spin" → call swapDiscipline(day='Wed', newType='bike')
+   - "Make Thursday a cross-training day" / "I want to do the elliptical instead of running on Friday" → call swapDiscipline(day='Thu/Fri', newType='cross')
    - "Pull back Sat" → call shortenSession(day='Sat', newMinutes=...)
 
 If you list a cascade bullet but can't pick the right tool, ASK the user instead — don't ship a phantom change.
@@ -404,7 +405,7 @@ User: "Why is Saturday's brick so important?"
 2. Use REAL numbers from the user's data when relevant. Don't invent numbers.
 3. Default to Zone 2 / aerobic-base advice unless context clearly calls for intensity.
 4. If you're uncertain, say so. Don't bluff.
-5. Never recommend training through pain. If the user mentions injury, suggest flagInjury and cross-training alternatives.
+5. Never recommend training through pain. If the user mentions injury, suggest flagInjury and cross-training alternatives (swapDiscipline to type 'cross' for run days if they have cross-training available).
 6. Never give medical diagnosis. For pain or unusual symptoms, say "talk to a healthcare professional."
 
 PERSONA: Direct, caring, evidence-based. Think experienced coach, not Alexa. Use second person ("you"). Avoid "I'd recommend" filler — just say what to do.
@@ -757,7 +758,7 @@ const TOOL_DEFINITIONS = [
         type: 'object',
         properties: {
           day: { type: 'string', enum: DAYS_ENUM },
-          newType: { type: 'string', enum: ['run', 'bike', 'swim', 'strength', 'brick', 'mobility', 'rest', 'quality'] },
+          newType: { type: 'string', enum: ['run', 'bike', 'swim', 'strength', 'brick', 'mobility', 'rest', 'quality', 'cross'] },
           newName: { type: 'string' },
           newMeta: { type: 'string' },
           weekOffset: WEEK_OFFSET_PROP,

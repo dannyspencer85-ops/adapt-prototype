@@ -4466,6 +4466,11 @@
       items.push('Start with 5 min of gentle movement to warm the joints');
       items.push('Hold each stretch for 30-60s — breathe, don\'t force it');
       items.push('Foam roll any tight spots first if you have one');
+    } else if (type === 'cross') {
+      items.push('Pick your machine before you start — elliptical, rower, bike, or pool');
+      items.push('This is a recovery day — aim for fully conversational Zone 2 effort');
+      if (duration >= 40) items.push('Bring water — cross-training sessions still produce real sweat');
+      items.push('If any soreness from primary training, this is the right day to protect it');
     } else if (type === 'bike') {
       items.push('Check bike and tire pressure before heading out');
       if (duration >= 60) {
@@ -4590,12 +4595,13 @@
     let set;
     if (isBike) {
       // Bike race — bike-dominant. Bike + trainer + strength on by default;
-      // running is an optional cross-train (off); no swim.
+      // cross-training (run, elliptical, etc.) optional.
       set = [
-        { disc: 'bike', label: 'Bike', active: true },
-        { disc: 'trainer', label: 'Indoor trainer', active: true },
-        { disc: 'strength', label: 'Strength / gym', active: true },
-        { disc: 'run', label: 'Run (cross-train)', active: false }
+        { disc: 'bike',     label: 'Bike',            active: true  },
+        { disc: 'trainer',  label: 'Indoor trainer',  active: true  },
+        { disc: 'strength', label: 'Strength / gym',  active: true  },
+        { disc: 'cross',    label: 'Cross-training',  active: false },
+        { disc: 'run',      label: 'Run',             active: false },
       ];
     } else if (isTri) {
       set = [
@@ -4607,10 +4613,11 @@
       ];
     } else if (isRun) {
       set = [
-        { disc: 'run', label: 'Run', active: true },
-        { disc: 'bike', label: 'Bike (cross-train)', active: true },
-        { disc: 'trainer', label: 'Indoor trainer', active: true },
-        { disc: 'strength', label: 'Strength / gym', active: true }
+        { disc: 'run',      label: 'Run',              active: true  },
+        { disc: 'cross',    label: 'Cross-training',   active: true  },
+        { disc: 'strength', label: 'Strength / gym',   active: true  },
+        { disc: 'bike',     label: 'Bike',             active: false },
+        { disc: 'trainer',  label: 'Indoor trainer',   active: false },
       ];
     } else {
       set = [
@@ -4630,10 +4637,10 @@
       hint.textContent = isTri
         ? 'Triathlon needs swim + bike + run. Strength training reduces injury risk. Deselect any you don\'t have access to.'
         : isBike
-        ? 'Bike races are built on riding (outdoor + indoor trainer) plus strength for power and durability. Running is an optional cross-train. Deselect any you don\'t have.'
+        ? 'Bike races are built on riding (outdoor + indoor trainer) plus strength. Cross-training (elliptical, row, run) is optional recovery variety. Deselect any you don\'t have.'
         : isRun
-        ? 'Running events benefit from bike or trainer for no-impact cross-training, plus strength for injury prevention.'
-        : 'Typical cross-training disciplines. Deselect any you don\'t have.';
+        ? 'Run events benefit from cross-training (elliptical, rowing, pool running) for low-impact recovery days, plus strength for injury prevention. Deselect any you don\'t have.'
+        : 'Typical disciplines for your event. Deselect any you don\'t have access to.';
     }
   }
   function finishOnboard() {
@@ -6412,6 +6419,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     plan:        '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/>',
     stats:       '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
     person:      '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    // Cross-training — two looping arrows (alternate disciplines)
+    cross:       '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
     // Training types
     intervals:   '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
     // Utility
@@ -6437,6 +6446,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     strength:  { bg: '#5A4B8C', fg: '#FFFFFF', label: 'Strength' },    // deep indigo
     mobility:  { bg: '#B0B7BD', fg: '#FFFFFF', label: 'Mobility' },    // soft grey
     walk:      { bg: '#84A9B5', fg: '#FFFFFF', label: 'Walk' },        // teal
+    cross:     { bg: '#2E9E8E', fg: '#FFFFFF', label: 'Cross-train' }, // teal-green
     rest:      { bg: '#E6E6E6', fg: '#888888', label: 'Rest' },        // very light grey
   };
   function sportColor(type) {
@@ -6460,7 +6470,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // — it just outputs the SVG instead of an emoji.
   const ICON = new Proxy({}, {
     get(_, type) {
-      const map = { rest: 'rest', quality: 'quality', brick: 'brick', run: 'run', bike: 'bike', swim: 'swim', strength: 'strength', mobility: 'mobility', walk: 'walk' };
+      const map = { rest: 'rest', quality: 'quality', brick: 'brick', run: 'run', bike: 'bike', swim: 'swim', strength: 'strength', mobility: 'mobility', walk: 'walk', cross: 'cross' };
       const name = map[type] || 'run';
       return icon(name, { size: 18 });
     }
@@ -6554,7 +6564,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         type: 'object',
         properties: {
           day: { type: 'string', enum: DAYS },
-          newType: { type: 'string', enum: ['run','bike','swim','brick','strength','mobility','quality'] },
+          newType: { type: 'string', enum: ['run','bike','swim','brick','strength','mobility','quality','cross'] },
           newName: { type: 'string' },
           newMeta: { type: 'string' },
           reason: { type: 'string' }
@@ -7075,8 +7085,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         return `Move ${dayShort(safe.fromDay)}'s session to ${dayShort(safe.toDay)}.${safe.reason ? ' Why: ' + safe.reason : ''}`;
       case 'shortenSession':
         return `Shorten ${dayShort(safe.day)} to ${safe.newMinutes} min.${safe.reason ? ' Why: ' + safe.reason : ''}`;
-      case 'swapDiscipline':
-        return `Change ${dayShort(safe.day)} to a ${safe.newType} session.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      case 'swapDiscipline': {
+        const _swapLabel = { run:'run', bike:'bike', swim:'swim', brick:'brick', strength:'strength', mobility:'mobility', quality:'quality', cross:'cross-training' }[safe.newType] || safe.newType;
+        return `Change ${dayShort(safe.day)} to a ${_swapLabel} session.${safe.reason ? ' Why: ' + safe.reason : ''}`;
+      }
       case 'openTrainingDay':
         return `Add ${dayShort(safe.day)} as a regular training day.${safe.reason ? ' Why: ' + safe.reason : ''}`;
       case 'closeTrainingDay':
@@ -10207,6 +10219,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         alternatives: ['Only 15 min: 2 rounds', 'Gym available: swap to barbell squat + deadlift']
       };
     }
+    if (session.type === 'cross') {
+      const dur = session.duration || 35;
+      return { ...base,
+        warmup: '5 min easy pace on your machine of choice to elevate HR gently.',
+        main: `${dur} min at conversational Zone 2 effort.\n\nMachine options — pick any:\n• Elliptical: smooth, full-body motion, low knee impact\n• Rowing machine: powerful drive from legs, avoid hunching\n• Aqua jogging / pool running: buoyancy belt, high knees, no wall push-off\n• Stationary bike: 85-95 rpm cadence, light resistance\n\nIf you notice any pain from your primary sport, this is the right day for it — the goal is aerobic stimulus with zero additional impact.`,
+        cooldown: '5 min easy + 5 min stretching (hips, calves, thoracic if rowing).',
+        targets: ['HR Zone 2 — fully conversational', 'RPE 3-4', 'No impact stress on primary muscles'],
+        cues: [
+          'This is a recovery-priority day — if you feel tired, go shorter, not harder.',
+          'Maintain steady effort; avoid interval surges unless the plan specifically says otherwise.',
+          'Hydrate the same as any aerobic session — sweat rate is similar.'
+        ],
+        alternatives: [
+          `Only ${Math.round(dur * 0.6)} min available: shorten, same intensity`,
+          'No machine: 30-min brisk walk or easy swim instead',
+          'Feeling good: add 10 min mobility work after, not more cardio intensity'
+        ]
+      };
+    }
     return { ...base,
       warmup: '5-10 min easy', main: `${session.duration} min ${session.name}. ${session.meta}.`,
       cooldown: '5 min easy', targets: ['Follow session intent'], cues: [], alternatives: []
@@ -12160,6 +12191,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const hasBike = avail.includes('bike') || avail.includes('trainer');
     const hasSwim = avail.includes('swim');
     const hasStrength = avail.includes('strength');
+    const hasCross = avail.includes('cross');
     // Run-only events HARD-coerce to run regardless of what was selected
     // (matches plan.js validatePlan run-only coercion). Defense in depth.
     const runOnlyEvent = isRun;
@@ -12307,7 +12339,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // Spread remaining weekly volume across ALL easy days, capped at
       // 75 min/run. No more single 126-min "easy aerobic" sessions.
       const totalEasy = hours * 60 - longMins - qualityMins;
-      Object.assign(newSessions, _spreadEasy(easyDays, totalEasy, 'run', 'Easy aerobic'));
+      // Cross-training injection: if the user has cross-training access and
+      // has 2+ easy days, replace the day immediately after quality day with a
+      // low-impact cross-training session. This reduces cumulative run impact
+      // while maintaining the aerobic stimulus — standard practice for
+      // run-heavy plans. Only applies to non-beginner runners with room in
+      // their schedule (beginners stay on walk-run to build the habit).
+      let crossDay = null;
+      let pureEasyDays = easyDays;
+      if (hasCross && easyDays.length >= 2) {
+        const qIdx = DAYS.indexOf(qualityDay);
+        crossDay = easyDays.find(d => DAYS.indexOf(d) > qIdx) || easyDays[0];
+        pureEasyDays = easyDays.filter(d => d !== crossDay);
+      }
+      if (crossDay) {
+        const crossMins = Math.min(45, Math.max(25, Math.round(totalEasy / easyDays.length)));
+        newSessions[crossDay] = {
+          name: 'Low-impact cross-training',
+          meta: `${crossMins} min · elliptical / row / aqua jog`,
+          duration: crossMins,
+          type: 'cross',
+          prescription: `${crossMins} min easy aerobic on any low-impact machine — elliptical, rowing machine, pool running / aqua jogging, or stationary bike. Keep effort in Zone 2 (conversational, RPE 3-4). This replaces a run day to reduce cumulative impact while preserving the aerobic stimulus. If you feel good, add a short mobility routine afterward.`,
+          targets: 'HR Z2 · RPE 3-4 · fully conversational · minimal ground impact',
+          intensity: 'Z2',
+        };
+      }
+      Object.assign(newSessions, _spreadEasy(pureEasyDays, totalEasy, 'run', 'Easy aerobic'));
     } else if (isTri) {
       // Triathlon — discipline-aware AND course-aware. Brick adapts to bike
       // profile (climbing course → climbing brick), quality adapts to bike

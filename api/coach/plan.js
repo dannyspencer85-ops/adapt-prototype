@@ -244,6 +244,7 @@ function buildPlanSystemPrompt({ event, hours, days, weeksToRace, profile, cours
   const hasSwim = Array.isArray(availableDisciplines) && availableDisciplines.includes('swim');
   const hasBike = Array.isArray(availableDisciplines) && availableDisciplines.includes('bike');
   const hasTrainer = Array.isArray(availableDisciplines) && availableDisciplines.includes('trainer');
+  const hasCross = Array.isArray(availableDisciplines) && availableDisciplines.includes('cross');
 
   // Build a discipline-allocation note that the plan engine MUST respect.
   let disciplineNote;
@@ -499,8 +500,9 @@ Your plans MUST reflect these established frameworks:
 ═══ HARD CONSTRAINTS — MUST follow ═══
 
 • Use ONLY the user's selected training days for sessions. Other days = full rest. Do not invent training days.
-• **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — EVEN IF the user has 'swim' or 'bike' in their available disciplines — NEVER prescribe swim or bike sessions OF ANY KIND. Not as quality, not as recovery, not as cross-training. Swim/bike exist ONLY in triathlon plans. For run events, every session is either run, rest, strength, or mobility.
-• For run events: allowed types are STRICTLY ${hasStrength ? "{'run', 'rest', 'strength', 'mobility'}" : "{'run', 'rest', 'mobility'}"}. TYPE 'swim' AND TYPE 'bike' ARE FORBIDDEN. Do not mention pools, swimming, cycling, or bike training anywhere in the plan.
+• **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — EVEN IF the user has 'swim' or 'bike' in their available disciplines — NEVER prescribe swim or bike sessions. Swim/bike exist ONLY in triathlon plans. For run events, every session is either run, rest, strength, mobility, or cross (if 'cross' is in availableDisciplines).
+• For run events: allowed types are STRICTLY ${hasCross ? (hasStrength ? "{'run','rest','strength','mobility','cross'}" : "{'run','rest','mobility','cross'}") : (hasStrength ? "{'run','rest','strength','mobility'}" : "{'run','rest','mobility'}")}. TYPE 'swim' AND TYPE 'bike' ARE FORBIDDEN regardless of discipline list.
+• **'cross' session type** (low-impact cross-training): Use when 'cross' is in availableDisciplines. Prescribe elliptical, rowing machine, aqua jogging, or pool running at Zone 2. Place on recovery days — ideally the day after quality work. Name: 'Low-impact cross-training', prescription must name specific machine options.
 • For triathlon events: types follow the discipline allocation rules in the discipline note.
 • Total weekly minutes must be within ±15% of the user's stated weekly hours × 60. (User said ${hours} hrs/week → target ~${Math.round(hours * 60)} min/week.)
 • Each week must have at least one full rest day (duration:0, type:'rest'). Two if hours <= 4.
@@ -508,7 +510,7 @@ Your plans MUST reflect these established frameworks:
 • No week-over-week total-hours jump exceeds +25% or drops more than 35% (deload/taper aside).
 • Long session is on Sat or Sun if those are training days; otherwise on the last selected day.
 • **RACE DAY ENDS THE CYCLE.** In race week, the LAST training session is race day itself. Every day STRICTLY AFTER race day inside race week must be type:'rest' with duration:0 — recovery, not training. Don't schedule a "long swim" on the Saturday after a Thursday race. The plan ENDS at race day.
-• Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1-2 sentence description of the workout structure), targets (HR/pace/RPE guidance — use ranges and reference the appropriate Daniels/CTL anchor when applicable).
+• Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality/cross), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1-2 sentence description of the workout structure), targets (HR/pace/RPE guidance — use ranges and reference the appropriate Daniels/CTL anchor when applicable).
 • prescription MUST reference specific zones, drills, or intervals — not just "easy aerobic." E.g. "8x400m at I pace (~5K race pace) with 400m recoveries; 1mi WU + CD" not "intervals."
 • prescription MUST be populated on every non-rest session — never leave it blank.
 
@@ -657,7 +659,7 @@ Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) p
 
 // ─── Plan validation ─────────────────────────────────────────────────────
 
-const VALID_TYPES = ['run','bike','swim','strength','brick','mobility','rest','quality'];
+const VALID_TYPES = ['run','bike','swim','strength','brick','mobility','rest','quality','cross'];
 const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 function validatePlan(parsed, { event, hours, days, weeksToRace, profile, fitnessMarkers, availableDisciplines }) {
