@@ -7909,18 +7909,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const safeS = _safeSession(s);
       let nameToShow = safeS.name;
       let metaToShow = safeS.meta;
-      if (isPast && !isCompleted && s.type !== 'rest') {
-        nameToShow = safeS.name + ' (planned)';
-        metaToShow = 'Not logged · ' + safeS.meta;
-      }
-      // For past + completed (real Strava match), show actual data
-      if (isCompleted && s.stravaName) {
+
+      if (isPast && !isCompleted) {
+        // Past + not done: show nothing about what was prescribed — it wasn't done
+        nameToShow = s.type === 'rest' ? 'Rest' : 'Not logged';
+        metaToShow = s.type === 'rest' ? 'Recovery' : '';
+      } else if (isCompleted && s.stravaName) {
+        // Past + completed: show actual workout data only
         nameToShow = s.stravaName;
         if (s.actualMins) {
           const dh = Math.floor(s.actualMins / 60);
           const dm = s.actualMins % 60;
           const dStr = dh > 0 ? `${dh}h ${dm}m` : `${dm} min`;
-          metaToShow = dStr + (s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : '');
+          const gymLike = s.type === 'strength' || s.type === 'mobility' || s.type === 'cross'
+            || /crosstraining|cross.training|weight|yoga|hiit|functional/i.test(s.stravaName || '');
+          const distStr = !gymLike && s.stravaDistance_km ? ' · ' + s.stravaDistance_km.toFixed(1) + ' km' : '';
+          const calStr = gymLike && s.stravaCalories ? ' · ' + s.stravaCalories + ' kcal' : '';
+          metaToShow = dStr + distStr + calStr;
         }
       }
 
