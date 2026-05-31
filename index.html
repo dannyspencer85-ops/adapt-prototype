@@ -22,6 +22,28 @@
      init time. Safe to leave even when SUPABASE_URL is not yet configured;
      the app falls back to localStorage auth in that case. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Synchronous session pre-check: if a valid auth session exists in localStorage,
+     suppress the onboard screen immediately so logged-in users never see the
+     welcome screen flash. DOMContentLoaded will call showScreen('today') anyway,
+     but this prevents the visible flicker while the async Supabase check runs. -->
+<script>
+(function() {
+  try {
+    // Supabase stores its token under sb-{project-ref}-auth-token
+    var sbKey = 'sb-lykorfkapbxufkjcqtnl-auth-token';
+    var hasSupabaseSession = !!localStorage.getItem(sbKey);
+    // Legacy localStorage auth (demo/tester accounts)
+    var hasLsSession = !!localStorage.getItem('adapt-session');
+    if (hasSupabaseSession || hasLsSession) {
+      // Hide the onboard screen instantly — DOMContentLoaded will show the right screen
+      document.addEventListener('DOMContentLoaded', function() {
+        var onboard = document.getElementById('screen-onboard');
+        if (onboard) onboard.classList.remove('active');
+      }, { once: true, capture: true }); // capture: true so this fires before other DOMContentLoaded handlers
+    }
+  } catch (e) { /* non-fatal */ }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
