@@ -2518,6 +2518,8 @@
         </div>
         <div id="heroDoneStats" style="display:none; margin-top: 14px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
           <div style="font-size: 11px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">What you actually did</div>
+          <!-- Per-activity breakdown — shown when multiple workouts on one day -->
+          <div id="heroDoneActivities" style="display:none; margin-bottom: 10px;"></div>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 13px;">
             <div><div style="opacity:0.75; font-size: 11px;">Duration</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneDuration">—</div></div>
             <div><div style="opacity:0.75; font-size: 11px;">Avg HR</div><div style="font-weight: 700; font-size: 16px;" id="heroDoneHr">—</div></div>
@@ -14021,7 +14023,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       why.textContent = w;
     }
 
-    // Actually-did stats — populate the small grid
+    // Actually-did stats — populate the small grid + per-activity list
     if (doneStats) {
       if (completed) {
         doneStats.style.display = 'block';
@@ -14041,6 +14043,31 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const hrEl = document.getElementById('heroDoneHr'); if (hrEl) hrEl.textContent = hr;
         const distLabel = document.getElementById('heroDoneDistLabel'); if (distLabel) distLabel.textContent = thirdLabel;
         const distEl = document.getElementById('heroDoneDistance'); if (distEl) distEl.textContent = thirdVal;
+
+        // Per-activity breakdown — only when multiple workouts on one day
+        const actsEl = document.getElementById('heroDoneActivities');
+        const ids = s.stravaIds || (s.stravaId ? [s.stravaId] : []);
+        if (actsEl && ids.length > 1) {
+          const allActs = planState.stravaActivities || [];
+          const matched = allActs.filter(a => ids.includes(String(a.id)));
+          if (matched.length > 1) {
+            const fmtMins = m => { const h = Math.floor(m/60), mn = m%60; return h > 0 ? `${h}h ${mn}m` : `${mn} min`; };
+            actsEl.innerHTML = matched.map((a, idx) => {
+              const mins = a.moving_min ? fmtMins(Math.round(a.moving_min)) : '';
+              const hrTxt = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm` : '';
+              const isLast = idx === matched.length - 1;
+              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${isLast ? '' : 'border-bottom:0.5px solid rgba(255,255,255,0.15);'}">
+                <span style="font-size:13px; font-weight:500; opacity:0.95;">${escapeHtml(a.name || a.type)}</span>
+                <span style="font-size:12px; opacity:0.75;">${mins}${hrTxt}</span>
+              </div>`;
+            }).join('');
+            actsEl.style.display = 'block';
+          } else {
+            actsEl.style.display = 'none';
+          }
+        } else if (actsEl) {
+          actsEl.style.display = 'none';
+        }
       } else {
         doneStats.style.display = 'none';
       }
