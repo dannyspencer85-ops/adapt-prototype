@@ -14047,24 +14047,32 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         // Per-activity breakdown — only when multiple workouts on one day
         const actsEl = document.getElementById('heroDoneActivities');
         const ids = s.stravaIds || (s.stravaId ? [s.stravaId] : []);
-        if (actsEl && ids.length > 1) {
-          const allActs = planState.stravaActivities || [];
-          const matched = allActs.filter(a => ids.includes(String(a.id)));
-          if (matched.length > 1) {
-            const fmtMins = m => { const h = Math.floor(m/60), mn = m%60; return h > 0 ? `${h}h ${mn}m` : `${mn} min`; };
-            actsEl.innerHTML = matched.map((a, idx) => {
-              const mins = a.moving_min ? fmtMins(Math.round(a.moving_min)) : '';
-              const hrTxt = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm` : '';
-              const isLast = idx === matched.length - 1;
-              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${isLast ? '' : 'border-bottom:0.5px solid rgba(255,255,255,0.15);'}">
-                <span style="font-size:13px; font-weight:500; opacity:0.95;">${escapeHtml(a.name || a.type)}</span>
-                <span style="font-size:12px; opacity:0.75;">${mins}${hrTxt}</span>
-              </div>`;
-            }).join('');
-            actsEl.style.display = 'block';
-          } else {
-            actsEl.style.display = 'none';
-          }
+        // Per-activity list + update aggregate third column to show total calories on multi-workout days
+        const allActs = planState.stravaActivities || [];
+        const matched = ids.length > 0 ? allActs.filter(a => ids.map(String).includes(String(a.id))) : [];
+        const totalCals = matched.reduce((sum, a) => sum + (a.calories_kcal || 0), 0);
+
+        // Always show total calories in the third column when we have data
+        if (totalCals > 0) {
+          const distLabel = document.getElementById('heroDoneDistLabel');
+          const distEl = document.getElementById('heroDoneDistance');
+          if (distLabel) distLabel.textContent = 'Calories';
+          if (distEl) distEl.textContent = Math.round(totalCals) + ' kcal';
+        }
+
+        if (actsEl && matched.length > 1) {
+          const fmtMins = m => { const h = Math.floor(m/60), mn = m%60; return h > 0 ? `${h}h ${mn}m` : `${mn} min`; };
+          actsEl.innerHTML = matched.map((a, idx) => {
+            const mins = a.moving_min ? fmtMins(Math.round(a.moving_min)) : '';
+            const hrTxt = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm` : '';
+            const calTxt = a.calories_kcal ? ` · ${Math.round(a.calories_kcal)} kcal` : '';
+            const isLast = idx === matched.length - 1;
+            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${isLast ? '' : 'border-bottom:0.5px solid rgba(255,255,255,0.15);'}">
+              <span style="font-size:13px; font-weight:500; opacity:0.95;">${escapeHtml(a.name || a.type)}</span>
+              <span style="font-size:12px; opacity:0.75; text-align:right;">${mins}${hrTxt}${calTxt}</span>
+            </div>`;
+          }).join('');
+          actsEl.style.display = 'block';
         } else if (actsEl) {
           actsEl.style.display = 'none';
         }
