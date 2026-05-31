@@ -10748,6 +10748,76 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const scaledSession = { ...s, duration: scaledDuration };
     const d = sessionDetail(scaledSession, day);
 
+    // ── Completed day: show actual workout data instead of planned session ──
+    if (s.completed && (s.stravaId || s.stravaIds)) {
+      const dateStr = planState.dates && planState.dates[day] ? planState.dates[day] : d.date;
+      document.getElementById('sdTitle').textContent = s.stravaName || 'Completed';
+      document.getElementById('sdWhen').textContent = `${dateStr} · ${day}`;
+
+      // Look up the individual activities from the cache
+      const allActs = planState.stravaActivities || [];
+      const ids = new Set(s.stravaIds || (s.stravaId ? [s.stravaId] : []));
+      const matchedActs = allActs.filter(a => ids.has(String(a.id)));
+
+      const fmtDur = m => { const h = Math.floor(m/60), mn = m%60; return h > 0 ? `${h}h ${mn}m` : `${mn} min`; };
+      const fmtPace = (km, min) => { if (!km || km < 0.1 || !min) return null; const s = Math.round(min/km*60); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}/km`; };
+
+      let actHtml = '';
+      if (matchedActs.length > 0) {
+        actHtml = matchedActs.map(a => {
+          const t = mapStravaTypeToSessionType(a.type);
+          const dur = a.moving_min ? fmtDur(Math.round(a.moving_min)) : '';
+          const hr = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm avg` : '';
+          const pace = (t === 'run' || t === 'walk') ? fmtPace(a.distance_km, a.moving_min) : null;
+          const dist = !pace && a.distance_km > 0.1 ? ` · ${a.distance_km.toFixed(1)} km` : '';
+          const paceStr = pace ? ` · ${pace}` : '';
+          const cal = a.calories_kcal && (t === 'cross' || t === 'strength') ? ` · ${Math.round(a.calories_kcal)} kcal` : '';
+          return `<div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:0.5px solid var(--border);">
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:15px;">${escapeHtml(a.name || a.type)}</div>
+              <div style="font-size:12px; color:var(--text-soft); margin-top:2px;">${dur}${hr}${dist}${paceStr}${cal}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      // Aggregated totals
+      const totalMins = s.actualMins || 0;
+      const avgHr = s.actualHr ? Math.round(s.actualHr) : null;
+      const totalsHtml = `
+        <div style="display:grid; grid-template-columns:1fr 1fr${avgHr ? ' 1fr' : ''}; gap:8px; margin-top:14px; margin-bottom:4px;">
+          <div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
+            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Duration</div>
+            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${totalMins > 0 ? fmtDur(totalMins) : '—'}</div>
+          </div>
+          ${avgHr ? `<div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
+            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Avg HR</div>
+            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${avgHr} bpm</div>
+          </div>` : ''}
+          ${s.stravaDistance_km ? `<div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
+            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Distance</div>
+            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${s.stravaDistance_km.toFixed(1)} km</div>
+          </div>` : ''}
+        </div>`;
+
+      document.getElementById('sdContent').innerHTML =
+        `<div class="detail-section"><div class="detail-label">What you did</div>${actHtml || '<div style="font-size:13px;color:var(--text-soft);">Activity details not available.</div>'}</div>${totalsHtml}`;
+
+      // Hide plan-only actions (long day swap, log)
+      const longSlot = document.getElementById('sdLongDayAction');
+      if (longSlot) longSlot.innerHTML = '';
+      const logSlot = document.getElementById('sdLogAction');
+      if (logSlot) logSlot.innerHTML = '';
+      const availSlot = document.getElementById('sdAvailAction');
+      if (availSlot) availSlot.innerHTML = '';
+
+      document.getElementById('sdView').style.display = 'block';
+      document.getElementById('sdEdit').style.display = 'none';
+      document.getElementById('sessionModal').classList.add('show');
+      return;
+    }
+    // ── End completed day block ──────────────────────────────────────────────
+
     document.getElementById('sdTitle').textContent = d.title;
     const durLabel = d.duration > 0 ? ` · ${d.duration} min` : '';
     document.getElementById('sdWhen').textContent = weekOffset === 0
@@ -17321,7 +17391,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       greet.textContent = 'Logged in as ' + display;
     }
     const onboardingComplete = _isSupabase() ? !!planState.onboardingComplete : !!(acct?.data?.onboardingComplete);
-    if (!onboardingComplete) {
+    // If the user has a real plan, treat them as complete even if the flag is missing —
+    // prevents logged-in users with a working plan from landing on the welcome screen.
+    const effectivelyComplete = onboardingComplete || _hasRealPlan();
+    if (!effectivelyComplete) {
       showScreen('onboard');
       // Post-login: skip step 0 (welcome panel). Resume from the furthest
       // step the user previously reached so they don't re-enter data they
