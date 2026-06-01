@@ -2889,6 +2889,14 @@
         <div id="perfDisciplineBars"></div>
       </div>
 
+      <!-- Time in zones summary -->
+      <div class="card" id="perfZonesCard" style="display:none;">
+        <div class="card-title" style="margin-bottom:6px;">Time in zones</div>
+        <div style="font-size:11px; color:var(--text-soft); margin-bottom:12px;">Total minutes per HR zone across all workouts in this period. Z2 is where aerobic fitness builds.</div>
+        <div id="perfZonesBars"></div>
+        <div id="perfZonesNote" style="font-size:11px; color:var(--text-soft); margin-top:8px;"></div>
+      </div>
+
       <!-- Fitness signals — volume vs RHR/HRV overlay -->
       <div class="card">
         <div class="card-title">Fitness signals</div>
@@ -3592,6 +3600,12 @@
         <button onclick="closeSessionReport()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
       </div>
       <div class="sub" id="srWhen"></div>
+      <!-- Prev / Next navigation -->
+      <div id="srNav" style="display:none; justify-content:space-between; align-items:center; margin: 8px 0 2px;">
+        <button id="srPrev" onclick="srNavigate(-1)" style="background:none; border:1px solid var(--border); border-radius:100px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; color:var(--text);">‹ Prev</button>
+        <span id="srNavLabel" style="font-size:11px; color:var(--text-soft);"></span>
+        <button id="srNext" onclick="srNavigate(1)" style="background:none; border:1px solid var(--border); border-radius:100px; padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; color:var(--text);">Next ›</button>
+      </div>
       <div id="srBody"></div>
       <button class="btn btn-ghost btn-full" onclick="closeSessionReport()" style="margin-top: 14px;">Close</button>
     </div>
@@ -16317,6 +16331,64 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderFitnessSignals();
   }
 
+  function renderZonesSummary(acts) {
+    const card = document.getElementById('perfZonesCard');
+    const barsEl = document.getElementById('perfZonesBars');
+    const noteEl = document.getElementById('perfZonesNote');
+    if (!card || !barsEl) return;
+
+    const maxHr = (planState.fitnessMarkers && planState.fitnessMarkers.maxHr) || null;
+    if (!maxHr) {
+      card.style.display = 'none';
+      return;
+    }
+
+    // Sum zone minutes across all activities with HR series
+    const totals = { Z1:0, Z2:0, Z3:0, Z4:0, Z5:0 };
+    let sessionsWithZones = 0;
+    (acts || []).forEach(a => {
+      if (!a.hr_series || a.hr_series.length < 2) return;
+      const hrArr = a.hr_series.map(p => p.bpm);
+      const tArr  = a.hr_series.map(p => p.t);
+      const tiz = calcTimeInZones(hrArr, tArr, maxHr);
+      if (!tiz) return;
+      sessionsWithZones++;
+      Object.keys(totals).forEach(z => { totals[z] += tiz[z]; });
+    });
+
+    const totalMins = Object.values(totals).reduce((s,v) => s+v, 0);
+    if (totalMins === 0) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    const ZONE_COLOR = { Z1:'#C9E3D2', Z2:'#8BC4A3', Z3:'#F5E5B8', Z4:'#F4C9A0', Z5:'#E9A4A4' };
+    const ZONE_LABEL = { Z1:'Z1 Recovery', Z2:'Z2 Aerobic', Z3:'Z3 Tempo', Z4:'Z4 Threshold', Z5:'Z5 VO2' };
+
+    // Stacked horizontal bar
+    const stackSegs = Object.entries(totals).filter(([,v]) => v > 0).map(([z, mins]) => {
+      const pct = (mins / totalMins) * 100;
+      return `<div title="${ZONE_LABEL[z]}: ${mins}m" style="height:100%; width:${pct.toFixed(1)}%; background:${ZONE_COLOR[z]};"></div>`;
+    }).join('');
+    const stack = `<div style="display:flex; height:10px; border-radius:5px; overflow:hidden; margin-bottom:12px; background:var(--bg-soft);">${stackSegs}</div>`;
+
+    const rows = Object.entries(totals).map(([z, mins]) => {
+      const pct = totalMins > 0 ? Math.round((mins / totalMins) * 100) : 0;
+      const h = Math.floor(mins / 60), m = mins % 60;
+      const label = h > 0 ? `${h}h ${m}m` : (mins > 0 ? `${m}m` : '—');
+      return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+        <div style="width:12px; height:12px; border-radius:3px; background:${ZONE_COLOR[z]}; flex-shrink:0;"></div>
+        <div style="width:96px; font-size:12px; color:var(--text-soft);">${ZONE_LABEL[z]}</div>
+        <div style="flex:1; height:8px; background:var(--bg-soft); border-radius:4px; overflow:hidden;">
+          <div style="width:${pct}%; height:100%; background:${ZONE_COLOR[z]}; border-radius:4px;"></div>
+        </div>
+        <div style="width:40px; text-align:right; font-size:12px; font-weight:600;">${label}</div>
+        <div style="width:30px; text-align:right; font-size:11px; color:var(--text-soft);">${mins > 0 ? pct + '%' : ''}</div>
+      </div>`;
+    }).join('');
+
+    barsEl.innerHTML = stack + rows;
+    if (noteEl) noteEl.textContent = `Based on ${sessionsWithZones} workout${sessionsWithZones !== 1 ? 's' : ''} with HR data · max HR ${maxHr} bpm`;
+  }
+
   function renderFitnessSignals() {
     const chartEl  = document.getElementById('perfFitnessChart');
     const calloutEl = document.getElementById('perfFitnessCallout');
@@ -17120,6 +17192,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
+    // Time in zones aggregate
+    renderZonesSummary(acts);
+
     // Fitness signals (volume vs RHR/HRV overlay)
     renderFitnessSignals();
 
@@ -17276,9 +17351,95 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     return `${m}:${String(s).padStart(2,'0')} /km`;
   }
 
+  // ── Session report navigation state ─────────────────────────────────────────
+  let _srActivityList = []; // sorted activity list for prev/next
+  let _srCurrentIdx   = 0;
+
+  function _buildSrNavList() {
+    return (planState.stravaActivities || [])
+      .filter(a => a.moving_min > 0)
+      .slice() // don't mutate
+      .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+  }
+
+  function srNavigate(dir) {
+    const next = _srCurrentIdx + dir;
+    if (next < 0 || next >= _srActivityList.length) return;
+    openStravaSessionReport(_srActivityList[next].id);
+  }
+
+  // ── Time-in-zones calculation ────────────────────────────────────────────────
+  // Returns { z1, z2, z3, z4, z5 } in minutes, given hr_series + maxHr.
+  function calcTimeInZones(hrArr, timeArr, maxHr) {
+    if (!hrArr || hrArr.length < 2 || !maxHr) return null;
+    const zones = [
+      { name: 'Z1', lo: 0,    hi: 0.60 },
+      { name: 'Z2', lo: 0.60, hi: 0.70 },
+      { name: 'Z3', lo: 0.70, hi: 0.80 },
+      { name: 'Z4', lo: 0.80, hi: 0.90 },
+      { name: 'Z5', lo: 0.90, hi: 9.99 },
+    ];
+    const secs = { Z1:0, Z2:0, Z3:0, Z4:0, Z5:0 };
+    for (let i = 1; i < hrArr.length; i++) {
+      const dt = (timeArr[i] - timeArr[i-1]); // seconds
+      const bpm = hrArr[i];
+      const pct = bpm / maxHr;
+      const z = zones.find(z => pct >= z.lo && pct < z.hi) || zones[4];
+      secs[z.name] += dt;
+    }
+    const toMin = s => Math.round(s / 60);
+    return { Z1: toMin(secs.Z1), Z2: toMin(secs.Z2), Z3: toMin(secs.Z3), Z4: toMin(secs.Z4), Z5: toMin(secs.Z5) };
+  }
+
+  function renderTimeInZonesHTML(zones, totalMins) {
+    if (!zones) return '';
+    const ZONE_COLOR = { Z1:'#C9E3D2', Z2:'#8BC4A3', Z3:'#F5E5B8', Z4:'#F4C9A0', Z5:'#E9A4A4' };
+    const ZONE_LABEL = { Z1:'Z1 Recovery', Z2:'Z2 Aerobic', Z3:'Z3 Tempo', Z4:'Z4 Threshold', Z5:'Z5 VO2' };
+    const total = Math.max(1, Object.values(zones).reduce((s,v) => s+v, 0));
+    const rows = Object.entries(zones).map(([z, mins]) => {
+      const pct = Math.round((mins / total) * 100);
+      const barW = Math.max(pct, mins > 0 ? 3 : 0);
+      return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+        <div style="width:80px; font-size:11px; color:var(--text-soft); font-weight:600;">${ZONE_LABEL[z]}</div>
+        <div style="flex:1; height:12px; background:var(--bg-soft); border-radius:6px; overflow:hidden;">
+          <div style="width:${barW}%; height:100%; background:${ZONE_COLOR[z]}; border-radius:6px;"></div>
+        </div>
+        <div style="width:44px; text-align:right; font-size:12px; font-weight:600;">${mins > 0 ? mins + 'm' : '—'}</div>
+        <div style="width:30px; text-align:right; font-size:11px; color:var(--text-soft);">${mins > 0 ? pct + '%' : ''}</div>
+      </div>`;
+    }).join('');
+    return `<div class="detail-section" style="margin-top:14px;">
+      <div class="detail-label">Time in zones</div>
+      <div style="margin-top:10px;">${rows}</div>
+    </div>`;
+  }
+
+  // ── End time-in-zones helpers ────────────────────────────────────────────────
+
   async function openStravaSessionReport(activityId) {
     const a = (planState.stravaActivities || []).find(x => String(x.id) === String(activityId));
     if (!a) return;
+
+    // Build / update navigation list
+    _srActivityList = _buildSrNavList();
+    _srCurrentIdx = _srActivityList.findIndex(x => String(x.id) === String(activityId));
+    const navEl = document.getElementById('srNav');
+    const prevBtn = document.getElementById('srPrev');
+    const nextBtn = document.getElementById('srNext');
+    const navLabel = document.getElementById('srNavLabel');
+    if (navEl && _srActivityList.length > 1) {
+      navEl.style.display = 'flex';
+      if (prevBtn) prevBtn.disabled = _srCurrentIdx >= _srActivityList.length - 1;
+      if (nextBtn) nextBtn.disabled = _srCurrentIdx <= 0;
+      if (navLabel) navLabel.textContent = `${_srActivityList.length - _srCurrentIdx} of ${_srActivityList.length}`;
+    } else if (navEl) {
+      navEl.style.display = 'none';
+    }
+
+    // Scroll modal back to top when navigating
+    const modalEl = document.querySelector('#sessionReportModal .modal');
+    if (modalEl) modalEl.scrollTop = 0;
+
     document.getElementById('srTitle').textContent = a.name;
     document.getElementById('srWhen').textContent = shortDay(a.start_date_local);
 
@@ -17376,10 +17537,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const hrMin  = Math.min(...hrArr);
         const hrMax  = Math.max(...hrArr);
         const hrAvg  = a.avg_hr ? Math.round(a.avg_hr) : Math.round(hrArr.reduce((s, v) => s + v, 0) / hrArr.length);
-        html += renderHrChartSVG(hrArr, tArr, { maxHr: a.max_hr || null });
+        const userMaxHr = (planState.fitnessMarkers && planState.fitnessMarkers.maxHr) || null;
+        const chartMaxHr = a.max_hr || userMaxHr || null;
+        html += renderHrChartSVG(hrArr, tArr, { maxHr: chartMaxHr });
         html += `<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
           <div>Min ${hrMin}</div><div>Avg ${hrAvg}</div><div>Max ${hrMax}</div>
         </div>`;
+        // Time-in-zones (needs maxHr to set zone boundaries)
+        if (chartMaxHr) {
+          const tiz = calcTimeInZones(hrArr, tArr, chartMaxHr);
+          html += renderTimeInZonesHTML(tiz, a.moving_min);
+        }
       } else if (a.avg_hr) {
         html += `<div style="display:flex; gap:24px; margin-top:6px;">
           <div><div style="font-size:24px; font-weight:700;">${Math.round(a.avg_hr)}</div><div style="font-size:11px; color:var(--text-soft);">Avg BPM</div></div>
