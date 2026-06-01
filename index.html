@@ -9,7 +9,7 @@
      sets the background that shows during PWA splash on Android. -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#3B8968">
-<meta name="background-color" content="#FFFFFF">
+<meta name="background-color" content="#F6F4F1">
 <!-- iOS Safari PWA tags. iOS uses these instead of the manifest for the
      home-screen install. apple-mobile-web-app-capable triggers standalone
      mode (no Safari chrome). status-bar-style controls the top bar. -->
@@ -142,8 +142,9 @@
     flex: 1;
   }
   .header {
-    padding: 14px 20px 18px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 18px;
     position: relative;
+    background: var(--bg);
   }
   .back-btn {
     display: inline-flex;
