@@ -3178,6 +3178,76 @@
 
       <!-- Settings now lives in the gear (⚙️) button at the top of every screen -->
 
+      <!-- Notification preferences -->
+      <div class="card" id="notifPrefsCard" style="margin-top: 16px;">
+        <div class="card-title" style="margin-bottom: 14px;">Notifications</div>
+        <div id="notifPermBanner" style="display:none; background: var(--secondary-soft); border-left: 3px solid var(--secondary); padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 14px;"></div>
+        <div id="notifRows" style="display:flex; flex-direction:column; gap:0;">
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
+            <div>
+              <div style="font-size:14px; font-weight:500;">Morning check-in</div>
+              <div style="font-size:12px; color:var(--text-soft);">Daily on training days</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-morning-checkin" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('morning_checkin_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-morning-checkin-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-morning-checkin-thumb"></span>
+            </label>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
+            <div>
+              <div style="font-size:14px; font-weight:500;">Post-workout prompt</div>
+              <div style="font-size:12px; color:var(--text-soft);">Log effort after sessions</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-post-workout" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('post_workout_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-post-workout-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-post-workout-thumb"></span>
+            </label>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
+            <div>
+              <div style="font-size:14px; font-weight:500;">Plan adjustments</div>
+              <div style="font-size:12px; color:var(--text-soft);">When your coach updates the plan</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-plan-adjustment" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('plan_adjustment_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-plan-adjustment-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-plan-adjustment-thumb"></span>
+            </label>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
+            <div>
+              <div style="font-size:14px; font-weight:500;">Weekly review</div>
+              <div style="font-size:12px; color:var(--text-soft);">Sunday evenings</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-weekly-review" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('weekly_review_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-weekly-review-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-weekly-review-thumb"></span>
+            </label>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0;">
+            <div>
+              <div style="font-size:14px; font-weight:500;">Race countdown</div>
+              <div style="font-size:12px; color:var(--text-soft);">Key milestones before your race</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-race-milestone" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('race_milestone_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-race-milestone-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-race-milestone-thumb"></span>
+            </label>
+          </div>
+
+        </div>
+        <button id="notifEnableBtn" onclick="handleNotifEnableBtn()" style="display:none; width:100%; margin-top:12px; padding:11px 14px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">Enable notifications</button>
+      </div>
+
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 14px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--text-soft);">Log out</button>
     </div>
@@ -3895,6 +3965,8 @@
   // Leave the placeholders below to keep using localStorage prototype auth.
   const SUPABASE_URL      = 'https://lykorfkapbxufkjcqtnl.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
+  // VAPID public key — safe to expose to the client (only private key is secret)
+  const VAPID_PUBLIC_KEY  = 'BFpvzKjkGcftF_cYz5KgZqYWOu0IH6FARejMdLbtdtQPseYkQSRJfcGiymmFUKSadpe4GdEWmUZdIoJw5uz2lrU';
 
   // ── PASSWORD RECOVERY URL DETECTION ─────────────────────────────────────
   // Must happen BEFORE createClient() — the Supabase SDK may synchronously
@@ -5695,6 +5767,10 @@
     saveUserData();
     showScreen('today');
     document.getElementById('nav').style.display = 'flex';
+    // Ask for push notification permission after plan is ready (non-blocking)
+    if (typeof maybeRequestPushPermission === 'function') {
+      maybeRequestPushPermission().catch(() => {});
+    }
   }
   function showScreen(name, fromBack) {
     if (currentScreen && currentScreen !== name && !fromBack) {
@@ -5716,7 +5792,7 @@
     if (name === 'ask') { updateChatState(); if (typeof _updateChatCapWarning === 'function') _updateChatCapWarning(); }
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') { autofillCheckin(); if (typeof renderPrepScreen === 'function') renderPrepScreen(); }
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); renderNotifPrefs(); }
   }
   function getPlanIntensity() {
     const d = localStorage.getItem('plan-difficulty-adjust');
@@ -6119,6 +6195,101 @@
   // that captures it (no need to re-walk the whole flow). Values are read
   // from the same sources the plan engines use, so what you see here is what
   // the plan was built from.
+  // ── Notification preferences UI ────────────────────────────────────────────
+
+  const NOTIF_TOGGLES = [
+    { key: 'morning_checkin_enabled',  el: 'notif-morning-checkin'  },
+    { key: 'post_workout_enabled',     el: 'notif-post-workout'      },
+    { key: 'plan_adjustment_enabled',  el: 'notif-plan-adjustment'   },
+    { key: 'weekly_review_enabled',    el: 'notif-weekly-review'     },
+    { key: 'race_milestone_enabled',   el: 'notif-race-milestone'    },
+  ];
+
+  function _setToggleVisual(elId, checked) {
+    const track = document.getElementById(elId + '-track');
+    const thumb = document.getElementById(elId + '-thumb');
+    const input = document.getElementById(elId);
+    if (!track || !thumb) return;
+    if (checked) {
+      track.style.background = 'var(--primary)';
+      thumb.style.transform = 'translateX(18px)';
+    } else {
+      track.style.background = '#ccc';
+      thumb.style.transform = 'translateX(0)';
+    }
+    if (input) input.checked = checked;
+  }
+
+  async function renderNotifPrefs() {
+    if (!('Notification' in window) || !('PushManager' in window)) {
+      const card = document.getElementById('notifPrefsCard');
+      if (card) card.style.display = 'none';
+      return;
+    }
+    const status = await getNotificationStatus();
+    const banner = document.getElementById('notifPermBanner');
+    const enableBtn = document.getElementById('notifEnableBtn');
+
+    if (status === 'denied') {
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = '<strong>Notifications blocked.</strong> To receive updates, open your device settings and allow notifications for this site.';
+      }
+      if (enableBtn) enableBtn.style.display = 'none';
+    } else if (status === 'not-subscribed') {
+      if (banner) banner.style.display = 'none';
+      if (enableBtn) enableBtn.style.display = 'block';
+    } else {
+      if (banner) banner.style.display = 'none';
+      if (enableBtn) enableBtn.style.display = 'none';
+    }
+
+    // Load and apply saved preferences
+    const prefs = await loadNotificationPrefs();
+    NOTIF_TOGGLES.forEach(({ key, el }) => {
+      const val = prefs ? prefs[key] !== false : true; // default on
+      _setToggleVisual(el, val);
+    });
+  }
+
+  async function onNotifToggle(prefKey, enabled) {
+    // If not subscribed yet and enabling, ask for permission first
+    const status = await getNotificationStatus();
+    if (status !== 'subscribed' && enabled) {
+      const permission = await requestNotificationPermission();
+      if (permission === 'granted') {
+        await subscribeToPush();
+      } else {
+        // Revert the toggle
+        const toggle = NOTIF_TOGGLES.find(t => t.key === prefKey);
+        if (toggle) _setToggleVisual(toggle.el, false);
+        return;
+      }
+    }
+    await saveNotificationPref({ [prefKey]: enabled });
+    renderNotifPrefs();
+  }
+
+  async function handleNotifEnableBtn() {
+    const permission = await requestNotificationPermission();
+    if (permission === 'granted') {
+      const result = await subscribeToPush();
+      if (result.success) {
+        // Save all defaults
+        await saveNotificationPref({
+          morning_checkin_enabled: true,
+          post_workout_enabled: true,
+          plan_adjustment_enabled: true,
+          weekly_review_enabled: true,
+          race_milestone_enabled: true,
+        });
+      }
+    }
+    renderNotifPrefs();
+  }
+
+  // ── End notification preferences UI ─────────────────────────────────────────
+
   function renderProfileInputs() {
     const slot = document.getElementById('profileInputsList');
     if (!slot) return;
@@ -17747,6 +17918,126 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       openCheckinCard();
     }
   };
+
+  // ── Push Notification Manager ──────────────────────────────────────────────
+  // Handles subscription, preference sync, and service-worker NAVIGATE routing.
+
+  function _urlBase64ToUint8Array(b64) {
+    const padding = '='.repeat((4 - b64.length % 4) % 4);
+    const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+
+  async function requestNotificationPermission() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return 'unsupported';
+    return Notification.requestPermission();
+  }
+
+  async function getNotificationStatus() {
+    if (!('Notification' in window) || !('PushManager' in window)) return 'unsupported';
+    if (Notification.permission === 'denied') return 'denied';
+    const reg = await navigator.serviceWorker.ready.catch(() => null);
+    if (!reg) return 'unsupported';
+    const sub = await reg.pushManager.getSubscription().catch(() => null);
+    return sub ? 'subscribed' : 'not-subscribed';
+  }
+
+  async function subscribeToPush() {
+    if (!_sb || !_sbUsername) return { success: false, error: 'not logged in' };
+    if (!('PushManager' in window)) return { success: false, error: 'unsupported' };
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const { endpoint, keys } = sub.toJSON();
+      const { data: { user } } = await _sb.auth.getUser();
+      if (!user) throw new Error('no auth user');
+      const { error } = await _sb.from('push_subscriptions').upsert({
+        user_id: user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth:   keys.auth,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'endpoint' });
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      console.warn('[push] subscribe error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function unsubscribeFromPush() {
+    if (!_sb) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return;
+      const { data: { user } } = await _sb.auth.getUser();
+      await sub.unsubscribe();
+      if (user) {
+        await _sb.from('push_subscriptions')
+          .delete().eq('user_id', user.id).eq('endpoint', sub.endpoint);
+      }
+    } catch (err) {
+      console.warn('[push] unsubscribe error:', err);
+    }
+  }
+
+  /** Called after onboarding is complete — prompts for permission then subscribes. */
+  async function maybeRequestPushPermission() {
+    if (!('Notification' in window) || !('PushManager' in window)) return;
+    if (Notification.permission !== 'default') return; // already decided
+    // Small delay so the user is settled on the Today screen first
+    await new Promise(r => setTimeout(r, 2000));
+    const permission = await requestNotificationPermission();
+    if (permission === 'granted') await subscribeToPush();
+  }
+
+  /** Load notification preferences from Supabase and return them. */
+  async function loadNotificationPrefs() {
+    if (!_sb) return null;
+    const { data: { user } } = await _sb.auth.getUser().catch(() => ({ data: { user: null } }));
+    if (!user) return null;
+    const { data } = await _sb.from('notification_preferences')
+      .select('*').eq('user_id', user.id).maybeSingle();
+    return data;
+  }
+
+  /** Upsert a partial preference update. */
+  async function saveNotificationPref(updates) {
+    if (!_sb) return;
+    const { data: { user } } = await _sb.auth.getUser().catch(() => ({ data: { user: null } }));
+    if (!user) return;
+    await _sb.from('notification_preferences').upsert({
+      user_id: user.id,
+      updated_at: new Date().toISOString(),
+      ...updates,
+    }, { onConflict: 'user_id' });
+  }
+
+  // Handle NAVIGATE messages posted by the service worker when a push
+  // notification is tapped while the app is already open.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type !== 'NAVIGATE') return;
+      const url = new URL(event.data.url, window.location.origin);
+      const action = url.searchParams.get('action');
+      switch (action) {
+        case 'checkin':      showScreen('prep');    break;
+        case 'log-session':  openLogForDay(getTodayDay()); break;
+        case 'weekly-review': if (typeof runWeeklyRecalc === 'function') runWeeklyRecalc(); break;
+        default:             showScreen('today');   break;
+      }
+    });
+  }
+
+  // ── End Push Notification Manager ───────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', async () => {
     // Safety net: if anything in init throws, fall back to the onboard screen

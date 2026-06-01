@@ -1,19 +1,15 @@
-// Adapt service worker — v35 passthrough / cache-bust edition.
+// Adapt service worker — v36
 //
-// This version deliberately skips ALL caching and fetch interception.
-// It exists solely to:
-//   1. Evict every previous Adapt cache (v30–v34) that may contain
-//      a stale or broken app shell.
-//   2. Claim all open clients immediately so the clean state takes
-//      effect on the current tab without a reload.
-//
-// After the stale-cache eviction a future deploy will re-enable
-// caching once the app is confirmed stable.
+// Responsibilities:
+//   1. Evict stale caches from v30-v35.
+//   2. Claim all clients immediately.
+//   3. Receive and display Web Push notifications.
+//   4. Handle notification clicks — focus existing window or open new one,
+//      then post a NAVIGATE message so the app routes to the right screen.
 
-const CACHE_VERSION = 'adapt-v35';
+const CACHE_VERSION = 'adapt-v36';
 
 self.addEventListener('install', (event) => {
-  // Nothing to pre-cache — skip straight to activation.
   event.waitUntil(self.skipWaiting());
 });
 
@@ -25,24 +21,68 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// No fetch handler — every request goes straight to the network.
-// This guarantees the browser always loads fresh HTML/assets from
-// Vercel and is never served a cached broken shell.
+// No fetch handler — all requests go straight to the network.
 
-// Allow the page to force this SW to activate immediately.
+// Page can force immediate activation.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// ── Push notifications ────────────────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    data = { title: 'Adapt', body: event.data.text() };
+  }
+
+  const options = {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'adapt-notification',
+    renotify: data.renotify || false,
+    requireInteraction: data.requireInteraction || false,
+    silent: false,
+    data: {
+      url: data.url || '/',
+      notificationType: data.notificationType || 'general',
+    },
+    actions: data.actions || [],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Adapt', options)
+  );
+});
+
+// ── Notification click ────────────────────────────────────────────────────────
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data || self.registration.scope;
+
+  const targetUrl = event.notification.data?.url || '/';
+  const origin = self.location.origin;
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((wins) => {
-      for (const win of wins) {
-        if (win.url === url) return win.focus();
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If the app is already open, focus it and post a NAVIGATE message.
+        for (const client of clientList) {
+          if (client.url.startsWith(origin) && 'focus' in client) {
+            client.focus();
+            client.postMessage({ type: 'NAVIGATE', url: targetUrl });
+            return;
+          }
+        }
+        // Otherwise open a new window.
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
   );
 });
