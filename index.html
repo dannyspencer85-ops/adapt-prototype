@@ -16525,10 +16525,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const tN = points[points.length - 1].date.getTime();
     const tRange = Math.max(1, tN - t0);
 
-    // For pace + avgHr, invert y so "better" is up
+    // Standard axis: higher value = higher on chart (1 - ratio puts max at top).
+    // Exception: pace (min/km) is inverted so a falling line = getting faster = visually "up".
+    // avgHr uses standard axis — HR going up should draw the line going up.
+    const invertAxis = metric === 'pace';
     const yPos = v => {
       const ratio = (v - yMin) / yRange;
-      const r = lowerIsBetter ? ratio : (1 - ratio);
+      const r = invertAxis ? ratio : (1 - ratio);
       return padT + r * chartH;
     };
     const xPos = d => padL + ((d.getTime() - t0) / tRange) * chartW;
