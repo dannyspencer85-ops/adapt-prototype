@@ -6077,7 +6077,8 @@
   function renderScheduleGrid() {
     const grid = document.getElementById('scheduleGrid');
     if (!grid) return;
-    const prefs = getSchedulePrefs();
+    // Prefer the in-flight draft so the grid always matches what the user is editing.
+    const prefs = _scheduleModalDraft || getSchedulePrefs();
     grid.innerHTML = DAYS.map(d => {
       const p = prefs[d];
       return `
@@ -6369,6 +6370,8 @@
     // Recalculate the plan against the new schedule (auto-save → auto-recalc).
     if (typeof generatePlanFromInputs === 'function') generatePlanFromInputs();
     renderAll();
+    // Re-render the schedule summary card with the newly-saved per-day data.
+    renderProfileScheduleSummary();
     if (typeof setChange === 'function') setChange('Schedule updated. plan recalculated to match your days + disciplines.');
     if (typeof trackEvent === 'function') trackEvent('schedule_updated');
   }
