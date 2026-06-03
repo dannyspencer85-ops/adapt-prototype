@@ -5705,17 +5705,50 @@
   }
 
   function computeReadinessFlags() {
-    const event = document.getElementById('eventSelect').value;
-    const activeHours = document.querySelector('#hoursChips .chip.active');
-    const hours = activeHours ? parseFloat(activeHours.dataset.hours) : 5;
-    const hoursLabel = activeHours ? activeHours.textContent : '5';
-    const activeDays = document.querySelectorAll('#daysChips .chip.active');
-    const dayCount = activeDays.length;
-    const dayNames = [...activeDays].map(d => d.textContent).join('/');
+    // Read event — prefer saved planState, fall back to onboarding UI
+    const event = (planState && planState.raceEvent)
+      || localStorage.getItem('race-event')
+      || document.getElementById('eventSelect')?.value
+      || 'Half Ironman';
+
+    // Hours — prefer saved localStorage, fall back to chip UI
+    let hours, hoursLabel;
+    const savedHours = parseFloat(localStorage.getItem('hours-per-week') || '0');
+    if (savedHours > 0) {
+      hours = savedHours; hoursLabel = savedHours + '';
+    } else {
+      const activeHours = document.querySelector('#hoursChips .chip.active');
+      hours = activeHours ? parseFloat(activeHours.dataset.hours) : 5;
+      hoursLabel = activeHours ? activeHours.textContent : '5';
+    }
+
+    // Training days — prefer saved localStorage, fall back to chip UI
+    let dayCount, dayNames;
+    const savedDays = (() => { try { return JSON.parse(localStorage.getItem('training-days') || '[]'); } catch(e) { return []; } })();
+    const schedulePrefs = (() => { try { return JSON.parse(localStorage.getItem('schedule-prefs') || 'null'); } catch(e) { return null; } })();
+    const schedAvailCount = schedulePrefs ? Object.values(schedulePrefs).filter(d => d.available).length : 0;
+    const effectiveDayCount = savedDays.length || schedAvailCount;
+    if (effectiveDayCount > 0) {
+      dayCount = effectiveDayCount;
+      dayNames = (savedDays.length ? savedDays : Object.keys(schedulePrefs || {}).filter(d => schedulePrefs[d]?.available)).join('/');
+    } else {
+      const activeDays = document.querySelectorAll('#daysChips .chip.active');
+      dayCount = activeDays.length;
+      dayNames = [...activeDays].map(d => d.textContent).join('/');
+    }
+
+    // Disciplines — prefer saved localStorage, fall back to chip UI
+    let activeDisc;
+    const savedDiscs = (() => { try { return JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch(e) { return []; } })();
+    if (savedDiscs.length > 0) {
+      activeDisc = new Set(savedDiscs);
+    } else {
+      activeDisc = new Set([...document.querySelectorAll('#discChips .chip.active')].map(c => c.dataset.disc));
+    }
+
     const isTri = /Ironman|Triathlon/.test(event);
     const isRun = /Marathon|10K|5K/.test(event);
     const isBike = /Gravel|Road/.test(event);
-    const activeDisc = new Set([...document.querySelectorAll('#discChips .chip.active')].map(c => c.dataset.disc));
     // Bike events need a bike (or indoor trainer); run events need run; tri all three.
     const hasBikeAccess = activeDisc.has('bike') || activeDisc.has('trainer');
     const required = isTri ? ['swim','bike','run'] : isRun ? ['run'] : [];
