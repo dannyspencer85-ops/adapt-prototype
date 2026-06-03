@@ -135,11 +135,13 @@
     overflow-y: auto;
     display: none;
     flex-direction: column;
+    background: var(--bg);
   }
   .screen.active { display: flex; }
   .screen-inner {
     padding: 12px 20px 110px;
     flex: 1;
+    background: var(--bg);
   }
   .header {
     padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 18px;
@@ -1653,6 +1655,7 @@
   /* Screen inner — slightly more breathing room */
   .screen-inner {
     padding: 12px 20px 110px;
+    background: var(--bg);
   }
 
   /* Stats grid — 2-col on the summary row */
