@@ -11014,48 +11014,80 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const matchedActs = allActs.filter(a => ids.has(String(a.id)));
 
       const fmtDur = m => { const h = Math.floor(m/60), mn = m%60; return h > 0 ? `${h}h ${mn}m` : `${mn} min`; };
-      const fmtPace = (km, min) => { if (!km || km < 0.1 || !min) return null; const s = Math.round(min/km*60); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}/km`; };
+      const fmtPaceStr = (km, min) => {
+        if (!km || km < 0.1 || !min) return null;
+        const secPerKm = Math.round(min / km * 60);
+        return `${Math.floor(secPerKm/60)}:${String(secPerKm%60).padStart(2,'0')}/km`;
+      };
+      const fmtSwimPace = (km, min) => {
+        if (!km || km < 0.05 || !min) return null;
+        const secPer100 = Math.round(min / (km * 10) * 60);
+        return `${Math.floor(secPer100/60)}:${String(secPer100%60).padStart(2,'0')}/100m`;
+      };
 
+      // Per-activity rows (shown when multiple workouts in one day)
       let actHtml = '';
-      if (matchedActs.length > 0) {
-        actHtml = matchedActs.map(a => {
+      if (matchedActs.length > 1) {
+        actHtml = matchedActs.map((a, idx) => {
           const t = mapStravaTypeToSessionType(a.type);
           const dur = a.moving_min ? fmtDur(Math.round(a.moving_min)) : '';
-          const hr = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm avg` : '';
-          const pace = (t === 'run' || t === 'walk') ? fmtPace(a.distance_km, a.moving_min) : null;
+          const hr = a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm` : '';
+          const pace = t === 'swim' ? fmtSwimPace(a.distance_km, a.moving_min)
+                     : (t === 'run' || t === 'walk') ? fmtPaceStr(a.distance_km, a.moving_min) : null;
           const dist = !pace && a.distance_km > 0.1 ? ` · ${a.distance_km.toFixed(1)} km` : '';
           const paceStr = pace ? ` · ${pace}` : '';
-          const cal = a.calories_kcal && (t === 'cross' || t === 'strength') ? ` · ${Math.round(a.calories_kcal)} kcal` : '';
-          return `<div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:0.5px solid var(--border);">
-            <div style="flex:1;">
-              <div style="font-weight:600; font-size:15px;">${escapeHtml(a.name || a.type)}</div>
-              <div style="font-size:12px; color:var(--text-soft); margin-top:2px;">${dur}${hr}${dist}${paceStr}${cal}</div>
-            </div>
+          const cal = a.calories_kcal ? ` · ${Math.round(a.calories_kcal)} kcal` : '';
+          const isLast = idx === matchedActs.length - 1;
+          return `<div style="padding:10px 0; ${isLast ? '' : 'border-bottom:0.5px solid var(--border);'}">
+            <div style="font-weight:600; font-size:14px;">${escapeHtml(a.name || a.type)}</div>
+            <div style="font-size:12px; color:var(--text-soft); margin-top:2px;">${dur}${hr}${dist}${paceStr}${cal}</div>
           </div>`;
         }).join('');
+        actHtml = `<div class="detail-section"><div class="detail-label">Sessions</div>${actHtml}</div>`;
       }
 
-      // Aggregated totals
+      // Aggregate stats — build tiles from available data
       const totalMins = s.actualMins || 0;
       const avgHr = s.actualHr ? Math.round(s.actualHr) : null;
-      const totalsHtml = `
-        <div style="display:grid; grid-template-columns:1fr 1fr${avgHr ? ' 1fr' : ''}; gap:8px; margin-top:14px; margin-bottom:4px;">
-          <div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
-            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Duration</div>
-            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${totalMins > 0 ? fmtDur(totalMins) : '—'}</div>
-          </div>
-          ${avgHr ? `<div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
-            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Avg HR</div>
-            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${avgHr} bpm</div>
-          </div>` : ''}
-          ${s.stravaDistance_km ? `<div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
-            <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Distance</div>
-            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; margin-top:2px;">${s.stravaDistance_km.toFixed(1)} km</div>
-          </div>` : ''}
+      // Max HR from matched activities
+      const maxHrVals = matchedActs.map(a => a.max_hr).filter(Boolean);
+      const maxHr = maxHrVals.length ? Math.round(Math.max(...maxHrVals)) : null;
+      // Total calories across all matched activities
+      const totalCals = matchedActs.reduce((sum, a) => sum + (a.calories_kcal || 0), 0);
+      // Pace (for single-discipline sessions)
+      const primaryType = matchedActs.length === 1 ? mapStravaTypeToSessionType(matchedActs[0].type) : null;
+      const paceLabel = primaryType === 'swim' ? 'Pace' : (primaryType === 'run' || primaryType === 'walk') ? 'Pace' : null;
+      const paceVal = primaryType === 'swim'
+        ? fmtSwimPace(s.stravaDistance_km, totalMins)
+        : (primaryType === 'run' || primaryType === 'walk') ? fmtPaceStr(s.stravaDistance_km, totalMins) : null;
+      const paceUnit = primaryType === 'swim' ? '/100m' : '/km';
+
+      const tile = (label, value, sub) =>
+        `<div style="padding:10px 12px; background:var(--bg); border-radius:var(--radius-sm);">
+          <div style="font-size:10px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">${label}</div>
+          <div style="font-family:var(--font-heading); font-size:18px; font-weight:600; margin-top:2px;">${value}</div>
+          ${sub ? `<div style="font-size:10px; color:var(--text-soft); margin-top:1px;">${sub}</div>` : ''}
         </div>`;
 
+      const tiles = [];
+      tiles.push(tile('Duration', totalMins > 0 ? fmtDur(totalMins) : '—'));
+      if (avgHr) tiles.push(tile('Avg HR', avgHr + ' bpm', maxHr ? `Max ${maxHr}` : null));
+      if (s.stravaDistance_km) tiles.push(tile('Distance', s.stravaDistance_km.toFixed(2) + ' km'));
+      if (paceVal && paceLabel) tiles.push(tile(paceLabel, paceVal, paceUnit));
+      if (totalCals > 0) tiles.push(tile('Calories', Math.round(totalCals) + ' kcal'));
+
+      const cols = Math.min(tiles.length, 3);
+      const totalsHtml = `<div style="display:grid; grid-template-columns:repeat(${cols},1fr); gap:8px; margin-top:14px;">${tiles.join('')}</div>
+        ${tiles.length > 3 ? `<div style="display:grid; grid-template-columns:repeat(${tiles.length - 3},1fr); gap:8px; margin-top:8px;">${tiles.slice(3).join('')}</div>` : ''}`;
+
+      // "View full details" button — opens session report with HR chart + zones
+      const primaryId = s.stravaId || (s.stravaIds && s.stravaIds[0]);
+      const viewDetailsBtn = primaryId
+        ? `<button onclick="openStravaSessionReport('${primaryId}'); closeSessionModal();" style="width:100%; margin-top:14px; padding:12px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:var(--radius-md); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">View full session details →</button>`
+        : '';
+
       document.getElementById('sdContent').innerHTML =
-        `<div class="detail-section"><div class="detail-label">What you did</div>${actHtml || '<div style="font-size:13px;color:var(--text-soft);">Activity details not available.</div>'}</div>${totalsHtml}`;
+        `${actHtml}${totalsHtml}${viewDetailsBtn}`;
 
       // Hide plan-only actions (long day swap, log)
       const longSlot = document.getElementById('sdLongDayAction');
