@@ -5764,6 +5764,10 @@
     const isTri = /Ironman|Triathlon/.test(event);
     const isRun = /Marathon|10K|5K/.test(event);
     const isBike = /Gravel|Road/.test(event);
+    // For run-only events, run is always assumed available. Stale discipline
+    // data saved from a previous event type (e.g. a bike race where run was
+    // deselected) must never surface a "no RUN access" false-positive.
+    if (isRun) activeDisc.add('run');
     // Bike events need a bike (or indoor trainer); run events need run; tri all three.
     const hasBikeAccess = activeDisc.has('bike') || activeDisc.has('trainer');
     const required = isTri ? ['swim','bike','run'] : isRun ? ['run'] : [];
@@ -17555,8 +17559,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const navLabel = document.getElementById('srNavLabel');
     if (navEl && _srActivityList.length > 1) {
       navEl.style.display = 'flex';
-      if (prevBtn) prevBtn.disabled = _srCurrentIdx >= _srActivityList.length - 1;
-      if (nextBtn) nextBtn.disabled = _srCurrentIdx <= 0;
+      if (prevBtn) prevBtn.disabled = _srCurrentIdx <= 0;
+      if (nextBtn) nextBtn.disabled = _srCurrentIdx >= _srActivityList.length - 1;
       if (navLabel) navLabel.textContent = `${_srActivityList.length - _srCurrentIdx} of ${_srActivityList.length}`;
     } else if (navEl) {
       navEl.style.display = 'none';
