@@ -164,11 +164,16 @@ export default async function handler(req) {
       let rawContent = '';
       const reader = upstream.body.getReader();
       const dec = new TextDecoder();
+      // lineBuffer holds the tail of the previous chunk that didn't end with \n,
+      // preventing SSE lines split across network chunks from being silently dropped.
+      let lineBuffer = '';
       outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = dec.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
+        const text = lineBuffer + dec.decode(value, { stream: true });
+        const lines = text.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const d = line.slice(6).trim();
           if (d === '[DONE]') break outer;
@@ -178,10 +183,20 @@ export default async function handler(req) {
           } catch (_) {}
         }
       }
+      // flush anything left in the buffer after stream closes
+      if (lineBuffer.startsWith('data: ')) {
+        const d = lineBuffer.slice(6).trim();
+        if (d && d !== '[DONE]') {
+          try {
+            const evt = JSON.parse(d);
+            rawContent += evt.choices?.[0]?.delta?.content || '';
+          } catch (_) {}
+        }
+      }
 
       let parsed;
       try { parsed = JSON.parse(rawContent); }
-      catch (e) { throw new Error('Plan JSON parse failed: ' + (e && e.message || '')); }
+      catch (e) { throw new Error('Plan JSON parse failed: ' + (e && e.message || '') + ' | raw[0:150]=' + rawContent.slice(0, 150)); }
 
       const validation = validatePlan(parsed, validationInputs);
       if (!validation.ok) {
