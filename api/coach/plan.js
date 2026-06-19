@@ -23,7 +23,7 @@ const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 // validatePlan coercions compensate for the smaller model; the rule engine
 // is the ultimate fallback if even this model is overloaded.
 const PLAN_MODEL = 'open-mistral-nemo';
-const MAX_TOKENS = 4500;                    // 6 weeks of detail fits in ~3000-4000 tokens
+const MAX_TOKENS = 2800;                    // trimmed from 4500: shorter output halves generation time on free-tier Mistral
 // Reduced from 45 s: with the Node.js runtime and maxDuration:60 in vercel.json
 // the function can run up to 60 s. Keep individual Mistral call well under that
 // to leave room for retries + response parsing.
@@ -517,8 +517,9 @@ Your plans MUST reflect these established frameworks:
 • No week-over-week total-hours jump exceeds +25% or drops more than 35% (deload/taper aside).
 • Long session is on Sat or Sun if those are training days; otherwise on the last selected day.
 • **RACE DAY ENDS THE CYCLE.** In race week, the LAST training session is race day itself. Every day STRICTLY AFTER race day inside race week must be type:'rest' with duration:0 — recovery, not training. Don't schedule a "long swim" on the Saturday after a Thursday race. The plan ENDS at race day.
-• Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality/cross), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1-2 sentence description of the workout structure), targets (HR/pace/RPE guidance — use ranges and reference the appropriate Daniels/CTL anchor when applicable).
-• prescription MUST reference specific zones, drills, or intervals — not just "easy aerobic." E.g. "8x400m at I pace (~5K race pace) with 400m recoveries; 1mi WU + CD" not "intervals."
+• Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality/cross), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1 sentence max — specific zone/interval/drill, not generic), targets (HR/pace/RPE in ≤15 words).
+• prescription: be terse. "10 min WU, 3×10 min Z3, 5 min CD" not a paragraph. NEVER exceed 20 words.
+• targets: ≤15 words. "Z2 HR 130-145 bpm, conversational pace" is enough.
 • prescription MUST be populated on every non-rest session — never leave it blank.
 
 ═══ DISCIPLINE NOTES FOR THIS USER ═══

@@ -16064,9 +16064,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         t.includes('mixedcardio') || t.includes('mixed_cardio') || t.includes('aqua')) return 'cross';
     if (t.includes('walk') || t.includes('hike')) return 'walk';
     if (t.includes('yoga') || t.includes('mobil') || t.includes('stretch') || t.includes('pilates')) return 'mobility';
-    // Apple Health generic 'Other' workout — classify as cross-training rather
-    // than the catch-all 'other' bucket so it shows in the discipline chart.
-    if (t === 'other' || t === 'traditionalstrengthtraining' || t === 'fitnessactivities') return 'cross';
+    // Apple Health generic fallback: 'Workout' is what HK_TYPE_MAP emits for any
+    // unmapped activity type (Dance, MindAndBody, Soccer, old HIIT entries, etc.).
+    // Map to 'cross' so it shows in the discipline chart rather than vanishing
+    // into the invisible 'other' bucket. Same for the Apple Health literal 'Other'.
+    if (t === 'other' || t === 'workout' || t === 'traditionalstrengthtraining' || t === 'fitnessactivities') return 'cross';
     return 'other';
   }
   // Find a Strava activity matching a YYYY-MM-DD date string (returns first match for that day)
@@ -17995,7 +17997,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       'CrossTraining':                  'CrossTraining',
       'Walking':                        'Walk',
       'Hiking':                         'Hike',
-      'HighIntensityIntervalTraining':  'Workout',
+      'HighIntensityIntervalTraining':  'HIIT',
       'Yoga':                           'Yoga',
       'Rowing':                         'Rowing',
       'Elliptical':                     'Elliptical',
@@ -18689,6 +18691,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function renderMarkdownToHtml(text) {
     if (!text) return '';
+    // Strip AI-echoed JSON field sequences before markdown conversion.
+    // The model sometimes outputs context data verbatim as "Field: value · Field: value"
+    // despite the prompt prohibition. Match 2+ consecutive "Label: value" pairs
+    // (the minimum that signals a field-dump, not natural language with a colon).
+    const FIELD_NAMES = 'Name|Type|Duration(?:\\s*\\(min\\))?|Meta|Prescription|Targets?|Intensity|Status';
+    const FIELD_RE = new RegExp(
+      `\\b(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+(?:\\s*·\\s*(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+)+`,
+      'gi'
+    );
+    text = text.replace(FIELD_RE, '').replace(/\s{2,}/g, ' ').trim();
     let s = escapeHtmlForChat(text);
     s = s.replace(/\*\*([^\n]+?)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/__([^\n_]+?)__/g, '<strong>$1</strong>');
