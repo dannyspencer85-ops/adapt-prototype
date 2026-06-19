@@ -11,23 +11,21 @@
 // failure (malformed JSON, validation reject, network error) the frontend
 // falls back to the rule-based generator so users always get *something*.
 
-// Switched from edge to Node.js runtime so maxDuration in vercel.json applies.
-// Edge functions are capped at 25s even on Pro; plan generation via Mistral
-// can take 30-50s on a busy free-tier key.
-export const config = { runtime: 'nodejs' };
+// Edge runtime: Vercel Hobby gives Edge functions 25 s; the Node.js/serverless
+// runtime is capped at 10 s on Hobby regardless of maxDuration in vercel.json.
+// Staying on Edge gives us the most headroom without requiring a Pro plan.
+export const config = { runtime: 'edge' };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 // Free-tier workhorse: open-mistral-nemo has sufficient reasoning for the
-// structured JSON plan output and avoids the 429 rate-limits that
-// mistral-medium-latest hits on the free tier. The heavy system prompt +
-// validatePlan coercions compensate for the smaller model; the rule engine
-// is the ultimate fallback if even this model is overloaded.
+// structured JSON plan output and avoids the 429 rate-limits that hit on
+// heavier models. The heavy system prompt + validatePlan coercions compensate
+// for the smaller model; the rule engine is the ultimate fallback.
 const PLAN_MODEL = 'open-mistral-nemo';
 const MAX_TOKENS = 2800;                    // trimmed from 4500: shorter output halves generation time on free-tier Mistral
-// Reduced from 45 s: with the Node.js runtime and maxDuration:60 in vercel.json
-// the function can run up to 60 s. Keep individual Mistral call well under that
-// to leave room for retries + response parsing.
-const REQUEST_TIMEOUT_MS = 25000;
+// 20 s — 5 s under the Vercel Edge 25 s hard limit so the function can return
+// a clean 504 before Vercel kills it with an unhandled FUNCTION_INVOCATION_TIMEOUT.
+const REQUEST_TIMEOUT_MS = 20000;
 
 // Plan generation is the most expensive call in this app (~$0.006-0.012 per
 // invocation with Mistral Medium). Cap per-IP attempts hard. The map is

@@ -18696,9 +18696,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // These are internal coach instructions, not language for the user to read.
     text = text.replace(/\*\*\d+\.\s*(?:ACKNOWLEDGE|IMPACT|CASCADE|WARNING)\*\*\s*/gi, '');
 
-    // Strip AI-echoed JSON field sequences: "Duration: 0 minutes · Type: Rest day".
-    // Match 2+ consecutive "Label: value" pairs (single pair can appear in normal prose).
-    const FIELD_NAMES = 'Name|Type|Duration(?:\\s*\\(min\\))?|Meta|Prescription|Targets?|Intensity|Status';
+    // Strip structural response labels the model emits as bold line-starters.
+    // "Acknowledged:", "Purpose:", "Feel:" are alternatives the model invents
+    // when the named section headers (ACKNOWLEDGE etc.) are blocked.
+    text = text.replace(/^\s*\*?\*?(?:Acknowledged?|Purpose|Feel)\*?\*?\s*:\s*/gim, '');
+
+    // Strip AI-echoed JSON field sequences: "Duration: 0 min · Intensity: Z2 · Feel: Good".
+    // Require 2+ consecutive "Label: value" pairs so normal prose with a colon isn't touched.
+    const FIELD_NAMES = 'Name|Type|Duration(?:\\s*\\(min\\))?|Meta|Prescription|Targets?|Intensity|Status|Feel|Purpose|RPE';
     const FIELD_RE = new RegExp(
       `\\b(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+(?:\\s*·\\s*(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+)+`,
       'gi'
