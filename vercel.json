@@ -4,14 +4,6 @@
   },
   "crons": [
     {
-      "path": "/api/notifications/morning-checkin",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/notifications/post-workout-prompt",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/notifications/weekly-review",
       "schedule": "0 19 * * 0"
     },
