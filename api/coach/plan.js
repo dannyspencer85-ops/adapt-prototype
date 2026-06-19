@@ -11,7 +11,10 @@
 // failure (malformed JSON, validation reject, network error) the frontend
 // falls back to the rule-based generator so users always get *something*.
 
-export const config = { runtime: 'edge' };
+// Switched from edge to Node.js runtime so maxDuration in vercel.json applies.
+// Edge functions are capped at 25s even on Pro; plan generation via Mistral
+// can take 30-50s on a busy free-tier key.
+export const config = { runtime: 'nodejs' };
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 // Free-tier workhorse: open-mistral-nemo has sufficient reasoning for the
@@ -21,7 +24,10 @@ const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 // is the ultimate fallback if even this model is overloaded.
 const PLAN_MODEL = 'open-mistral-nemo';
 const MAX_TOKENS = 4500;                    // 6 weeks of detail fits in ~3000-4000 tokens
-const REQUEST_TIMEOUT_MS = 45000;
+// Reduced from 45 s: with the Node.js runtime and maxDuration:60 in vercel.json
+// the function can run up to 60 s. Keep individual Mistral call well under that
+// to leave room for retries + response parsing.
+const REQUEST_TIMEOUT_MS = 25000;
 
 // Plan generation is the most expensive call in this app (~$0.006-0.012 per
 // invocation with Mistral Medium). Cap per-IP attempts hard. The map is
@@ -120,10 +126,12 @@ export default async function handler(req) {
     temperature: 0.3, // low temp for consistency, but not 0 — we want some judgment
   };
 
-  // Retry up to 3× on transient Mistral errors (500/502/503/529).
-  // Same strategy as /api/coach/chat — brief back-off prevents hammering.
+  // One retry on transient Mistral server errors (500/502/503/529) only.
+  // Timeouts are NOT retried: if Mistral is slow on attempt 1 it'll be slow
+  // on attempt 2, and retrying blows through maxDuration:60. Worst-case with
+  // one retry: 25s + 1s backoff + 25s = 51s — comfortably under the 60s cap.
   const TRANSIENT = new Set([500, 502, 503, 529]);
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 2;
   let upstream, attempt = 0;
   while (attempt < MAX_ATTEMPTS) {
     try {
@@ -133,15 +141,14 @@ export default async function handler(req) {
         body: JSON.stringify(payload),
       }), REQUEST_TIMEOUT_MS);
     } catch (e) {
-      // Network / timeout error — only retry if attempts remain.
-      attempt++;
-      if (attempt >= MAX_ATTEMPTS) return jsonErr(502, 'Mistral request failed after retries: ' + (e && e.message || 'timeout'));
-      await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2500));
-      continue;
+      // Timeout or network failure — fail immediately, no retry.
+      // Frontend falls back to the rule-engine plan; retrying a slow API just
+      // burns time and budget without improving the outcome.
+      return jsonErr(504, 'Plan generation timed out — the AI took too long. Using built-in schedule instead.');
     }
     if (upstream.ok || !TRANSIENT.has(upstream.status)) break;
     attempt++;
-    if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2500));
+    if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1000));
   }
 
   if (!upstream.ok) {

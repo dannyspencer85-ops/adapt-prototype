@@ -3776,7 +3776,7 @@
       <div id="sdView">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
           <h2 id="sdTitle" style="font-size:20px; margin:0;">Session</h2>
-          <button onclick="closeSessionModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+          <button onclick="event.stopPropagation(); closeSessionModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:8px; line-height:1; min-width:44px; min-height:44px;">×</button>
         </div>
         <div class="sub" id="sdWhen"></div>
         <div id="sdContent"></div>
@@ -3794,14 +3794,14 @@
              weeks (this week + next 2). -->
         <div id="sdAvailAction"></div>
         <div style="display:flex; gap:8px; margin-top: 16px;">
-          <button class="btn btn-ghost" style="flex:1;" onclick="closeSessionModal()">Close</button>
+          <button class="btn btn-ghost" style="flex:1;" onclick="event.stopPropagation(); closeSessionModal()">Close</button>
           <button class="btn btn-primary" style="flex:1;" onclick="startEditSession()">Edit</button>
         </div>
       </div>
       <div id="sdEdit" style="display:none;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
           <h2 style="font-size:20px; margin:0;">What do you want to do?</h2>
-          <button onclick="closeSessionModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+          <button onclick="event.stopPropagation(); closeSessionModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:8px; line-height:1; min-width:44px; min-height:44px;">×</button>
         </div>
         <div class="sub" id="sdEditWhen"></div>
 
@@ -6381,7 +6381,7 @@
       ? disc.map(d => discLabels[d] || d).join(', ')
       : 'Not set';
 
-    const NOT_SET = '<span style="color:var(--text-soft); font-weight:500;">Not set. tap to add</span>';
+    const NOT_SET = '<span style="color:var(--text-soft); font-weight:500;">Not set — tap to add</span>';
     const rows = [
       { label: 'Name', value: name ? esc(name.charAt(0).toUpperCase() + name.slice(1)) : NOT_SET, step: 1 },
       { label: 'Current fitness & background', value: bgParts.length ? esc(bgParts.join(' · ')) : NOT_SET, step: 2 },
@@ -8160,9 +8160,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       let metaToShow = safeS.meta;
 
       if (isPast && !isCompleted) {
-        // Past + not done: show nothing about what was prescribed — it wasn't done
-        nameToShow = s.type === 'rest' ? 'Rest' : 'Not logged';
-        metaToShow = s.type === 'rest' ? 'Recovery' : '';
+        // Past + not done: show the session name so the week is scannable;
+        // the "Not logged" status badge already communicates it wasn't done.
+        if (s.type === 'rest') {
+          nameToShow = 'Rest';
+          metaToShow = 'Recovery';
+        }
+        // else: keep nameToShow = safeS.name and metaToShow = safeS.meta
       } else if (isCompleted && s.stravaName) {
         // Past + completed: show actual workout data only
         nameToShow = s.stravaName;
@@ -10938,6 +10942,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function openSessionModal(day, weekOffset) {
+    // Ignore opens within 300 ms of a close — prevents mobile tap-through from
+    // re-opening the modal immediately after the user tapped the × button.
+    if (Date.now() - _modalClosedAt < 300) return;
     weekOffset = weekOffset || 0;
     let s = planState.sessions[day];
     // Track whether the session came from fullPlan (already phase-scaled by
@@ -11222,8 +11229,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     closeSessionModal();
   }
 
+  let _modalClosedAt = 0;
   function closeSessionModal() {
+    _modalClosedAt = Date.now();
     document.getElementById('sessionModal').classList.remove('show');
+    document.getElementById('sdView').style.display = '';
+    document.getElementById('sdEdit').style.display = 'none';
     currentEditDay = null;
   }
 
@@ -11814,6 +11825,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // "I slept badly" with "my plan is behind."
     const card = document.getElementById('todayReadinessCard');
     if (!card) return;
+    // Don't render until plan data has loaded — avoids the 100→65 flicker
+    // where the score computes a default (high) value before sessions/plan are
+    // available, then recomputes lower once the full state is in memory.
+    const planLoaded = !!(planState.fullPlan && planState.fullPlan.weeks && planState.fullPlan.weeks.length > 0);
     let race = null, body = null;
     try { race = (typeof computeRaceReadiness === 'function') ? computeRaceReadiness() : null; } catch (e) {}
     try { body = (typeof computeBodyReadiness === 'function') ? computeBodyReadiness() : null; } catch (e) {}
@@ -11822,6 +11837,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       card.style.display = 'none';
       return;
     }
+    // Force "pending" display until the plan is loaded so the score doesn't flicker.
+    if (!planLoaded) { race = { ...race, status: 'pending', score: 0 }; }
     if (!body) body = computeBodyReadiness();
 
     // The card's overall background follows the WORSE of the two — if either
@@ -11865,7 +11882,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ${scoreBlock(body, 'Body today', body.label, bodyPending)}
         ${scoreBlock(raceObj, 'Race ready', race.label, racePending)}
       </div>
-      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(racePending ? 'Plan is still building' : race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan needs small fixes' : 'Plan is behind. adjust this week')}</div>
+      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(racePending ? 'Plan is still building' : race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan is slightly behind' : 'Plan is behind — adjust this week')}</div>
     `;
   }
 
@@ -12145,6 +12162,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderPRBanner() {
     const slot = document.getElementById('prCelebrationBanner');
     if (!slot) { return; }
+    // Respect the 24-hour cooldown set when the user last dismissed the banner.
+    const dismissedUntil = parseInt(localStorage.getItem('pr-dismissed-until') || '0', 10);
+    if (dismissedUntil > Date.now()) { slot.style.display = 'none'; return; }
     const records = detectPRs();
     let dismissed = {};
     try { dismissed = JSON.parse(localStorage.getItem('pr-dismissed') || '{}'); } catch (e) {}
@@ -12175,14 +12195,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // render" bug where the celebration is silently consumed.
     const r = fresh[0];
     slot.style.display = 'block';
-    slot.innerHTML = `<div style="background:linear-gradient(135deg, var(--primary-light, #5DA985), var(--primary, #3B8968)); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+    slot.innerHTML = `<div onclick="dismissPR('${r.id}')" style="background:linear-gradient(135deg, var(--primary-light, #5DA985), var(--primary, #3B8968)); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px; cursor:pointer;">
       <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${icon('trophy', { size: 24, color: '#fff', stroke: 1.8 })}</div>
       <div style="flex:1; min-width:0;">
         <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.9;">${welcomeShown ? 'NEW PERSONAL BEST' : 'YOUR BEST RECORD'}</div>
         <div style="font-size:16px; font-weight:800; margin-top:2px;">${escapeHtml(r.label)}. ${escapeHtml(r.value)}</div>
         <div style="font-size:11.5px; opacity:0.9; margin-top:1px;">Tap to dismiss</div>
       </div>
-      <button onclick="dismissPR('${r.id}')" style="background:rgba(255,255,255,0.25); color:#fff; border:0; padding:6px 9px; border-radius:100px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;">Got it</button>
+      <div style="background:rgba(255,255,255,0.25); color:#fff; padding:6px 9px; border-radius:100px; font-size:11px; font-weight:700; flex-shrink:0;">Got it</div>
     </div>`;
   }
   function dismissPR(id) {
@@ -12192,12 +12212,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try { seen = JSON.parse(localStorage.getItem('pr-seen') || '{}'); } catch (e) {}
     dismissed[id] = Date.now();
     localStorage.setItem('pr-dismissed', JSON.stringify(dismissed));
-    // Mark ALL current records as seen now that user has interacted with the
-    // banner — subsequent runs will only celebrate brand-new records.
+    // Mark ALL current records as seen so subsequent renders only celebrate
+    // genuinely new records (prevents re-show if the best-week ID shifts).
     const records = detectPRs();
     records.forEach(r => { seen[r.id] = Date.now(); });
     localStorage.setItem('pr-seen', JSON.stringify(seen));
     localStorage.setItem('pr-welcome-shown', '1');
+    // 24-hour cooldown: even if a record ID shifts (e.g. Strava re-sync picks
+    // a different best-week start date), the banner won't re-appear until tomorrow.
+    localStorage.setItem('pr-dismissed-until', String(Date.now() + 24 * 3600 * 1000));
     renderPRBanner();
   }
 
@@ -16033,10 +16056,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (t.includes('run') || t.includes('jog') || t.includes('virtualrun')) return 'run';
     if (t.includes('ride') || t.includes('bike') || t.includes('cycl') || t.includes('virtualride') || t.includes('ebike')) return 'bike';
     if (t.includes('swim')) return 'swim';
-    if (t.includes('crosstraining') || t.includes('hiit') || t.includes('functional')) return 'cross';
-    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit')) return 'strength';
+    // Strength / gym — before 'cross' so 'crossfit' maps here not to cross-training
+    if (t.includes('weight') || t.includes('strength') || t.includes('crossfit') || t.includes('core') || t.includes('hiit')) return 'strength';
+    // Low-impact cross-training: elliptical, rowing, stair, aqua, etc.
+    if (t.includes('crosstraining') || t.includes('cross_training') || t.includes('elliptical') ||
+        t.includes('rowing') || t.includes('stair') || t.includes('functional') ||
+        t.includes('mixedcardio') || t.includes('mixed_cardio') || t.includes('aqua')) return 'cross';
     if (t.includes('walk') || t.includes('hike')) return 'walk';
-    if (t.includes('yoga') || t.includes('mobil')) return 'mobility';
+    if (t.includes('yoga') || t.includes('mobil') || t.includes('stretch') || t.includes('pilates')) return 'mobility';
+    // Apple Health generic 'Other' workout — classify as cross-training rather
+    // than the catch-all 'other' bucket so it shows in the discipline chart.
+    if (t === 'other' || t === 'traditionalstrengthtraining' || t === 'fitnessactivities') return 'cross';
     return 'other';
   }
   // Find a Strava activity matching a YYYY-MM-DD date string (returns first match for that day)
@@ -16493,7 +16523,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       : (hk.hrv || []).filter(r => r && r.value > 0 && r.value < 250);
 
     const noDataMsg = metric === 'rhr'
-      ? 'No resting heart rate data. Install the latest build from TestFlight and wear your Apple Watch to sleep.'
+      ? 'No resting heart rate data. Connect Apple Health and wear your Apple Watch to sleep to see this chart.'
       : metric === 'vo2'
       ? 'No VO2 Max data. Apple Watch estimates VO2 Max from outdoor runs or walks. Try an outdoor run to trigger a reading.'
       : 'No HRV data. Apple Watch records HRV nightly during sleep. Wear it to sleep for a few days to see this chart.';
@@ -17170,13 +17200,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Stash buckets for drill-down lookups
     _perfBucketCache = { buckets, bucketSize, activities: acts };
     bars.innerHTML = buckets.map((b, idx) => {
-      const pct = b.mins > 0 ? Math.max(8, Math.round((b.mins / peakMins) * 100)) : 6;
       const isEmpty = b.mins < 1;
+      // Empty days render as a 3px flat baseline so the date label always has
+      // a visible anchor and the chart doesn't appear truncated.
+      const pct = isEmpty ? 0 : Math.max(8, Math.round((b.mins / peakMins) * 100));
       const isSelected = _perfDrill && _perfDrill.kind === 'bucket' && _perfDrill.idx === idx;
-      const baseStyle = `height: ${pct}%; cursor: pointer;`;
+      const baseStyle = isEmpty
+        ? `height: 3px; border-radius: 2px; background: var(--border); cursor: pointer;`
+        : `height: ${pct}%; cursor: pointer;`;
       const selectedStyle = isSelected ? 'box-shadow: 0 0 0 2px var(--primary); transform: scaleY(1.04); transform-origin: bottom;' : '';
-      const opacity = isEmpty ? 'opacity: 0.4;' : '';
-      return `<div class="bar ${isEmpty ? '' : 'done'}" onclick="selectPerfBucket(${idx})" style="${baseStyle} ${opacity} ${selectedStyle}" title="${b.label}: ${formatHM(b.mins)}"></div>`;
+      return `<div class="bar ${isEmpty ? '' : 'done'}" onclick="selectPerfBucket(${idx})" style="${baseStyle} ${selectedStyle}" title="${b.label}: ${formatHM(b.mins)}"></div>`;
     }).join('');
 
     // X-axis labels — show start, middle, end (or first / last few for short ranges)
@@ -17622,7 +17655,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           ${a.max_hr ? `<div><div style="font-size:24px; font-weight:700;">${Math.round(a.max_hr)}</div><div style="font-size:11px; color:var(--text-soft);">Max BPM</div></div>` : ''}
         </div>`;
       } else {
-        html += `<div style="font-size:12px; color:var(--text-soft); margin-top:4px;">No HR data. workout may not have been recorded with a heart rate sensor, or install the latest build from TestFlight to enable per-workout HR tracking.</div>`;
+        html += `<div style="font-size:12px; color:var(--text-soft); margin-top:4px;">No HR data. This workout may not have been recorded with a heart rate sensor.</div>`;
       }
       html += `</div>`;
 
@@ -19437,15 +19470,11 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
         }
       }
     } catch (e) { /* non-fatal — calendar will fall back to planState.sessions */ }
-    // Recompute localStorage 'training-days' from the live session map so
-    // _regeneratePlanInBackground / retryAIPlan see the user's actual choice.
-    try {
-      const liveTrainingDays = DAYS.filter(d =>
-        planState.sessions[d] && planState.sessions[d].type !== 'rest' &&
-        (planState.sessions[d].duration || 0) > 0
-      );
-      localStorage.setItem('training-days', JSON.stringify(liveTrainingDays));
-    } catch (e) {}
+    // Do NOT rewrite 'training-days' here. That preference is the user's
+    // stable schedule constraint (set via onboarding or the You-tab schedule
+    // modal). Deriving it from planState.sessions would corrupt it whenever
+    // the AI generates a lighter week (taper, recovery) with fewer active
+    // days than the user's actual preference.
   }
 
   function tool_openTrainingDay({ day }) {

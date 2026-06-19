@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/coach/plan.js": { "maxDuration": 60 }
+  },
   "crons": [
     {
       "path": "/api/notifications/morning-checkin",
