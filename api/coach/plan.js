@@ -22,7 +22,12 @@ const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 // heavier models. The heavy system prompt + validatePlan coercions compensate
 // for the smaller model; the rule engine is the ultimate fallback.
 const PLAN_MODEL = 'open-mistral-nemo';
-const MAX_TOKENS = 2800;                    // trimmed from 4500: shorter output halves generation time on free-tier Mistral
+const MAX_TOKENS = 3000;
+// Max weeks generated per call. A full 16-week plan in pretty-printed JSON
+// is ~9,000 tokens — way over budget and over the 25s Edge limit. At 3,000
+// tokens and compact JSON we can reliably fit 6 weeks. The frontend can
+// trigger a second generation for later weeks if needed.
+const MAX_PLAN_WEEKS = 6;
 // 20 s — 5 s under the Vercel Edge 25 s hard limit so the function can return
 // a clean 504 before Vercel kills it with an unhandled FUNCTION_INVOCATION_TIMEOUT.
 const REQUEST_TIMEOUT_MS = 20000;
@@ -196,7 +201,7 @@ export default async function handler(req) {
 
       let parsed;
       try { parsed = JSON.parse(rawContent); }
-      catch (e) { throw new Error('Plan JSON parse failed: ' + (e && e.message || '') + ' | raw[0:150]=' + rawContent.slice(0, 150)); }
+      catch (e) { throw new Error('Plan JSON parse failed: ' + (e && e.message || '')); }
 
       const validation = validatePlan(parsed, validationInputs);
       if (!validation.ok) {
@@ -590,7 +595,7 @@ You MUST output an object exactly matching this shape:
         "Sun": { ... }
       }
     },
-    ... (one per week, weekIndex 0 through weeksToRace-1)
+    ... (one entry per week; generate up to MAX_PLAN_WEEKS weeks, starting from weekIndex 0)
   ],
   "notesForUser": [
     "1-3 short bullet notes about the plan's logic that the user should know"
@@ -611,7 +616,10 @@ These fields are read by DIFFERENT parts of the UI. If they disagree, the user s
 
 If you change durationMin, the prescription text must reflect the new total. If you change prescription structure, durationMin must follow. They are tied together.
 
-NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.`;
+NO prose outside this JSON. NO markdown. NO trailing comments. Just the object.
+
+OUTPUT FORMAT: compact JSON only — no whitespace between fields, no newlines, no indentation. Your entire response must be one minified JSON line. Example: {"summary":"...","blocks":[...],"weeks":[...],"notesForUser":["..."]}`;
+
 }
 
 // Server-side mirror of the client's RACE_MIN_HOURS so the AI prompt knows
@@ -689,7 +697,7 @@ ${discList && discList.includes('strength') ? 'I have strength/gym access — pl
 
 ${difficultyAdjust === 'easier' ? 'IMPORTANT: I told you my last plan was TOO HARD. Build the new plan with lighter sessions, longer walk intervals, slower progression. Defer quality work by 1-2 weeks. Treat me as a notch less experienced than my profile suggests.' : difficultyAdjust === 'harder' ? 'IMPORTANT: I told you my last plan was TOO EASY. Build the new plan with sharper progression, earlier quality work (week 3 instead of week 5), longer continuous run intervals from week 1. Treat me as a notch more experienced than my profile suggests.' : ''}
 
-Build the full ${Math.min(weeksToRace || 16, 24)}-week (or fewer if less time) plan now. Output the JSON only.`;
+Build the plan now — ${Math.min(weeksToRace || MAX_PLAN_WEEKS, MAX_PLAN_WEEKS)} weeks (${MAX_PLAN_WEEKS}-week maximum per generation). Output compact minified JSON only — no whitespace, no newlines, no indentation.`;
 }
 
 // ─── Plan validation ─────────────────────────────────────────────────────
