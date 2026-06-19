@@ -5430,21 +5430,36 @@
         }),
       });
       clearTimeout(timeout);
-      const data = await resp.json().catch(() => ({}));
-
-      // 422 = plan generated OK but failed a statistical guardrail (e.g. week-
-      // over-week jump > 30%). The response body includes `raw` — the already-
-      // coerced plan that just missed the bound. Using it is MUCH better than
-      // the rule-engine fallback: all session-type fixes, duration caps, and
-      // discipline coercions have already been applied.
-      if (resp.status === 422 && data.raw && Array.isArray(data.raw.weeks) && data.raw.weeks.length > 0) {
-        console.warn('[Adapt] Plan passed AI but hit a validation bound:', data.error, '— using coerced plan.');
-        return data.raw;
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || ('HTTP ' + resp.status));
       }
 
-      if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
-      if (!data || !data.ok || !data.plan) throw new Error('Plan response missing plan field');
-      return data.plan;
+      // Plan endpoint now streams SSE. Accumulate until [DONE], then parse.
+      const sseReader = resp.body.getReader();
+      const sseDec = new TextDecoder();
+      let planData = null;
+      sseOuter: while (true) {
+        const { done, value } = await sseReader.read();
+        if (done) break;
+        const chunk = sseDec.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const d = line.slice(6).trim();
+          if (d === '[DONE]') break sseOuter;
+          try { planData = JSON.parse(d); } catch (_) {}
+        }
+      }
+
+      // Validation-failed plan: server sends ok:false with raw data (equivalent
+      // of the old 422 response — use the coerced plan rather than rule-engine).
+      if (planData && !planData.ok && planData.raw && Array.isArray(planData.raw.weeks) && planData.raw.weeks.length > 0) {
+        console.warn('[Adapt] Plan passed AI but hit a validation bound:', planData.error, '— using coerced plan.');
+        return planData.raw;
+      }
+
+      if (!planData || !planData.ok || !planData.plan) throw new Error((planData && planData.error) || 'Plan response missing plan field');
+      return planData.plan;
     } catch (e) {
       clearTimeout(timeout);
       throw e;

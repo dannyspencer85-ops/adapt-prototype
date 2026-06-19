@@ -121,27 +121,22 @@ export default async function handler(req) {
     ],
     response_format: { type: 'json_object' },
     max_tokens: MAX_TOKENS,
-    temperature: 0.3, // low temp for consistency, but not 0 — we want some judgment
+    temperature: 0.3,
+    stream: true,
   };
 
   // One retry on transient Mistral server errors (500/502/503/529) only.
-  // Timeouts are NOT retried: if Mistral is slow on attempt 1 it'll be slow
-  // on attempt 2, and retrying blows through maxDuration:60. Worst-case with
-  // one retry: 25s + 1s backoff + 25s = 51s — comfortably under the 60s cap.
   const TRANSIENT = new Set([500, 502, 503, 529]);
   const MAX_ATTEMPTS = 2;
   let upstream, attempt = 0;
   while (attempt < MAX_ATTEMPTS) {
     try {
-      upstream = await withTimeout(fetch(MISTRAL_URL, {
+      upstream = await fetch(MISTRAL_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }), REQUEST_TIMEOUT_MS);
+      });
     } catch (e) {
-      // Timeout or network failure — fail immediately, no retry.
-      // Frontend falls back to the rule-engine plan; retrying a slow API just
-      // burns time and budget without improving the outcome.
       return jsonErr(504, 'Plan generation timed out — the AI took too long. Using built-in schedule instead.');
     }
     if (upstream.ok || !TRANSIENT.has(upstream.status)) break;
@@ -155,40 +150,59 @@ export default async function handler(req) {
     return jsonErr(upstream.status, `Mistral ${upstream.status}: ${String(detail).slice(0, 200)}`);
   }
 
-  let response;
-  try {
-    response = await upstream.json();
-  } catch (e) {
-    return jsonErr(502, 'Mistral returned non-JSON');
-  }
+  // Stream Mistral's SSE response through a TransformStream. The Edge function
+  // returns immediately; Vercel pipes the readable until the writer closes.
+  // Accumulate content tokens server-side, validate the complete JSON, then
+  // emit a single result event so the client never sees raw Mistral SSE.
+  const { readable, writable } = new TransformStream();
+  const enc = new TextEncoder();
+  const wr = writable.getWriter();
+  const validationInputs = { event, hours, days, weeksToRace, availableDisciplines, profile, fitnessMarkers };
 
-  const rawText = response?.choices?.[0]?.message?.content || '';
-  if (!rawText) return jsonErr(502, 'Mistral returned empty content');
+  (async () => {
+    try {
+      let rawContent = '';
+      const reader = upstream.body.getReader();
+      const dec = new TextDecoder();
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const d = line.slice(6).trim();
+          if (d === '[DONE]') break outer;
+          try {
+            const evt = JSON.parse(d);
+            rawContent += evt.choices?.[0]?.delta?.content || '';
+          } catch (_) {}
+        }
+      }
 
-  let parsed;
-  try { parsed = JSON.parse(rawText); }
-  catch (e) {
-    return jsonErr(502, 'Plan JSON parse failed: ' + (e && e.message || ''));
-  }
+      let parsed;
+      try { parsed = JSON.parse(rawContent); }
+      catch (e) { throw new Error('Plan JSON parse failed: ' + (e && e.message || '')); }
 
-  // Validate + normalize. If validation fails, return the failure to the
-  // caller — the frontend can fall back to its rule engine.
-  // Pass profile + fitnessMarkers — validatePlan's beginner-runner cap is
-  // gated on isBeginnerRunner which reads profile.exp / fitnessMarkers
-  // .runAbility. Previously those were undefined, so the cap NEVER fired
-  // and a 5K beginner could get a 60-min "easy run" if the AI slipped.
-  const validation = validatePlan(parsed, { event, hours, days, weeksToRace, availableDisciplines, profile, fitnessMarkers });
-  if (!validation.ok) {
-    return new Response(JSON.stringify({
-      ok: false,
-      error: 'Plan validation failed: ' + validation.reason,
-      raw: parsed,
-    }), { status: 422, headers: { 'Content-Type': 'application/json' } });
-  }
+      const validation = validatePlan(parsed, validationInputs);
+      if (!validation.ok) {
+        await wr.write(enc.encode(`data: ${JSON.stringify({ ok: false, error: 'Plan validation failed: ' + validation.reason, raw: parsed })}\n\n`));
+      } else {
+        await wr.write(enc.encode(`data: ${JSON.stringify({ ok: true, plan: validation.plan, model: PLAN_MODEL })}\n\n`));
+      }
+    } catch (e) {
+      await wr.write(enc.encode(`data: ${JSON.stringify({ ok: false, error: String(e.message || e) })}\n\n`));
+    } finally {
+      await wr.write(enc.encode('data: [DONE]\n\n'));
+      await wr.close();
+    }
+  })();
 
-  return new Response(JSON.stringify({ ok: true, plan: validation.plan, model: PLAN_MODEL }), {
+  return new Response(readable, {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+    },
   });
 }
 
