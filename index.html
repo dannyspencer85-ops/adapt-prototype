@@ -18691,16 +18691,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function renderMarkdownToHtml(text) {
     if (!text) return '';
-    // Strip AI-echoed JSON field sequences before markdown conversion.
-    // The model sometimes outputs context data verbatim as "Field: value · Field: value"
-    // despite the prompt prohibition. Match 2+ consecutive "Label: value" pairs
-    // (the minimum that signals a field-dump, not natural language with a colon).
+    // Strip structural labels the model outputs when following the 4-part adherence
+    // format: "**1. ACKNOWLEDGE**", "**2. IMPACT**", "**3. CASCADE**", "**4. WARNING**".
+    // These are internal coach instructions, not language for the user to read.
+    text = text.replace(/\*\*\d+\.\s*(?:ACKNOWLEDGE|IMPACT|CASCADE|WARNING)\*\*\s*/gi, '');
+
+    // Strip AI-echoed JSON field sequences: "Duration: 0 minutes · Type: Rest day".
+    // Match 2+ consecutive "Label: value" pairs (single pair can appear in normal prose).
     const FIELD_NAMES = 'Name|Type|Duration(?:\\s*\\(min\\))?|Meta|Prescription|Targets?|Intensity|Status';
     const FIELD_RE = new RegExp(
       `\\b(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+(?:\\s*·\\s*(?:${FIELD_NAMES})\\s*:\\s*[^·\\n.!?]+)+`,
       'gi'
     );
-    text = text.replace(FIELD_RE, '').replace(/\s{2,}/g, ' ').trim();
+    text = text.replace(FIELD_RE, '').replace(/\n{3,}/g, '\n\n').replace(/\s{2,}/g, ' ').trim();
     let s = escapeHtmlForChat(text);
     s = s.replace(/\*\*([^\n]+?)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/__([^\n_]+?)__/g, '<strong>$1</strong>');
