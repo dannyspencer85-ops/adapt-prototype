@@ -12205,10 +12205,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       slot.style.display = 'none';
       return;
     }
-    // We have something fresh. DO NOT mark as seen yet — only mark when the
-    // user dismisses (via dismissPR). This prevents the "all seen on first
-    // render" bug where the celebration is silently consumed.
+    // Mark the record as seen and start the 24-hour cooldown now, at display
+    // time — not just on explicit dismiss. If the user navigates away without
+    // tapping "Got it" the banner will not re-appear on the next visit.
     const r = fresh[0];
+    seen[r.id] = Date.now();
+    localStorage.setItem('pr-seen', JSON.stringify(seen));
+    localStorage.setItem('pr-welcome-shown', '1');
+    // Only set the cooldown if it isn't already active (don't shorten an
+    // existing dismiss cooldown by re-displaying in the same session).
+    if (!(dismissedUntil > Date.now())) {
+      localStorage.setItem('pr-dismissed-until', String(Date.now() + 24 * 3600 * 1000));
+    }
     slot.style.display = 'block';
     slot.innerHTML = `<div onclick="dismissPR('${r.id}')" style="background:linear-gradient(135deg, var(--primary-light, #5DA985), var(--primary, #3B8968)); color:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px; cursor:pointer;">
       <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${icon('trophy', { size: 24, color: '#fff', stroke: 1.8 })}</div>
