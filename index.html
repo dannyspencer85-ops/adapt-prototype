@@ -24,7 +24,7 @@
 <!-- Supabase JS SDK — loaded before the app script so _sb is available at
      init time. Safe to leave even when SUPABASE_URL is not yet configured;
      the app falls back to localStorage auth in that case. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onerror="(function(){var s=document.createElement('script');s.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js';document.head.appendChild(s);console.warn('[Adapt] jsdelivr CDN failed — loading Supabase from unpkg fallback');})()"></script>
 <!-- Synchronous session pre-check: if a valid auth session exists in localStorage,
      suppress the onboard screen immediately so logged-in users never see the
      welcome screen flash. DOMContentLoaded will call showScreen('today') anyway,
@@ -1909,15 +1909,8 @@
         </div>
       </div>
 
-      <!-- Demo persona launcher: skip onboarding entirely and load a fully
-           populated app under one of N pre-built athlete profiles. Useful for
-           test-group runs where each tester gets a deterministic starting
-           state without re-typing their fitness history. -->
-      <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border);">
-        <div style="font-size: 12px; color: var(--text-soft); text-align: center; margin-bottom: 10px; line-height: 1.5;">
-          <strong style="color: var(--text);">Reviewing the prototype?</strong><br>Skip onboarding and load a fully populated demo athlete:
-        </div>
-      </div>
+      <!-- Demo persona launcher placeholder — removed. Re-add when demo accounts
+           are provisioned in Supabase and the persona picker modal is rebuilt. -->
     </div>
   </div>
 
@@ -3585,8 +3578,9 @@
 
       <div id="scheduleGrid" style="margin-top: 16px;"></div>
 
-      <div style="font-size: 12px; color: var(--text-soft); margin-top: 14px; line-height: 1.5; padding: 10px 12px; background: var(--bg-soft); border-radius: 8px;">
-        💡 Toggle the <strong>day</strong> to set availability. Tap the discipline chips under each day to enable / disable. Example: keep Sunday for long runs only by leaving Run on and turning Swim/Bike off.
+      <div style="font-size: 12px; color: var(--text-soft); margin-top: 14px; line-height: 1.5; padding: 10px 12px; background: var(--bg-soft); border-radius: 8px; display: flex; gap: 8px; align-items: flex-start;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top: 1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Toggle the <strong>day</strong> to set availability. Tap the discipline chips under each day to enable / disable. Example: keep Sunday for long runs only by leaving Run on and turning Swim/Bike off.</span>
       </div>
 
       <div style="display: flex; gap: 8px; margin-top: 18px;">
@@ -6182,10 +6176,12 @@
   // is only called at render time — not during script initialisation where
   // ICON_PATHS is still in the temporal dead zone.
   const SCHEDULE_DISCIPLINES = [
-    { id: 'run',      label: 'Run',      get icon() { return icon('run',      { size: 13 }); } },
-    { id: 'bike',     label: 'Bike',     get icon() { return icon('bike',     { size: 13 }); } },
-    { id: 'swim',     label: 'Swim',     get icon() { return icon('swim',     { size: 13 }); } },
-    { id: 'strength', label: 'Strength', get icon() { return icon('strength', { size: 13 }); } },
+    { id: 'run',        label: 'Run',        get icon() { return icon('run',        { size: 13 }); } },
+    { id: 'bike',       label: 'Bike',       get icon() { return icon('bike',       { size: 13 }); } },
+    { id: 'swim',       label: 'Swim',       get icon() { return icon('swim',       { size: 13 }); } },
+    { id: 'strength',   label: 'Strength',   get icon() { return icon('strength',   { size: 13 }); } },
+    { id: 'functional', label: 'Functional', get icon() { return icon('functional', { size: 13 }); } },
+    { id: 'hiit',       label: 'HIIT',       get icon() { return icon('hiit',       { size: 13 }); } },
   ];
   // Default schedule = the user's ACTUAL onboarding selections, derived from
   // 'training-days' + 'available-disciplines'. Previously this returned
@@ -6201,7 +6197,7 @@
     const mapped = new Set();
     (Array.isArray(disc) ? disc : []).forEach(d => {
       if (d === 'trainer') mapped.add('bike');
-      else if (['run', 'bike', 'swim', 'strength'].includes(d)) mapped.add(d);
+      else if (['run', 'bike', 'swim', 'strength', 'functional', 'hiit'].includes(d)) mapped.add(d);
     });
     const discList = mapped.size ? [...mapped] : SCHEDULE_DISCIPLINES.map(x => x.id);
     const haveDays = Array.isArray(days) && days.length > 0;
@@ -7124,7 +7120,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const key = getAnalyticsKey();
     if (!key || _posthogReady || window.posthog) return;
     !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys getNextSurveyStep onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-    window.posthog.init(key, { api_host: 'https://us.i.posthog.com', person_profiles: 'identified_only', capture_pageview: false });
+    // ⚠️ FLAG FOR OWNER: session_recording, autocapture, and surveys are DISABLED
+    // because this is a health app — replay could capture HR, RPE, or injury inputs.
+    // Confirm whether you want replay off permanently before enabling any of these.
+    window.posthog.init(key, {
+      api_host: 'https://us.i.posthog.com',
+      person_profiles: 'identified_only',
+      capture_pageview: false,
+      disable_session_recording: true,   // no video replay of health inputs
+      autocapture: false,                // no automatic click/input capture
+      disable_surveys: true,             // no in-app survey injection
+      mask_all_text: true,               // masks any text if replay ever re-enabled
+      mask_all_element_attributes: true, // masks attributes in DOM snapshots
+    });
     const u = (typeof currentUser === 'function') ? currentUser() : null;
     if (u) window.posthog.identify(u);
     _posthogReady = true;
@@ -7132,7 +7140,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function trackEvent(event, props) {
     const u = (typeof currentUser === 'function') ? currentUser() : null;
     const payload = { ...(props || {}), $user: u || 'anonymous' };
-    console.log('[analytics]', event, payload);
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') console.log('[analytics]', event, payload);
     initAnalytics();
     if (window.posthog && _posthogReady) {
       try { window.posthog.capture(event, payload); } catch (e) {}
@@ -7229,6 +7237,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     bike:     '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 17.5l1 -3.5l-3 -3l3 -3l1.5 3l3 0"/>',
     swim:     '<path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/>',
     strength: '<path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/>',
+    hiit:     '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+    functional: '<circle cx="12" cy="5" r="2"/><path d="M5 9l7 4 7-4"/><path d="M12 9v8"/><path d="M8 22l4-5 4 5"/>',
     rest:     '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
     walk:     '<path d="M13 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M7 21l3 -4"/><path d="M16 21l-2 -4l-3 -3l1 -6"/><path d="M6 12l2 -3l4 -1l3 3l3 1"/>',
     mobility: '<path d="M16 5a1 1 0 1 0 -2 0a1 1 0 0 0 2 0z"/><path d="M17 11l-5 1l-3 -2l-3 1l-3 5"/><path d="M7 18l4 -2"/><path d="M9 13v4l5 1l-1 4"/><path d="M19 21v-3l-1 -2l-3 0"/>',
@@ -7305,8 +7315,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     strength:  { bg: '#5A4B8C', fg: '#FFFFFF', label: 'Strength' },    // deep indigo
     mobility:  { bg: '#B0B7BD', fg: '#FFFFFF', label: 'Mobility' },    // soft grey
     walk:      { bg: '#84A9B5', fg: '#FFFFFF', label: 'Walk' },        // teal
-    cross:     { bg: '#2E9E8E', fg: '#FFFFFF', label: 'Cross-train' }, // teal-green
-    rest:      { bg: '#E6E6E6', fg: '#888888', label: 'Rest' },        // very light grey
+    cross:      { bg: '#2E9E8E', fg: '#FFFFFF', label: 'Cross-train' }, // teal-green
+    hiit:       { bg: '#D64C2A', fg: '#FFFFFF', label: 'HIIT' },       // vivid red-orange
+    functional: { bg: '#6B7E3E', fg: '#FFFFFF', label: 'Functional' }, // olive green
+    rest:       { bg: '#E6E6E6', fg: '#888888', label: 'Rest' },       // very light grey
   };
   function sportColor(type) {
     return SPORT_COLORS[type] || SPORT_COLORS.rest;
@@ -8985,7 +8997,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     ];
 
     _showCalendarPopover({
-      icon: '😴',
+      icon: icon('rest', { size: 22, stroke: 2 }),
       tag: 'REST DAY',
       title: friendlyDate,
       body: reason,
@@ -10949,9 +10961,17 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // never disagree with the duration shown in the modal header (e.g. body
       // says "40 min run" while header says "15 min").
       const dur = Number(session.duration) || 0;
-      const presBody = session.prescription
+      // Strip any ≈/approx/total duration summaries the AI embedded in the
+      // prescription — they may not match session.duration and would contradict
+      // the canonical "N min total." we prepend below.
+      const rawPres = session.prescription
         ? String(session.prescription)
         : `${session.name}. ${session.meta || ''}`;
+      const presBody = rawPres
+        .replace(/[≈~]\s*\d+\s*min(?:utes?)?\b\.?/gi, '')
+        .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')
+        .replace(/\(\s*total\s+\d+\s*min(?:utes?)?\s*\)/gi, '')
+        .replace(/\s{2,}/g, ' ').trim();
       const main = dur > 0
         ? `${dur} min total. ${presBody}`
         : presBody;
@@ -11319,7 +11339,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
           const longestDur = Math.max(0, ...DAYS.map(dd => (weekSessions[dd] && weekSessions[dd].duration) || 0));
           const isAlreadyLong = (s.duration || 0) >= longestDur && longestDur > 0;
           if (!isAlreadyLong) {
-            longSlot.innerHTML = `<button onclick="makeLongDay('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--secondary-soft); color:#7a5a18; border:1px solid var(--secondary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">↔ Make this my long day this week</button>
+            longSlot.innerHTML = `<button onclick="makeLongDay('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--secondary-soft); color:#7a5a18; border:1px solid var(--secondary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">${icon('sync', {size:14})} Make this my long day this week</button>
             <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Swaps your long session onto ${day}. Use this when your week is irregular and the planned long day doesn't work.</div>`;
           }
         }
@@ -11334,7 +11354,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       logSlot.innerHTML = '';
       if (weekOffset === 0 && s && s.type !== 'rest' && (s.duration || 0) > 0) {
         const logged = s.loggedManually || s.completed;
-        logSlot.innerHTML = `<button onclick="openLogForDay('${day}')" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">${logged ? '✎ Edit what I did' : '✓ Log what I did (HR, time, distance)'}</button>
+        logSlot.innerHTML = `<button onclick="openLogForDay('${day}')" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--primary-soft); color:var(--primary-dark); border:1px solid var(--primary); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">${logged ? icon('pencil',{size:14}) + ' Edit what I did' : icon('check',{size:14}) + ' Log what I did (HR, time, distance)'}</button>
         <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Enter your heart rate, distance, and effort by hand.</div>`;
       }
     }
@@ -11346,7 +11366,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (weekOffset >= 0 && weekOffset <= 2) {
         const dateStr = _dateForDayOffset(day, weekOffset);
         const hasOverride = dateStr && !!getDayOverride(dateStr);
-        availSlot.innerHTML = `<button onclick="openDayAvail('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--bg-soft); color:var(--text); border:1px solid var(--border); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">📅 ${hasOverride ? "Edit this day's availability" : "Set my availability this day"}</button>
+        availSlot.innerHTML = `<button onclick="openDayAvail('${day}', ${weekOffset})" style="width:100%; margin-top:14px; padding:11px 14px; background:var(--bg-soft); color:var(--text); border:1px solid var(--border); border-radius:100px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">${icon('calendar',{size:14})} ${hasOverride ? "Edit this day's availability" : "Set my availability this day"}</button>
         <div style="font-size:11px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.4;">Week different than usual? Set the time + disciplines you actually have ${day}.</div>`;
       }
     }
@@ -14549,10 +14569,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const showPrescription = !completed && s.type !== 'rest' && (s.prescription || s.targets);
     if (presEl) {
       if (showPrescription && s.prescription) {
-        // Linkify acronyms (Z2, HR, RPE, FTP, CSS, etc.) so the user can tap
-        // for a definition. Use innerHTML because markupGlossaryTerms returns
-        // safe HTML (it escapes the source string before wrapping known terms).
-        presEl.innerHTML = markupGlossaryTerms(String(s.prescription));
+        // Strip ≈/total duration summaries that may contradict the canonical
+        // duration shown in heroDuration just above.
+        const cleanedPres = String(s.prescription)
+          .replace(/[≈~]\s*\d+\s*min(?:utes?)?\b\.?/gi, '')
+          .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')
+          .replace(/\(\s*total\s+\d+\s*min(?:utes?)?\s*\)/gi, '')
+          .replace(/\s{2,}/g, ' ').trim();
+        presEl.innerHTML = markupGlossaryTerms(cleanedPres);
         presEl.style.display = 'block';
       } else {
         presEl.style.display = 'none';
@@ -17668,15 +17692,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       : null;
     if (totalEl) totalEl.textContent = formatHM(totalMins);
     if (sessionsEl) sessionsEl.textContent = acts.length;
-    if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : '—';
-    if (avgHrEl) avgHrEl.textContent = latestRhr ? latestRhr + ' bpm' : '—';
+    if (distanceEl) distanceEl.textContent = totalDistKm > 0.5 ? totalDistKm.toFixed(0) + ' km' : (acts.length > 0 ? 'No GPS' : 'Log a session');
+    if (avgHrEl) avgHrEl.textContent = latestRhr ? latestRhr + ' bpm' : 'Sync Apple Health';
     const rhrSubEl = document.getElementById('perfRhrSub');
     if (rhrSubEl) {
       if (latestRhrEntry) {
         const rhrDate = new Date(latestRhrEntry.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         rhrSubEl.textContent = rhrAvg7 && rhrAvg7 !== latestRhr ? `${rhrDate} · ${days}-day avg ${rhrAvg7}` : rhrDate;
       } else {
-        rhrSubEl.textContent = '';
+        rhrSubEl.textContent = 'grant Health access in the native app';
       }
     }
 
@@ -18983,8 +19007,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const _todayName = _todayS && _todayS.name ? _todayS.name : "today's session";
 
       // Find the next long session (Sat or last training day)
-      const _longDay = ['Sat','Sun','Fri','Thu'].find(d => { const s = (planState.sessions||{})[d]; return s && s.type !== 'rest' && s.duration >= 60; }) || 'Sat';
-      const _longS = (planState.sessions||{})[_longDay];
+      const _longDay = ['Sat','Sun','Fri','Thu'].find(d => { const s = (planState.sessions||{})[d]; return s && s.type !== 'rest' && s.duration >= 60; });
+      const _longS = _longDay ? (planState.sessions||{})[_longDay] : null;
       const _longLabel = _longS ? `Why ${_longDay}'s ${_longS.type === 'brick' ? 'brick' : 'long run'}?` : "Why the long session?";
       const _longPrompt = _longS ? `Why is ${_longS.name || _longDay + "'s session"} structured this way?` : "Why is the long session important?";
 
@@ -19228,8 +19252,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const raceEvent = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
     let availableDisciplines = [];
     try { availableDisciplines = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
+    // Explicit top-level field so the AI never has to look up sessions[today.day]
+    // and can't confuse it with nextWeekSessions or any other sessions field.
+    const todaySession = (planState.sessions || {})[todayDay] || null;
     return {
       today: { day: todayDay, label: todayDateStr },
+      todaySession,   // single authoritative source — mirrors exactly what Home shows
       timeline,
       daysToRace,
       raceEvent,                          // <— NEW: explicit event source-of-truth

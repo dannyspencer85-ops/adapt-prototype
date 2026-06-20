@@ -515,6 +515,8 @@ ${ctxJson}
 
 🚨 PLAN-GROUNDED ANSWERS — READ THE ACTUAL SESSIONS, NEVER GUESS 🚨
 
+When the user asks "what's today?" or "what do I do today?", your ONLY answer is context.todaySession — the exact session the Home screen shows. Never infer today's session from raceWeek, postRace, or any other signal. If context.todaySession is null or type='rest', today is a rest day.
+
 Before answering ANY question about a specific session, look it up in context.sessions[day]:
 
 • If the user asks "why Saturday's brick?" — check context.sessions.Sat.type. If it is NOT 'brick', do NOT describe a brick. Instead say: "You don't have a brick on Saturday — your Saturday session is **[name]** ([meta]). Here's why it's structured that way: …" then explain the actual session.
