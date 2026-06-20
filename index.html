@@ -1,20 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:#F6F4F1">
 <head>
 <meta charset="UTF-8">
+<!-- Critical: set bg before any blocking script so iOS status bar reads #F6F4F1 on first paint -->
+<style>html,body{background:#F6F4F1;}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Adapt — Adaptive Endurance Coach</title>
 <!-- PWA manifest + theme. Lets the user "Add to Home Screen" on iOS/Android,
      applies the brand color to the OS chrome (URL bar / task switcher), and
      sets the background that shows during PWA splash on Android. -->
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#3B8968">
+<meta name="theme-color" content="#F6F4F1">
 <meta name="background-color" content="#F6F4F1">
+<meta name="color-scheme" content="light">
 <!-- iOS Safari PWA tags. iOS uses these instead of the manifest for the
      home-screen install. apple-mobile-web-app-capable triggers standalone
      mode (no Safari chrome). status-bar-style controls the top bar. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Adapt">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -35,11 +38,11 @@
     // Legacy localStorage auth (demo/tester accounts)
     var hasLsSession = !!localStorage.getItem('adapt-session');
     if (hasSupabaseSession || hasLsSession) {
-      // Hide the onboard screen instantly — DOMContentLoaded will show the right screen
-      document.addEventListener('DOMContentLoaded', function() {
-        var onboard = document.getElementById('screen-onboard');
-        if (onboard) onboard.classList.remove('active');
-      }, { once: true, capture: true }); // capture: true so this fires before other DOMContentLoaded handlers
+      // Inject a style rule synchronously so the browser never renders the
+      // onboard screen at all. Without this, the parser renders it (it starts
+      // class="screen active") and the DOMContentLoaded handler fires too late
+      // — after the first paint — causing a visible flash on every refresh.
+      document.write('<style>#screen-onboard{display:none!important}</style>');
     }
   } catch (e) { /* non-fatal */ }
 })();
@@ -94,6 +97,7 @@
     --sport-walk:     #84A9B5;
     --sport-rest:     #E6E6E6;
   }
+  :root { color-scheme: light; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
@@ -101,12 +105,15 @@
     color: var(--text);
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
   }
   body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
   /* Heading font — applied to all display-scale elements */
   h1, h2, h3,
@@ -119,16 +126,15 @@
     font-family: var(--font-heading);
   }
   .phone {
-    width: 100%;
-    max-width: 100%;
-    height: 100vh;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: var(--bg);
-    border-radius: 0;
-    box-shadow: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    position: relative;
   }
   .screen {
     flex: 1;
@@ -136,6 +142,7 @@
     display: none;
     flex-direction: column;
     background: var(--bg);
+    overscroll-behavior: none;
   }
   .screen.active { display: flex; }
   .screen-inner {
@@ -1890,6 +1897,12 @@
           <label>Confirm password</label>
           <input type="password" id="signupConfirm" autocomplete="new-password">
         </div>
+        <div style="margin-top:12px; display:flex; align-items:flex-start; gap:10px;">
+          <input type="checkbox" id="signupConsent" style="margin-top:3px; flex-shrink:0; width:16px; height:16px; accent-color:var(--primary); cursor:pointer;">
+          <label for="signupConsent" style="font-size:12px; color:var(--text-soft); line-height:1.5; cursor:pointer;">
+            I understand that my data is processed by <strong>Supabase</strong> (auth &amp; storage), <strong>Mistral AI</strong> (AI coaching), <strong>PostHog</strong> (analytics), and <strong>Vercel</strong> (hosting). I have read the <button type="button" onclick="showScreen('privacy')" style="background:none;border:0;padding:0;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Privacy policy</button>.
+          </label>
+        </div>
         <div class="auth-error" id="signupError" style="display:none;"></div>
         <div class="onboard-actions" style="padding-top: 0;">
           <button class="btn btn-primary btn-full btn-lg" onclick="doSignup()">Create account</button>
@@ -2447,6 +2460,7 @@
       <div>
         <div class="greeting" id="todayGreetingDate">Today</div>
         <div class="title" id="todayGreetingName">Good morning</div>
+        <div id="todayHeroStreak" style="font-size:12px; color:var(--text-soft); margin-top:2px;"></div>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <button onclick="openNotifications()" aria-label="Notifications" style="position:relative; background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
@@ -2469,15 +2483,7 @@
       <div id="planSourceBanner"></div>
       <div id="todayChangeBanner"></div>
 
-      <!-- 1. Race countdown — slim strip, sets context without dominating -->
-      <div id="todayRaceBanner" onclick="showScreen('plan')" style="background: linear-gradient(90deg, var(--primary-dark), var(--primary)); color: #fff; padding: 14px 18px; border-radius: 20px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; cursor: pointer;">
-        <div id="raceDaysCount" style="background: rgba(255,255,255,0.25); padding: 5px 12px; border-radius: 100px; font-size: 14px; font-weight: 800; min-width: 36px; text-align: center;">47</div>
-        <div style="flex:1; min-width:0;">
-          <div id="raceLabelTop" style="font-size: 14px; font-weight: 700; line-height: 1.25;">days to your race</div>
-          <div id="raceLabelBottom" style="font-size: 12px; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px;">·</div>
-        </div>
-        <div style="font-size: 16px; opacity: 0.7;">›</div>
-      </div>
+      <!-- Race countdown moved below hero card — see below -->
 
       <!-- RACE-DAY FLOW — three different cards swap into this slot based on
            where the user is in their race timeline:
@@ -2513,7 +2519,10 @@
           <div class="workout-name" id="heroName">
             <span>Loading…</span>
           </div>
-          <div class="workout-duration" id="heroDuration"></div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div class="workout-duration" id="heroDuration"></div>
+            <span id="heroIntensityPill" style="display:none; font-size:10px; font-weight:700; letter-spacing:0.04em; padding:2px 8px; border-radius:100px; background:rgba(255,255,255,0.22); color:#fff;"></span>
+          </div>
           <!-- AI prescription block: the actual workout structure (warmup / main set / cooldown). Populated from planState.sessions[today].prescription when present. -->
           <div id="heroPrescription" style="display:none; margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,0.18); border-radius: 10px; font-size: 13px; line-height: 1.5; font-weight: 500;"></div>
           <div id="heroTargets" style="display:none; margin-top: 6px; font-size: 12px; opacity: 0.92; line-height: 1.4;"></div>
@@ -2536,11 +2545,6 @@
           <button onclick="quickReschedule()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">⟲ Reschedule</button>
           <button onclick="quickSkip()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✕ Skip</button>
         </div>
-        <div class="hero-actions" id="heroLogActions">
-          <button class="btn btn-on-hero" onclick="openTodaySessionDetails()">Full workout</button>
-          <button class="btn btn-on-hero-ghost" onclick="openLogForDay(getTodayDay())">Log session</button>
-          <button class="btn btn-on-hero-ghost" onclick="openCrunch()">Adjust</button>
-        </div>
         <div id="heroActionsDone" style="display: none; margin-top: 14px;">
           <button id="heroViewDetails" onclick="" class="btn btn-on-hero" style="width: 100%;">View workout details →</button>
         </div>
@@ -2550,7 +2554,18 @@
         </div>
       </div>
 
-      <!-- (Fitness Pulse removed from Home — duplicates the Body row in Smart Summary above) -->
+      <!-- 1. Race countdown — compact bar below hero, context without dominating -->
+      <div id="todayRaceBanner" onclick="showScreen('plan')" style="display:none; margin-top:10px; background:var(--card); border:1px solid var(--border); color:var(--text); padding:9px 14px; border-radius:12px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+        <div id="raceDaysCount" style="background:var(--primary); color:#fff; padding:3px 10px; border-radius:100px; font-size:13px; font-weight:800; min-width:28px; text-align:center; flex-shrink:0;"></div>
+        <div style="flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; overflow:hidden;">
+          <div id="raceLabelTop" style="font-size:12px; font-weight:700; white-space:nowrap; color:var(--text);"></div>
+          <div id="raceLabelBottom" style="font-size:12px; color:var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+        </div>
+        <div style="font-size:14px; color:var(--text-soft); flex-shrink:0;">›</div>
+      </div>
+
+      <!-- Tomorrow preview — compact single-line card below today's hero -->
+      <div id="tomorrowPreview" style="display:none; margin-top:10px;"></div>
 
       <!-- 4. Coach insights — categorized, collapsible -->
       <div id="todayInsights"></div>
@@ -2568,8 +2583,8 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--alert)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </span>
           <span class="action-row-text">
-            <span class="action-row-title">Morning check-in</span>
-            <span class="action-row-sub">How's your body today?</span>
+            <span class="action-row-title" id="checkinRowTitle">Morning check-in</span>
+            <span class="action-row-sub" id="checkinRowSub">How's your body today?</span>
           </span>
           <span class="action-row-chevron">›</span>
         </button>
@@ -2643,8 +2658,10 @@
         <button onclick="navWeek(1)" id="weekNextBtn" style="background:none; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Next ›</button>
       </div>
       <div class="week-strip" id="weekStrip"></div>
-      <div style="text-align: center; font-size: 11px; color: var(--text-soft); margin-top: 4px; margin-bottom: 6px;">Tap a day to see details or swap in a different workout</div>
       <div id="weekStateBanner"></div>
+
+      <!-- Weekly volume bar — planned vs logged minutes -->
+      <div id="weekVolumeBar" style="display:none; margin-bottom:14px;"></div>
 
       <!-- 2. THIS WEEK'S SESSIONS — the substance -->
       <div id="weekSessions"></div>
@@ -2820,7 +2837,7 @@
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
           <div class="greeting" id="progressGreeting">Stats</div>
-          <div class="title">How you're trending</div>
+          <div class="title">Your stats</div>
         </div>
         <button onclick="openSettings()" aria-label="Settings" style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 100px; cursor: pointer; line-height: 0; color: var(--text-soft);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2837,6 +2854,9 @@
         <button class="chip" data-perf-range="365" onclick="setPerfRange(365)">Last year</button>
       </div>
       <div id="perfSyncNotice" style="font-size: 11px; color: var(--text-soft); margin-bottom: 10px;"></div>
+
+      <!-- Personal bests — shown when Strava/Apple Health data available -->
+      <div id="perfPersonalBests" style="display:none; margin-bottom:14px;"></div>
 
       <!-- Summary tiles -->
       <div class="card" id="perfSummary">
@@ -3016,17 +3036,11 @@
           </div>
         </div>
         <div class="field">
-          <label>Stress level today</label>
-          <div class="chip-row" id="ciStress">
-            <button class="chip" onclick="singleChip(this)">Low</button>
-            <button class="chip" onclick="singleChip(this)">Normal</button>
-            <button class="chip" onclick="singleChip(this)">High</button>
-          </div>
+          <label>Anything else? <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
+          <input type="text" id="ciNotes" placeholder="e.g. right calf tight, stressed, poor sleep quality…">
         </div>
-        <div class="field">
-          <label>Soreness or concerns (optional)</label>
-          <input type="text" id="ciNotes" placeholder="e.g. right calf tight, or leave blank">
-        </div>
+        <!-- ciStress hidden — kept for downstream logic compatibility, always defaults to Normal -->
+        <div id="ciStress" style="display:none;"></div>
         <!-- Conditional: only shows when an injury is active. Populated by
              renderInjuryCheckinField() which is called when the check-in
              form opens. -->
@@ -3197,6 +3211,18 @@
 
           <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
             <div>
+              <div style="font-size:14px; font-weight:500;">Evening workout preview</div>
+              <div style="font-size:12px; color:var(--text-soft);">Tomorrow's session at 6 pm</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+              <input type="checkbox" id="notif-workout-preview" style="opacity:0;width:0;height:0;" onchange="onNotifToggle('workout_reminders_enabled', this.checked)">
+              <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:13px;transition:.2s;" id="notif-workout-preview-track"></span>
+              <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s;" id="notif-workout-preview-thumb"></span>
+            </label>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border);">
+            <div>
               <div style="font-size:14px; font-weight:500;">Morning check-in</div>
               <div style="font-size:12px; color:var(--text-soft);">Daily on training days</div>
             </div>
@@ -3261,6 +3287,82 @@
 
       <button class="btn btn-primary btn-full" onclick="startFreshOnboarding()" style="margin-top: 14px;">Start over with a new plan</button>
       <button class="btn btn-ghost btn-full" onclick="doLogout()" style="margin-top: 10px; color: var(--text-soft);">Log out</button>
+
+      <!-- Privacy + account management links -->
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0;">
+        <button onclick="showScreen('privacy')" style="background: none; border: 0; text-align: left; padding: 10px 0; font-size: 13px; color: var(--text-soft); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Privacy policy
+        </button>
+        <button onclick="openDeleteAccountModal()" style="background: none; border: 0; text-align: left; padding: 10px 0; font-size: 13px; color: #C44545; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          Delete account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE ACCOUNT MODAL -->
+  <div class="modal-bg" id="deleteAccountModal" style="display:none;">
+    <div class="modal" style="max-width:360px;">
+      <h2 style="font-size:18px; margin:0 0 8px; color:#C44545;">Delete account</h2>
+      <p style="font-size:13px; color:var(--text-soft); line-height:1.5; margin:0 0 16px;">This permanently deletes your account and <strong>all associated data</strong> — your plan, history, check-ins, and notifications. <strong>This cannot be undone.</strong></p>
+      <div id="deleteAccountStep1">
+        <div class="field" style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.4px;">Re-enter your password to confirm</label>
+          <input type="password" id="deleteAccountPassword" autocomplete="current-password" placeholder="Your current password" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:14px; background:#fff; box-sizing:border-box; margin-top:6px;">
+        </div>
+        <div id="deleteAccountError" style="display:none; font-size:12px; color:#C44545; margin-bottom:10px; padding:8px 10px; background:#fde8e8; border-radius:8px;"></div>
+        <button onclick="confirmDeleteAccount()" style="width:100%; padding:12px; background:#C44545; color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;" id="deleteAccountBtn">Permanently delete my account</button>
+        <button onclick="closeDeleteAccountModal()" style="width:100%; padding:10px; background:none; border:0; color:var(--text-soft); font-family:inherit; font-size:13px; cursor:pointer; margin-top:6px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIVACY SCREEN -->
+  <div id="screen-privacy" class="screen">
+    <div class="header">
+      <button class="back-btn" onclick="goBack()" style="display:flex;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Back
+      </button>
+      <div class="title">Privacy policy</div>
+    </div>
+    <div class="screen-inner">
+      <div class="card" style="font-size:13px; line-height:1.7; color:var(--text);">
+        <div class="card-title" style="margin-bottom:4px;">Privacy policy</div>
+        <p style="font-size:11px; color:var(--text-soft); margin-bottom:14px;">Operated by <strong>Danny Spencer</strong> · Effective date: [TODO: insert date] · <a href="mailto:[TODO: privacy email]" style="color:var(--primary);">[TODO: privacy email]</a></p>
+
+        <p style="font-weight:600; margin-top:8px;">What we collect</p>
+        <p>Your first name, email address, and the training data you enter — goals, race dates, session logs, and check-in answers. We do not collect payment information, location, contacts, or photos.</p>
+
+        <p style="font-weight:600; margin-top:14px;">Third-party services</p>
+        <p>Your data is processed by:</p>
+        <ul style="margin:6px 0 0 16px; padding:0;">
+          <li style="margin-bottom:4px;"><strong>Supabase</strong> — account auth &amp; data storage. <a href="https://supabase.com/privacy" target="_blank" style="color:var(--primary);">Privacy policy</a></li>
+          <li style="margin-bottom:4px;"><strong>Mistral AI</strong> — AI coaching. Your messages and plan context are sent to Mistral's API. Mistral does not train on API traffic. <a href="https://mistral.ai/terms/" target="_blank" style="color:var(--primary);">Terms</a></li>
+          <li style="margin-bottom:4px;"><strong>PostHog</strong> — anonymous usage analytics (screens visited, features used). No health data is sent. <a href="https://posthog.com/privacy" target="_blank" style="color:var(--primary);">Privacy policy</a></li>
+          <li style="margin-bottom:4px;"><strong>Vercel</strong> — hosting. <a href="https://vercel.com/legal/privacy-policy" target="_blank" style="color:var(--primary);">Privacy policy</a></li>
+        </ul>
+        <p style="margin-top:8px;">We do not sell your personal information.</p>
+
+        <p style="font-weight:600; margin-top:14px;">Apple Health data</p>
+        <p>On the native iOS app, if you grant Apple Health access, heart rate, HRV, and sleep data are read locally to personalise your readiness score. This data is not sent to our servers.</p>
+
+        <p style="font-weight:600; margin-top:14px;">Deletion</p>
+        <p>Delete your account anytime: <strong>You tab → Delete account</strong>. Deletion is immediate and permanent — all your data is removed from our servers the moment you confirm.</p>
+
+        <p style="font-weight:600; margin-top:14px;">Your rights (California — CCPA)</p>
+        <ul style="margin:6px 0 0 16px; padding:0;">
+          <li style="margin-bottom:4px;"><strong>Right to know</strong> — request details on what we collect.</li>
+          <li style="margin-bottom:4px;"><strong>Right to delete</strong> — use in-app deletion or email us.</li>
+          <li style="margin-bottom:4px;"><strong>Right to opt out of sale</strong> — we don't sell data, so no action needed.</li>
+          <li style="margin-bottom:4px;"><strong>Right to non-discrimination</strong> — exercising your rights won't affect your service.</li>
+        </ul>
+
+        <p style="font-weight:600; margin-top:14px;">Contact</p>
+        <p>Danny Spencer · <a href="mailto:[TODO: privacy email]" style="color:var(--primary);">[TODO: privacy email]</a></p>
+      </div>
     </div>
   </div>
 
@@ -3628,6 +3730,21 @@
     </div>
   </div>
 
+  <!-- POST-WORKOUT RPE PROMPT (Part 2 Fix 9) -->
+  <div class="modal-bg" id="rpePromptModal">
+    <div class="modal" style="text-align:center;">
+      <div style="font-size:22px; margin-bottom:4px;">Nice work</div>
+      <div style="font-size:13px; color:var(--text-soft); margin-bottom:18px;" id="rpePromptSub">How hard did it feel?</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
+        <button onclick="saveQuickRpe(1,'Easy')" style="padding:12px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text);">😌 Easy<div style="font-size:11px; font-weight:400; color:var(--text-soft); margin-top:2px;">RPE 1–3</div></button>
+        <button onclick="saveQuickRpe(5,'Moderate')" style="padding:12px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text);">🙂 Moderate<div style="font-size:11px; font-weight:400; color:var(--text-soft); margin-top:2px;">RPE 4–6</div></button>
+        <button onclick="saveQuickRpe(7,'Hard')" style="padding:12px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text);">😤 Hard<div style="font-size:11px; font-weight:400; color:var(--text-soft); margin-top:2px;">RPE 7–8</div></button>
+        <button onclick="saveQuickRpe(10,'Max')" style="padding:12px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text);">🥵 Max<div style="font-size:11px; font-weight:400; color:var(--text-soft); margin-top:2px;">RPE 9–10</div></button>
+      </div>
+      <button onclick="closeRpePrompt()" style="background:none; border:0; color:var(--text-soft); font-size:13px; cursor:pointer; font-family:inherit; padding:4px;">Skip</button>
+    </div>
+  </div>
+
   <!-- COURSE INTEL EDITOR MODAL -->
   <div class="modal-bg" id="courseIntelModal">
     <div class="modal" style="max-height: 90vh; overflow-y: auto;">
@@ -3814,6 +3931,7 @@
             <button type="button" class="chip" data-disc="swim" onclick="pickEdDiscipline('swim')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M3 12c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M3 16c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0c1.333 -1.333 2.667 -1.333 4 0c1.333 1.333 2.667 1.333 4 0"/><path d="M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M11 13l-1 -1l-1.5 -2.5l4 -4.5"/></svg>Swim</button>
             <button type="button" class="chip" data-disc="strength" onclick="pickEdDiscipline('strength')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M2 12h1"/><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2"/><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M9 12h6"/><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1z"/><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2"/><path d="M22 12h-1"/></svg>Strength</button>
             <button type="button" class="chip" data-disc="brick" onclick="pickEdDiscipline('brick')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/><line x1="11" y1="5" x2="11" y2="11"/><line x1="13" y1="13" x2="13" y2="19"/></svg>Brick</button>
+            <button type="button" class="chip" data-disc="cross" onclick="pickEdDiscipline('cross')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;margin-right:4px;"><path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3"/></svg>Cross-training</button>
             <button type="button" class="chip" data-disc="rest" onclick="pickEdDiscipline('rest')">Rest</button>
           </div>
         </div>
@@ -3983,7 +4101,7 @@
   const SUPABASE_URL      = 'https://lykorfkapbxufkjcqtnl.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5a29yZmthcGJ4dWZramNxdG5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODM1MDAsImV4cCI6MjA5NTI1OTUwMH0.s03ghWriqwPloHq6gW3VmCJx_ADRU0rF3O7TkGG4r1s';
   // VAPID public key — safe to expose to the client (only private key is secret)
-  const VAPID_PUBLIC_KEY  = 'BFpvzKjkGcftF_cYz5KgZqYWOu0IH6FARejMdLbtdtQPseYkQSRJfcGiymmFUKSadpe4GdEWmUZdIoJw5uz2lrU';
+  const VAPID_PUBLIC_KEY  = 'BAWYs4sh0lOO98rYASUgF7iytj18CEbTLesfWxiGu-kA0cTlHR95g4hZFyQFFeir1yw3WmPRyMWKMh5x1ij32HM';
 
   // ── PASSWORD RECOVERY URL DETECTION ─────────────────────────────────────
   // Must happen BEFORE createClient() — the Supabase SDK may synchronously
@@ -4018,6 +4136,7 @@
   let _posthogReady = false;
   let _stagedStatusTimer = null;
   let _planWatchdogTimer = null;
+  let _sbSavePending = false; // set true when _sbSave fails offline; cleared on reconnect
   let currentScreen = null;
   let _suppressNextHistoryPush = false;
   let _extraWorkouts = [];
@@ -4063,7 +4182,7 @@
   const STRAVA_ENABLED  = false;
   const COACH_ACCEPT_KEY  = 'adapt-coach-accepted';
   const COACH_HISTORY_KEY = 'adapt-coach-history';
-  const MAX_INSIGHTS_SHOWN = 3;
+  const MAX_INSIGHTS_SHOWN = 1;
 
   // planState fields persisted per-user (Supabase and localStorage).
   const _PLAN_FIELDS = [
@@ -5210,7 +5329,9 @@
     const eventLocation = (planState.raceLocation || localStorage.getItem('race-location') || '');
     const activeHours = document.querySelector('#hoursChips .chip.active');
     const hours = activeHours ? parseFloat(activeHours.dataset.hours) : 5;
-    const activeDays = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent);
+    const _chipDays = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent.trim());
+    const _prevDays = (() => { try { return JSON.parse(localStorage.getItem('training-days') || '[]'); } catch(e) { return []; } })();
+    const activeDays = _chipDays.length ? _chipDays : _prevDays;
     const complexity = document.querySelector('#complexityChips .chip.active')?.dataset.mode || 'simple';
     localStorage.setItem('complexity-mode', complexity);
     localStorage.setItem('race-event', event);
@@ -5742,7 +5863,8 @@
     const savedDays = (() => { try { return JSON.parse(localStorage.getItem('training-days') || '[]'); } catch(e) { return []; } })();
     const schedulePrefs = (() => { try { return JSON.parse(localStorage.getItem('schedule-prefs') || 'null'); } catch(e) { return null; } })();
     const schedAvailCount = schedulePrefs ? Object.values(schedulePrefs).filter(d => d.available).length : 0;
-    const effectiveDayCount = savedDays.length || schedAvailCount;
+    const planSessionCount = Object.values(planState.sessions || {}).filter(s => s && s.type !== 'rest' && s.duration > 0).length;
+    const effectiveDayCount = Math.max(savedDays.length, schedAvailCount, planSessionCount);
     if (effectiveDayCount > 0) {
       dayCount = effectiveDayCount;
       dayNames = (savedDays.length ? savedDays : Object.keys(schedulePrefs || {}).filter(d => schedulePrefs[d]?.available)).join('/');
@@ -5917,6 +6039,24 @@
     }
     _suppressNextHistoryPush = false;
   };
+  // Swipe-right-to-go-back gesture (edge swipe, left 30px only to avoid carousel conflicts)
+  (function() {
+    let _swipeStartX = 0, _swipeStartY = 0, _swipeActive = false;
+    document.addEventListener('touchstart', function(e) {
+      const t = e.touches[0];
+      _swipeStartX = t.clientX;
+      _swipeStartY = t.clientY;
+      _swipeActive = _swipeStartX < 30;
+    }, { passive: true });
+    document.addEventListener('touchend', function(e) {
+      if (!_swipeActive) return;
+      _swipeActive = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - _swipeStartX;
+      const dy = Math.abs(t.clientY - _swipeStartY);
+      if (dx > 80 && dy < 60 && screenHistory.length > 0) goBack();
+    }, { passive: true });
+  })();
   function toggleChip(el) {
     el.classList.toggle('active');
   }
@@ -6268,11 +6408,12 @@
   // ── Notification preferences UI ────────────────────────────────────────────
 
   const NOTIF_TOGGLES = [
-    { key: 'morning_checkin_enabled',  el: 'notif-morning-checkin'  },
-    { key: 'post_workout_enabled',     el: 'notif-post-workout'      },
-    { key: 'plan_adjustment_enabled',  el: 'notif-plan-adjustment'   },
-    { key: 'weekly_review_enabled',    el: 'notif-weekly-review'     },
-    { key: 'race_milestone_enabled',   el: 'notif-race-milestone'    },
+    { key: 'workout_reminders_enabled', el: 'notif-workout-preview'  }, // TYPE 1: evening preview
+    { key: 'morning_checkin_enabled',   el: 'notif-morning-checkin'  }, // TYPE 2: check-in
+    { key: 'post_workout_enabled',      el: 'notif-post-workout'     },
+    { key: 'plan_adjustment_enabled',   el: 'notif-plan-adjustment'  }, // TYPE 3: adaptations
+    { key: 'weekly_review_enabled',     el: 'notif-weekly-review'    },
+    { key: 'race_milestone_enabled',    el: 'notif-race-milestone'   },
   ];
 
   function _setToggleVisual(elId, checked) {
@@ -6341,12 +6482,23 @@
   }
 
   async function handleNotifEnableBtn() {
+    // iOS Safari only supports push when the PWA is installed to the Home Screen.
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || !!window.navigator.standalone;
+    if (isIOS && !isInstalled) {
+      const banner = document.getElementById('notifPermBanner');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = 'On iPhone, <strong>add Adapt to your Home Screen first</strong>, then tap "Enable notifications."<br><span style="font-size:11px; opacity:0.85;">Safari share button → Add to Home Screen → open from Home Screen.</span>';
+      }
+      return;
+    }
     const permission = await requestNotificationPermission();
     if (permission === 'granted') {
       const result = await subscribeToPush();
       if (result.success) {
-        // Save all defaults
         await saveNotificationPref({
+          workout_reminders_enabled: true,
           morning_checkin_enabled: true,
           post_workout_enabled: true,
           plan_adjustment_enabled: true,
@@ -7891,29 +8043,55 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // Direct tool execution (no gating). Used internally by applyPendingChange
   // AND by the legacy callers that already passed through their own UI.
+  // Tools that represent a genuine plan adaptation (session eased/moved/swapped).
+  // _notifyAdaptation is fired for these so the user gets a TYPE 3 push.
+  const _ADAPTATION_TOOLS = new Set(['shortenSession', 'moveSession', 'swapDiscipline', 'addRestWeek', 'adjustVolume']);
+
+  // Fire-and-forget POST to the plan-adjustment push endpoint.
+  // Called from _runToolDirect for adaptation-class tools only.
+  async function _notifyAdaptation(toolName, input) {
+    if (!_ADAPTATION_TOOLS.has(toolName) || !_sb) return;
+    try {
+      const { data: { user } } = await _sb.auth.getUser();
+      if (!user) return;
+      const sessionName = input.newName || input.fromDay && `session on ${input.fromDay}` || 'your session';
+      const dayName     = input.toDay   || input.day    || 'Tomorrow';
+      const reason      = input.reason  || '';
+      fetch('/api/notifications/plan-adjustment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, sessionName, dayName, reason }),
+      }).catch(() => {}); // fire-and-forget; push failure must never break the UI
+    } catch (_) {}
+  }
+
   function _runToolDirect(name, input) {
     trackEvent('plan_modified', { tool: name, ...input });
+    let result;
     try {
       switch (name) {
-        case 'moveSession': return tool_moveSession(input);
-        case 'shortenSession': return tool_shortenSession(input);
-        case 'swapDiscipline': return tool_swapDiscipline(input);
-        case 'flagInjury': return tool_flagInjury(input);
-        case 'progressInjury': return tool_progressInjury(input);
-        case 'clearInjury': return tool_clearInjury(input);
-        case 'addRestWeek': return tool_addRestWeek(input);
-        case 'adjustVolume': return tool_adjustVolume(input);
-        case 'completeSession': return tool_completeSession(input);
-        case 'skipSession': return tool_skipSession(input);
-        case 'openTrainingDay': return tool_openTrainingDay(input);
-        case 'closeTrainingDay': return tool_closeTrainingDay(input);
-        case 'setTrainingFocus': return tool_setTrainingFocus(input);
-        case 'adjustPlanDifficulty': return tool_adjustPlanDifficulty(input);
-        default: return { success: false, message: `Unknown tool: ${name}` };
+        case 'moveSession':       result = tool_moveSession(input);       break;
+        case 'shortenSession':    result = tool_shortenSession(input);    break;
+        case 'swapDiscipline':    result = tool_swapDiscipline(input);    break;
+        case 'flagInjury':        result = tool_flagInjury(input);        break;
+        case 'progressInjury':    result = tool_progressInjury(input);    break;
+        case 'clearInjury':       result = tool_clearInjury(input);       break;
+        case 'addRestWeek':       result = tool_addRestWeek(input);       break;
+        case 'adjustVolume':      result = tool_adjustVolume(input);      break;
+        case 'completeSession':   result = tool_completeSession(input);   break;
+        case 'skipSession':       result = tool_skipSession(input);       break;
+        case 'openTrainingDay':   result = tool_openTrainingDay(input);   break;
+        case 'closeTrainingDay':  result = tool_closeTrainingDay(input);  break;
+        case 'setTrainingFocus':  result = tool_setTrainingFocus(input);  break;
+        case 'adjustPlanDifficulty': result = tool_adjustPlanDifficulty(input); break;
+        default: result = { success: false, message: `Unknown tool: ${name}` };
       }
     } catch (err) {
-      return { success: false, message: 'Tool error: ' + err.message };
+      result = { success: false, message: 'Tool error: ' + err.message };
     }
+    // Single TYPE 3 hook: fire adaptation notification for session-change tools.
+    if (result?.success) _notifyAdaptation(name, input);
+    return result;
   }
 
   // Public dispatch — gates structural tools through the confirm card and
@@ -8606,7 +8784,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       .filter(t => presentTypes.has(t))
       .map(t => {
         const c = sportColor(t);
-        return `<div style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; background:#fff; border:1px solid var(--border); border-radius:100px; font-size:11px; font-weight:600; color:var(--text);">
+        return `<div style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; background:var(--bg-soft); border:1px solid var(--border); border-radius:100px; font-size:11px; font-weight:600; color:var(--text);">
           <span style="width:10px; height:10px; border-radius:50%; background:${c.bg}; ${t === 'rest' ? 'border:1px solid #c0c0c0;' : ''} display:inline-block;"></span>
           ${escapeHtml(c.label)}
         </div>`;
@@ -8717,10 +8895,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     </div>`;
 
     el.innerHTML = `
-      <div class="section-label plain" style="margin: 4px 0 8px; display:flex; align-items:center; gap:6px;">${icon('calendar', { size: 14 })} Training calendar</div>
-      <div style="font-size:12px; color:var(--text-soft); margin-bottom: 10px;">Each day's color shows the planned activity. Tap any day. workouts open the session detail, rest days tell you why you're resting, race day gets a pep talk. <strong>Dashed borders</strong> are projected weeks. the plan adapts week-to-week based on what you actually train.</div>
       <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${legendHtml}</div>
-      <div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px;">
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:14px;">
         ${headerHtml}
         <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;">${dayHeaderHtml}</div>
         <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; margin-top:4px;">${cellsHtml}</div>
@@ -8955,9 +9131,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const inj = planState.injury;
       const sev = inj.severity || 'low';
       const sevLabel = sev === 'high' ? 'Plan paused' : 'Injury flagged';
-      slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5;">
-        <strong>${sevLabel}: ${escapeHtml(inj.area)} · ${escapeHtml(sev)}.</strong>
-        ${sev === 'high' ? 'See a doctor or PT before resuming. Plan modifications active.' : 'Plan adapted to protect this area. Update daily in your check-in.'}
+      slot.innerHTML = `<div style="background:#fde8e8; border:1px solid #f5b5b5; color:#7a2828; padding:12px 14px; border-radius:12px; margin-bottom:14px; font-size:13px; line-height:1.5; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div><strong>${sevLabel}: ${escapeHtml(inj.area)} · ${escapeHtml(sev)}.</strong> ${sev === 'high' ? 'See a doctor or PT before resuming.' : 'Plan adapted.'}</div>
+        <button onclick="showScreen('prep')" style="background:transparent; border:1px solid rgba(180,80,80,0.4); border-radius:6px; color:inherit; font-size:12px; font-weight:600; padding:4px 10px; cursor:pointer; white-space:nowrap; flex-shrink:0; font-family:inherit;">Update today →</button>
       </div>`;
       return;
     }
@@ -9382,7 +9558,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         })()
       });
     }
-    if (!aiPlanProtected && !hasQuality && activeSessions.length > 0) {
+    const _currentArcEntry = planState.weekArc?.find(w => w.current) || planState.weekArc?.[0];
+    const _isBasePhase = _currentArcEntry && /base/i.test(_currentArcEntry.focus || '');
+    if (!aiPlanProtected && !hasQuality && activeSessions.length > 0 && !_isBasePhase) {
       const weekday = ['Tue','Wed','Thu'].find(d => sessions[d] && sessions[d].type !== 'rest' && sessions[d].type !== 'quality' && sessions[d].type !== 'brick');
       insights.push({
         severity: 'warn',
@@ -10243,36 +10421,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     const rows = visible.map(ins => renderInsightRow(ins)).join('');
 
-    // "N more" overflow — collapsed by default
-    let overflowSection = '';
-    if (overflow.length > 0) {
-      const overflowRows = overflow.map(ins => renderInsightRow(ins)).join('');
-      overflowSection = `
-        <div id="insightOverflowToggle" style="border-top:1px solid var(--border); padding:10px 16px; text-align:center;">
-          <button onclick="toggleInsightOverflow()" style="background:none; border:0; color:var(--primary); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">
-            ${overflow.length} more note${overflow.length > 1 ? 's' : ''} ›
-          </button>
-        </div>
-        <div id="insightOverflowBody" style="display:none;">${overflowRows}</div>`;
-    }
-
-    // Apply fixes — only shown when there are ≥2 to make the button worthwhile
-    const fixesBtn = fixCount >= 2 ? `
-      <div style="border-top:1px solid var(--border); padding:12px 16px;">
-        <button class="btn btn-primary btn-full" onclick="applyAllFixes()">Apply ${fixCount} suggested fix${fixCount > 1 ? 'es' : ''}</button>
-      </div>` : '';
-
-    const footer = dismissedCount > 0 ? `
-      <div style="border-top:1px solid var(--border); padding:10px 16px; text-align:center; font-size:11px; color:var(--text-soft);">
-        ${dismissedCount} dismissed today · <a onclick="restoreAllInsights()" style="color:var(--primary); cursor:pointer; font-weight:600;">restore</a>
-      </div>` : '';
-
     const html = `
       <div class="card" style="padding:0; overflow:hidden; margin-bottom:14px;">
         <div style="padding:14px 16px 12px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
           <div style="font-weight:700; font-size:15px; color:${headerColor};">Coach insights</div>
         </div>
-        ${rows}${overflowSection}${fixesBtn}${footer}
+        ${rows}
       </div>`;
 
     target.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
@@ -11150,7 +11304,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (d.cooldown) html += `<div class="detail-section"><div class="detail-label">Cool-down</div><div class="detail-body">${markupGlossaryTerms(d.cooldown)}</div></div>`;
     if (d.targets && d.targets.length) html += `<div class="detail-section"><div class="detail-label">Targets <span style="font-size:10px; color:var(--text-soft); font-weight:500; text-transform:none; letter-spacing:0; margin-left:6px;">tap any underlined term</span></div><ul class="detail-list">${d.targets.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
     if (d.cues && d.cues.length) html += `<div class="detail-section"><div class="detail-label">Cues</div><ul class="detail-list">${d.cues.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
-    if (d.alternatives && d.alternatives.length) html += `<div class="detail-section"><div class="detail-label">If life gets in the way</div><ul class="detail-list">${d.alternatives.map(t => `<li>${markupGlossaryTerms(t)}</li>`).join('')}</ul></div>`;
     document.getElementById('sdContent').innerHTML = html;
     // Movable long-day action. Show "Make this my long day this week" when:
     //  - this is today or a future day (weekOffset >= 0)
@@ -11697,12 +11850,90 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // behind-schedule plan reads honestly: "Your body is ready, your plan
   // is behind."
   // ──────────────────────────────────────────────────────────────────────
+
+  // Extract readiness score deltas from HealthKit data when available.
+  // Returns null when no health source is connected — DORMANT on pure web builds.
+  // NEVER injects fake values: only active when planState.healthKit.syncedAt
+  // is set by the native iOS shell after a real Apple Health read.
+  function _healthKitReadinessFactors() {
+    const hk = planState.healthKit;
+    if (!hk || !hk.syncedAt) return null;
+    // Treat data stale after 24 h — recovery state changes overnight.
+    if (Date.now() - hk.syncedAt > 24 * 60 * 60 * 1000) return null;
+
+    const factors = [];
+    let score = 0;
+    const notes = [];
+
+    // HRV: low = autonomic stress / poor recovery; high = well-rested.
+    // Absolute thresholds — a baseline-relative approach requires multi-day history.
+    const hrv = typeof hk.latestHrvMs === 'number' ? hk.latestHrvMs : null;
+    if (hrv !== null && hrv > 0) {
+      if (hrv >= 70)      { score += 5;  notes.push(`HRV ${hrv}ms (high)`);      factors.push({ label: 'HRV', value: `${hrv} ms`, delta: 5  }); }
+      else if (hrv >= 50) {              notes.push(`HRV ${hrv}ms (normal)`);     factors.push({ label: 'HRV', value: `${hrv} ms`, delta: 0  }); }
+      else if (hrv >= 35) { score -= 10; notes.push(`HRV ${hrv}ms (low)`);       factors.push({ label: 'HRV', value: `${hrv} ms`, delta: -10 }); }
+      else                { score -= 20; notes.push(`HRV ${hrv}ms (very low)`);  factors.push({ label: 'HRV', value: `${hrv} ms`, delta: -20 }); }
+    }
+
+    // Resting HR: compare to stored onboarding baseline when available.
+    const rhrArr = hk.restingHeartRate || [];
+    const rhr = (rhrArr[0] && typeof rhrArr[0].value === 'number') ? rhrArr[0].value : null;
+    const baseline = planState.fitnessMarkers && typeof planState.fitnessMarkers.restingHr === 'number'
+      ? planState.fitnessMarkers.restingHr : null;
+    if (rhr !== null && rhr > 30 && rhr < 120) {
+      if (baseline) {
+        const diff = Math.round(rhr - baseline);
+        if (diff > 10)     { score -= 15; notes.push(`RHR ${rhr}bpm (+${diff} vs baseline)`); factors.push({ label: 'Resting HR', value: `${rhr} bpm (+${diff})`, delta: -15 }); }
+        else if (diff > 5) { score -= 7;  notes.push(`RHR ${rhr}bpm (+${diff} vs baseline)`); factors.push({ label: 'Resting HR', value: `${rhr} bpm (+${diff})`, delta: -7  }); }
+        else               {              notes.push(`RHR ${rhr}bpm (normal)`);               factors.push({ label: 'Resting HR', value: `${rhr} bpm`, delta: 0 }); }
+      } else {
+        // No calibrated baseline — use absolute threshold
+        if (rhr > 75) { score -= 7; notes.push(`RHR ${rhr}bpm (elevated)`); factors.push({ label: 'Resting HR', value: `${rhr} bpm`, delta: -7 }); }
+        else          {             notes.push(`RHR ${rhr}bpm`);             factors.push({ label: 'Resting HR', value: `${rhr} bpm`, delta: 0 }); }
+      }
+    }
+
+    // Sleep via HealthKit prefill (if set today and sourced from Apple Health).
+    // Uses the same chip-label → delta mapping as saveMorningCheckin so scores are consistent.
+    const pf = planState.lastCheckinPrefill || {};
+    if (pf.source === 'apple-health' && pf.sleep && pf.when && Date.now() - pf.when < 16 * 60 * 60 * 1000) {
+      const sleepChipLabel = _HK_SLEEP_CHIP_MAP[pf.sleep] || pf.sleep;
+      const sleepDelta = { 'Under 5h': -25, '5-6h': -12, '6-7h': -5, '7-8h': 0, '8h+': 2 }[sleepChipLabel];
+      if (typeof sleepDelta === 'number') {
+        score += sleepDelta;
+        if (sleepDelta !== 0) notes.push(`Sleep: ${sleepChipLabel} (Apple Health)`);
+        factors.push({ label: 'Sleep (Apple Health)', value: sleepChipLabel, delta: sleepDelta });
+      }
+    }
+
+    if (factors.length === 0) return null;
+    return { score, factors, notes };
+  }
+
   function computeBodyReadiness() {
     const checkin = planState.lastCheckin || null;
     const inj = planState.injury || null;
 
-    // No data → conservative neutral signal that prompts a check-in.
+    // No manual check-in yet — try HealthKit signals before falling back to neutral.
     if (!checkin && !inj) {
+      const hkOnly = _healthKitReadinessFactors();
+      if (hkOnly) {
+        // Health data is present and fresh — compute a score from it alone.
+        const hkScore = Math.max(0, Math.min(100, 100 + hkOnly.score));
+        let label, verdict, color, bgSoft, borderSoft, textColor;
+        if (hkScore >= 80) {
+          label = 'Ready to push'; verdict = 'Apple Health signals good recovery';
+          color = '#3B8968'; bgSoft = '#DCEADF'; borderSoft = '#3B8968'; textColor = '#2E6B51';
+        } else if (hkScore >= 55) {
+          label = 'Stay steady'; verdict = 'Health data suggests a measured day';
+          color = '#D9A94A'; bgSoft = '#FBF0D3'; borderSoft = '#e8c46b'; textColor = '#7a5a18';
+        } else {
+          label = 'Take it easy'; verdict = 'Health signals show fatigue — prioritise recovery';
+          color = '#C44545'; bgSoft = '#fde8e8'; borderSoft = '#f5b5b5'; textColor = '#7a2828';
+        }
+        return { score: hkScore, label, verdict, color, bgSoft, borderSoft, textColor, notes: hkOnly.notes, factors: hkOnly.factors };
+      }
+      // No health data either — prompt a manual check-in.
       return {
         score: 75,
         label: 'No check-in yet',
@@ -11745,6 +11976,16 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (inj && inj.severity === 'high') { score -= 40; notes.push(`Injury: ${inj.area} (severe)`); factors.push({ label: 'Injury', value: `${inj.area} (severe)`, delta: -40 }); }
     else if (inj && inj.severity === 'moderate') { score -= 20; notes.push(`Injury: ${inj.area} (moderate)`); factors.push({ label: 'Injury', value: `${inj.area} (moderate)`, delta: -20 }); }
     else if (inj && inj.severity === 'low') { score -= 8; notes.push(`Injury: ${inj.area} (mild)`); factors.push({ label: 'Injury', value: `${inj.area} (mild)`, delta: -8 }); }
+
+    // Blend objective HealthKit signals (RHR/HRV) when available — weighted at 40%
+    // because the user's subjective check-in is more actionable day-to-day.
+    // Dormant on web: _healthKitReadinessFactors() returns null when no native sync.
+    const hkBlend = _healthKitReadinessFactors();
+    if (hkBlend && hkBlend.factors.length > 0) {
+      score += Math.round(hkBlend.score * 0.4);
+      hkBlend.factors.forEach(f => factors.push(f));
+      hkBlend.notes.forEach(n => notes.push(n));
+    }
 
     score = Math.max(0, Math.min(100, score));
 
@@ -11874,34 +12115,52 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     card.style.color = palette.text;
     card.style.display = 'block';
 
-    // Per-score color block helper. When the score is a placeholder (no
-    // check-in for body, or no plan for race), render "—" instead of a
-    // misleading number.
-    const scoreBlock = (s, label, sublabel, isPending) => `
-      <div style="flex:1; min-width:0; background:rgba(255,255,255,0.55); padding:10px 12px; border-radius:10px;">
-        <div style="display:flex; align-items:baseline; gap:6px;">
-          <div style="font-family:var(--font-heading); font-size:26px; font-weight:600; color:${s.color}; line-height:1; letter-spacing:-0.02em;">${isPending ? '—' : s.score}</div>
-          <div style="font-size:9px; font-weight:500; color:var(--text-soft); letter-spacing:0.3px;">${isPending ? '' : '/ 100'}</div>
-        </div>
-        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-top:5px; color:${s.color};">${escapeHtml(label)}</div>
-        <div style="font-size:11.5px; line-height:1.35; margin-top:2px; color:var(--text-soft);">${escapeHtml(sublabel)}</div>
-      </div>`;
-
     // Race readiness uses race.status mapped to a color.
     const raceColor = race.status === 'on-track' ? '#3B8968' : race.status === 'slightly-behind' ? '#D9A94A' : '#C44545';
-    const raceObj = { score: race.score, color: raceColor };
 
-    // Pending flags — body has no check-in, race has no plan. Show "—" so
-    // the card doesn't lie about the data we have.
+    // Pending flags — body has no check-in, race has no plan.
     const bodyPending = !planState.lastCheckin && !planState.injury;
     const racePending = race.status === 'pending';
+
+    // Plan status line
+    const planStatusText = (() => {
+      if (racePending) return 'Plan is still building';
+      if (race.score >= 80) return 'Plan is on track';
+      const todayIdx = (typeof getTodayIdx === 'function') ? getTodayIdx() : 3;
+      const missed = Object.values(planState.sessions || {}).filter((s, i) => i <= todayIdx && s && s.type !== 'rest' && !s.completed).length;
+      if (race.score >= 65) return missed > 0 ? `Plan slightly behind — ${missed} session${missed > 1 ? 's' : ''} not yet logged` : 'Plan is slightly behind';
+      return missed > 0 ? `Plan needs attention — ${missed} session${missed > 1 ? 's' : ''} not logged this week` : 'Plan is behind — adjust this week';
+    })();
+
+    // Track first open for first-week explanations (Fix 4 Part 2)
+    if (!localStorage.getItem('adapt-first-open')) localStorage.setItem('adapt-first-open', Date.now());
+    const _firstOpenMs = parseInt(localStorage.getItem('adapt-first-open') || '0', 10);
+    const _isFirstWeek = _firstOpenMs > 0 && (Date.now() - _firstOpenMs) < 7 * 24 * 3600 * 1000;
+
+    // Body dot — colored indicator for body readiness
+    const bodyDotColor = body.score >= 80 ? '#3B8968' : body.score >= 60 ? '#D9A94A' : '#C44545';
+
     card.innerHTML = `
-      <div style="font-size:11px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; opacity:0.85; margin-bottom:8px;">TODAY · TAP FOR DETAILS</div>
-      <div style="display:flex; gap:8px;">
-        ${scoreBlock(body, 'Body today', body.label, bodyPending)}
-        ${scoreBlock(raceObj, 'Race ready', race.label, racePending)}
+      <div style="display:flex; align-items:flex-start; gap:14px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:10px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; opacity:0.75; margin-bottom:4px;">Race ready</div>
+          <div style="display:flex; align-items:baseline; gap:5px;">
+            <div style="font-family:var(--font-heading); font-size:40px; font-weight:700; color:${raceColor}; line-height:1; letter-spacing:-0.03em;">${racePending ? '—' : race.score}</div>
+            ${racePending ? '' : '<div style="font-size:11px; font-weight:500; opacity:0.65; align-self:flex-end; padding-bottom:4px;">/ 100</div>'}
+          </div>
+          <div style="font-size:12px; line-height:1.4; margin-top:5px; opacity:0.9;">${escapeHtml(planStatusText)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.5); border-radius:10px; padding:8px 12px; min-width:90px; text-align:right;">
+          <div style="font-size:10px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; opacity:0.65;">Body today</div>
+          <div style="display:flex; align-items:center; justify-content:flex-end; gap:5px; margin-top:4px;">
+            <div style="width:7px; height:7px; border-radius:50%; background:${bodyDotColor};"></div>
+            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; color:${bodyDotColor}; letter-spacing:-0.02em;">${bodyPending ? '—' : body.score}</div>
+          </div>
+          <div style="font-size:11px; line-height:1.3; margin-top:3px; opacity:0.8;">${escapeHtml(bodyPending ? 'Check in' : body.label)}</div>
+        </div>
       </div>
-      <div style="font-size:12px; line-height:1.45; margin-top:10px; opacity:0.9;">${escapeHtml(body.verdict)} · ${escapeHtml(racePending ? 'Plan is still building' : race.score >= 80 ? 'Plan is on track' : race.score >= 65 ? 'Plan is slightly behind' : 'Plan is behind — adjust this week')}</div>
+      <div style="font-size:12px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07); opacity:0.85;">${escapeHtml(bodyPending ? 'Log a check-in to see your body readiness score.' : body.verdict)}</div>
+      ${_isFirstWeek ? `<div style="font-size:11px; margin-top:8px; padding:8px 10px; background:rgba(0,0,0,0.05); border-radius:8px; line-height:1.5; opacity:0.85;"><strong>New to these scores?</strong> Race ready (0–100) tracks how on-plan you are. Body today reflects how you feel. Both improve as you log sessions and check in daily.</div>` : ''}
     `;
   }
 
@@ -12409,8 +12668,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   //      (so a user opening the app at 6am sees a clear "today's session"
   //      ping even before they navigate)
   //   4. Gracefully no-ops on browsers without Notification support
-  // For real backgrounded reminders we'd need a push backend — flagged in
-  // the deferred-work list.
+  // TODO(background-reminders): Real backgrounded workout/check-in reminders
+  // MUST be sent server-side — a closed PWA cannot self-schedule. Required work:
+  //   1. Vercel cron job (vercel.json "crons") that runs nightly.
+  //   2. Cron reads Supabase push_subscriptions for users whose next training
+  //      day is tomorrow and whose notifications are enabled.
+  //   3. Calls api/_utils/sendPush.js with the Web Push payload.
+  //   4. VAPID_PRIVATE_KEY must be set as a Vercel env var (never in client code).
+  // Do NOT implement client-side scheduling here — this comment is the
+  // designated integration point for the server-side reminder pipeline.
   // ──────────────────────────────────────────────────────────────────────
   function _hasNotificationApi() {
     return typeof window !== 'undefined' && 'Notification' in window;
@@ -12949,49 +13215,40 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bottom = document.getElementById('raceLabelBottom');
     if (!banner) return;
 
-    // No race date (general fitness, or unset) — hide the countdown
-    // banner entirely. The hero workout becomes primary.
+    // No race date (general fitness, or unset) — hide the countdown banner.
     if (days == null) {
       banner.style.display = 'none';
       return;
     }
     banner.style.display = 'flex';
+    // Compact design: use pill color for urgency, keep card neutral.
+    banner.style.background = '';
+    banner.style.color = '';
 
     if (days < 0) {
-      // POST-RACE — racefinished. Lock the banner into a celebratory + new-goal
-      // CTA. Other parts of the app should also reach this state via
-      // planState.postRace flag so insights/coach behave appropriately.
-      banner.style.background = 'linear-gradient(135deg, var(--secondary), #B8862E)';
-      if (count) count.textContent = '✓';
+      if (count) { count.textContent = '✓'; count.style.background = 'var(--secondary)'; }
       if (top) top.textContent = 'Race complete';
-      if (bottom) bottom.innerHTML = `${escapeHtml(event)} ${location ? '· ' + escapeHtml(location) : ''} <a onclick="resetForNewGoal()" style="color:#fff; text-decoration:underline; cursor:pointer;">Set new goal →</a>`;
+      if (bottom) bottom.innerHTML = `${escapeHtml(event)}${location ? ' · ' + escapeHtml(location) : ''} · <a onclick="resetForNewGoal()" style="color:var(--primary); text-decoration:none; font-weight:600; cursor:pointer;">Set new goal →</a>`;
       planState.postRace = true;
       planState.raceWeek = false;
     } else if (days === 0) {
-      banner.style.background = 'linear-gradient(135deg, #F5A623, #F27B22)';
-      if (count) count.textContent = '0';
+      if (count) { count.textContent = '!'; count.style.background = '#F5A623'; }
       if (top) top.textContent = 'Race day';
-      if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''}. Go execute the plan.`;
+      if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''} · Go execute the plan.`;
       planState.postRace = false;
       planState.raceWeek = true;
     } else if (days <= 7) {
-      // RACE WEEK — brand-green gradient. Encouraging "you're peaking"
-      // signal rather than cautionary gold or alarming red. Matches the
-      // primary palette + the race-week checklist card. Race DAY itself
-      // (the actual day-of cell on the calendar) keeps the gold flag
-      // treatment as the celebration / arrival moment.
-      banner.style.background = 'linear-gradient(135deg, #3B8968, #2E6B51)';
-      if (count) count.textContent = days;
-      if (top) top.textContent = `RACE WEEK · ${days} day${days === 1 ? '' : 's'} out`;
-      if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''}. Taper protocol active. Sharpen, don't strain.`;
+      if (count) { count.textContent = days; count.style.background = '#3B8968'; }
+      if (top) top.textContent = `Race week`;
+      if (bottom) bottom.textContent = `${days} day${days === 1 ? '' : 's'} · ${event}${location ? ' · ' + location : ''}`;
       planState.postRace = false;
       planState.raceWeek = true;
     } else {
       const weekIdx = getCurrentWeekIdx();
       const arc = planState.weekArc[weekIdx] || planState.weekArc[0];
-      if (count) count.textContent = days;
-      if (top) top.textContent = days === 1 ? 'day to your race' : 'days to your race';
-      if (bottom) bottom.textContent = `${event}${location ? ' · ' + location : ''}${arc ? ' · ' + arc.focus : ''}`;
+      if (count) { count.textContent = days; count.style.background = 'var(--primary)'; }
+      if (top) top.textContent = `${days === 1 ? 'day' : 'days'} to race`;
+      if (bottom) bottom.textContent = `${event}${arc ? ' · ' + arc.focus : ''}${location ? ' · ' + location : ''}`;
       planState.postRace = false;
       planState.raceWeek = false;
     }
@@ -14205,7 +14462,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const actionsPending = document.getElementById('heroActionsPending');
     const actionsDone = document.getElementById('heroActionsDone');
     const actionsRest = document.getElementById('heroActionsRest');
-    const logActions = document.getElementById('heroLogActions');
     const syncNote = document.getElementById('heroSyncNote');
     const doneStats = document.getElementById('heroDoneStats');
 
@@ -14311,23 +14567,41 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
     }
 
-    // Why-text
-    if (why) {
-      let w = '';
-      if (completed) {
-        w = `You already trained today. nice work. Plan stays as-is; today's box is locked.`;
-      } else if (adjusted) {
-        w = `Adjusted from your original session: ${planState.lastChange}. Engine confirmed this still fits your week's balance.`;
-      } else if (s.type === 'rest') {
-        w = 'Full rest today. Recovery is the workout. the body adapts between sessions, not during them.';
-      } else if (s.duration < 40) {
-        w = `Short session (${s.duration} min). Quality over quantity: hit the intent in the window you have.`;
-      } else if (s.type === 'quality' || s.type === 'brick') {
-        w = `Quality session today. Controlled-hard, not all-out. leaves enough in the tank for the rest of the week.`;
+    // Intensity zone pill (Part 2 Fix 2)
+    const intensityPill = document.getElementById('heroIntensityPill');
+    if (intensityPill) {
+      if (!completed && s.type !== 'rest' && s.intensity && s.intensity !== 'rest') {
+        const zoneLabels = { Z2: 'Zone 2', Z3: 'Zone 3', Z4: 'Zone 4', Z5: 'Zone 5', mixed: 'Mixed zones' };
+        const label = zoneLabels[s.intensity];
+        if (label) { intensityPill.textContent = label; intensityPill.style.display = 'inline-block'; }
+        else { intensityPill.style.display = 'none'; }
       } else {
-        w = `Easy aerobic work. Conversational pace, HR in Zone 2.`;
+        intensityPill.style.display = 'none';
       }
-      why.textContent = w;
+    }
+
+    // Why-text / plan-adapted callout
+    if (why) {
+      if (completed) {
+        why.style.cssText = '';
+        why.textContent = 'You already trained today. nice work. Plan stays as-is; today\'s box is locked.';
+      } else if (adjusted && planState.lastChange) {
+        // Fix 10 Part 2: visible adapted callout box
+        why.style.cssText = 'margin-top:12px;';
+        why.innerHTML = `<div style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;">
+          <div style="font-weight:700;letter-spacing:0.2px;margin-bottom:3px;font-size:11px;text-transform:uppercase;opacity:0.85;">Plan adapted</div>
+          <div style="opacity:0.9;">${escapeHtml(planState.lastChange)}</div>
+        </div>`;
+      } else if (s.type === 'rest') {
+        why.style.cssText = '';
+        why.textContent = 'Full rest today. Recovery is the workout. the body adapts between sessions, not during them.';
+      } else if (s.type === 'quality' || s.type === 'brick') {
+        why.style.cssText = '';
+        why.textContent = 'Quality session today. Controlled-hard, not all-out. leaves enough in the tank for the rest of the week.';
+      } else {
+        why.style.cssText = '';
+        why.textContent = 'Easy aerobic work. Conversational pace, HR in Zone 2.';
+      }
     }
 
     // Actually-did stats — populate the small grid + per-activity list
@@ -14393,7 +14667,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Done/Reschedule/Skip can never appear on a session there's nothing to do.
     const isRest = !completed && (s.type === 'rest' || !s.duration || Number(s.duration) === 0);
     if (actionsPending) actionsPending.style.display = (completed || isRest) ? 'none' : 'grid';
-    if (logActions) logActions.style.display = (completed || isRest) ? 'none' : 'flex';
     if (syncNote) syncNote.style.display = (completed || isRest) ? 'none' : 'block';
     if (actionsDone) actionsDone.style.display = completed ? 'block' : 'none';
     if (actionsRest) actionsRest.style.display = isRest ? 'block' : 'none';
@@ -14413,6 +14686,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Show/hide weekly review button based on day of week
     const wrBtn = document.getElementById('weeklyReviewBtn');
     if (wrBtn) wrBtn.style.display = shouldShowWeeklyReview() ? '' : 'none';
+
+    // Time-aware check-in row label
+    const _h = new Date().getHours();
+    const _ciTitle = document.getElementById('checkinRowTitle');
+    const _ciSub = document.getElementById('checkinRowSub');
+    if (_ciTitle) _ciTitle.textContent = _h < 12 ? 'Morning check-in' : _h < 17 ? 'Daily check-in' : 'Evening check-in';
+    if (_ciSub) _ciSub.textContent = _h < 12 ? "How's your body today?" : _h < 17 ? 'Quick body check before training' : "How'd the day go?";
   }
   // Render the "Coming up" section on Today tab — next 2 non-rest sessions
   function renderTodayComingUp() {
@@ -14602,6 +14882,93 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
   }
 
+  // ── Tomorrow preview (Part 2 Fix 3) ──────────────────────────────────────
+  function renderTomorrowPreview() {
+    const el = document.getElementById('tomorrowPreview');
+    if (!el) return;
+    const _daysToRace = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    if (_daysToRace != null && _daysToRace >= -14 && _daysToRace <= 7) { el.style.display = 'none'; return; }
+    const todayDay = getTodayDay();
+    const todayIdx = DAYS.indexOf(todayDay);
+    if (todayIdx < 0 || todayIdx >= DAYS.length - 1) { el.style.display = 'none'; return; }
+    const tomorrowDay = DAYS[todayIdx + 1];
+    const s = planState.sessions[tomorrowDay];
+    if (!s) { el.style.display = 'none'; return; }
+    const safeS = (typeof _safeSession === 'function') ? _safeSession(s) : s;
+    const isRest = s.type === 'rest' || !s.duration;
+    const name = safeS.name || s.name || 'Training';
+    const meta = safeS.meta || (s.duration ? s.duration + ' min' : '');
+    const typeColors = { quality: '#C44545', brick: '#7E5BB6', strength: '#D9A94A', run: 'var(--primary)', bike: '#2B6CB0', swim: '#2B6CB0', cross: 'var(--text-soft)', rest: 'var(--text-soft)' };
+    const dot = isRest ? '' : `<span style="width:7px;height:7px;border-radius:50%;background:${typeColors[s.type]||'var(--primary)'};display:inline-block;flex-shrink:0;"></span>`;
+    el.style.display = 'block';
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:13px;cursor:pointer;" onclick="openSessionModal('${tomorrowDay}',0)">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-soft);white-space:nowrap;min-width:62px;">Tomorrow</div>
+      <div style="width:1px;height:14px;background:var(--border);flex-shrink:0;"></div>
+      ${dot}
+      <div style="flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(isRest ? 'Rest day' : name)}</div>
+      ${(!isRest && meta) ? `<div style="font-size:12px;color:var(--text-soft);white-space:nowrap;flex-shrink:0;">${escapeHtml(meta)}</div>` : ''}
+    </div>`;
+  }
+
+  // ── Weekly volume bar (Part 2 Fix 7) ──────────────────────────────────────
+  function renderWeekVolumeBar() {
+    const el = document.getElementById('weekVolumeBar');
+    if (!el) return;
+    const sessions = planState.sessions || {};
+    let plannedMins = 0, loggedMins = 0;
+    DAYS.forEach(d => {
+      const s = sessions[d];
+      if (!s || s.type === 'rest' || !s.duration) return;
+      plannedMins += Number(s.duration) || 0;
+      if (s.completed) loggedMins += Number(s.actualMins || s.duration) || 0;
+    });
+    if (plannedMins === 0) { el.style.display = 'none'; return; }
+    const pct = Math.min(100, Math.round((loggedMins / plannedMins) * 100));
+    const fmtH = m => { const h = Math.floor(m / 60), mn = m % 60; return h > 0 ? `${h}h ${mn > 0 ? ' ' + mn + 'm' : ''}`.trim() : `${mn}m`; };
+    const barColor = pct >= 80 ? 'var(--primary)' : pct >= 40 ? '#D9A94A' : 'var(--border)';
+    el.style.display = 'block';
+    el.innerHTML = `<div style="padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--text-soft);">This week</div>
+        <div style="font-size:12px;font-weight:600;">${fmtH(loggedMins)} <span style="color:var(--text-soft);font-weight:400;">of ${fmtH(plannedMins)} planned</span></div>
+      </div>
+      <div style="background:var(--bg);border-radius:100px;height:5px;overflow:hidden;">
+        <div style="background:${barColor};height:100%;width:${pct}%;border-radius:100px;transition:width 0.4s ease;"></div>
+      </div>
+    </div>`;
+  }
+
+  // ── Personal bests (Part 2 Fix 8) ─────────────────────────────────────────
+  function renderPersonalBests() {
+    const el = document.getElementById('perfPersonalBests');
+    if (!el) return;
+    const prs = (typeof detectPRs === 'function') ? detectPRs() : [];
+    const streak = computeStreak();
+    if ((!prs || prs.length === 0) && streak.days < 1) { el.style.display = 'none'; return; }
+    const fmtDate = iso => { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
+    const streakTile = streak.days >= 1 ? `
+      <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);grid-column:span 2;">
+        <div style="font-size:10px;color:var(--text-soft);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Training streak</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:3px;">
+          <div style="font-family:var(--font-heading);font-size:28px;font-weight:600;letter-spacing:-0.02em;color:#E8941F;">${streak.days}</div>
+          <div style="font-size:13px;color:var(--text-soft);">consecutive days</div>
+        </div>
+      </div>` : '';
+    el.style.display = 'block';
+    el.innerHTML = `<div class="card">
+      <div class="card-title" style="margin-bottom:10px;">Personal bests</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        ${streakTile}
+        ${prs.slice(0, 6).map(pr => `
+          <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);cursor:pointer;" onclick="${pr.activityId ? `openStravaSessionReport('${pr.activityId}')` : ''}">
+            <div style="font-size:10px;color:var(--text-soft);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(pr.label || '')}</div>
+            <div style="font-family:var(--font-heading);font-size:20px;font-weight:600;margin-top:3px;letter-spacing:-0.02em;">${escapeHtml(pr.value || '—')}</div>
+            ${pr.date ? `<div style="font-size:10px;color:var(--text-soft);margin-top:2px;">${fmtDate(pr.date)}</div>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
   function renderAll() {
     // Guarantee current-week race-week taper BEFORE any surface reads
     // planState.sessions. Cheap (skips when not in race week).
@@ -14615,6 +14982,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderSmartSummary();
     renderTodayHero();
+    renderTomorrowPreview();
+    renderWeekVolumeBar();
     // Note: renderFitnessPulse() removed from Home — Smart Summary's Body row covers it
     renderTodayComingUp();
     renderTodayRationaleSlot();
@@ -14624,12 +14993,14 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     renderRecentStravaSessions();
     renderProgressTab();
     renderPerformanceTab();
+    renderPersonalBests();
     renderWeekArc();
     renderBanners();
     renderPlanPriorityBanner();
     renderInsights();
     renderCourseIntel();
     renderReadinessPills();
+    renderStreakPill();
     if (typeof renderRaceDayCard === 'function') renderRaceDayCard();
     if (typeof renderPRBanner === 'function') renderPRBanner();
     if (typeof renderWeeklyRecap === 'function') renderWeeklyRecap();
@@ -14639,9 +15010,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── Streak tracking ──
   function computeStreak() {
+    // Prefer Strava activity history for a real consecutive-day streak.
+    const acts = planState.stravaActivities || [];
+    if (acts.length > 0) {
+      // Build a Set of YYYY-MM-DD dates with at least one activity.
+      const activeDates = new Set();
+      acts.forEach(a => {
+        if (a.start_date_local) activeDates.add(a.start_date_local.slice(0, 10));
+        else if (a.start_date) activeDates.add(a.start_date.slice(0, 10));
+      });
+      // Walk backwards from today counting consecutive active days.
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      let streak = 0, cursor = new Date(today);
+      for (let i = 0; i < 365; i++) {
+        const key = cursor.toISOString().slice(0, 10);
+        if (activeDates.has(key)) {
+          streak++;
+          cursor.setDate(cursor.getDate() - 1);
+        } else {
+          // Allow missing today (not yet trained) by skipping it once.
+          if (i === 0) { cursor.setDate(cursor.getDate() - 1); continue; }
+          break;
+        }
+      }
+      return { days: streak };
+    }
+    // Fallback: count completed sessions this week.
     const completedCount = DAYS.filter(d => planState.sessions[d] && planState.sessions[d].completed).length;
-    const total = DAYS.length;
-    return { days: completedCount, total };
+    return { days: completedCount };
   }
 
   function renderStreakPill() {
@@ -14649,7 +15045,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!el) return;
     const s = computeStreak();
     if (s.days < 2) { el.innerHTML = ''; return; }
-    el.innerHTML = ` · ${icon('flame', { size: 13, color: '#E8941F' })} ${s.days}-day streak`;
+    const flameIcon = icon('flame', { size: 13, color: '#E8941F' });
+    el.innerHTML = `${flameIcon} <span style="font-weight:600; color:#E8941F;">${s.days}-day streak</span>`;
   }
 
   // ── Celebration moments ──
@@ -14927,20 +15324,34 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   async function _sbSave() {
-    const { data: s } = await _sb.auth.getSession();
-    if (!s.session) return;
-    const userScoped = {};
-    USER_SCOPED_LOCAL_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) userScoped[k] = v; });
-    const planSnapshot = {};
-    _PLAN_FIELDS.forEach(f => { if (planState[f] !== undefined) planSnapshot[f] = planState[f]; });
-    const { error } = await _sb.from('user_data').upsert({
-      user_id: s.session.user.id,
-      username: _sbUsername,
-      plan_state: planSnapshot,
-      user_scoped: userScoped,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
-    if (error) console.warn('saveUserData (Supabase):', error.message);
+    // Last-write-wins: the local state at call time is authoritative.
+    // If the write fails (offline / transient error) we set _sbSavePending so
+    // the 'online' listener can retry with the then-current local state.
+    try {
+      const { data: s } = await _sb.auth.getSession();
+      if (!s.session) return;
+      const userScoped = {};
+      USER_SCOPED_LOCAL_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) userScoped[k] = v; });
+      const planSnapshot = {};
+      _PLAN_FIELDS.forEach(f => { if (planState[f] !== undefined) planSnapshot[f] = planState[f]; });
+      const { error } = await _sb.from('user_data').upsert({
+        user_id: s.session.user.id,
+        username: _sbUsername,
+        plan_state: planSnapshot,
+        user_scoped: userScoped,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      if (error) {
+        console.warn('[Adapt] Supabase upsert error:', error.message);
+        _sbSavePending = true;
+        return;
+      }
+      _sbSavePending = false;
+    } catch (e) {
+      // Network unavailable — mark pending so the online listener retries.
+      _sbSavePending = true;
+      console.warn('[Adapt] Supabase save failed (offline?); will retry on reconnect.', e.message);
+    }
   }
 
   // Known demo / tester accounts — auto-created in Supabase on first login.
@@ -15137,6 +15548,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!email || !email.includes('@')) { showError('signupError', 'Please enter a valid email address.'); return; }
     if (!password || password.length < 6) { showError('signupError', 'Password must be at least 6 characters.'); return; }
     if (password !== confirm) { showError('signupError', 'Passwords don\'t match.'); return; }
+    if (!document.getElementById('signupConsent')?.checked) { showError('signupError', 'Please read and accept the privacy policy to continue.'); return; }
 
     if (_isSupabase()) {
       const btn = document.querySelector('#authSignup .btn-primary');
@@ -15184,6 +15596,91 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
     _clearUserScopedLocal();
     chatMessages.length = 0;
+    location.reload();
+  }
+
+  function openDeleteAccountModal() {
+    if (!_isSupabase()) {
+      alert('Account deletion requires a Supabase account. Use Log out and contact support.');
+      return;
+    }
+    const modal = document.getElementById('deleteAccountModal');
+    if (!modal) return;
+    document.getElementById('deleteAccountPassword').value = '';
+    document.getElementById('deleteAccountError').style.display = 'none';
+    document.getElementById('deleteAccountBtn').disabled = false;
+    document.getElementById('deleteAccountBtn').textContent = 'Permanently delete my account';
+    modal.style.display = 'flex';
+  }
+
+  function closeDeleteAccountModal() {
+    const modal = document.getElementById('deleteAccountModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function confirmDeleteAccount() {
+    const password = (document.getElementById('deleteAccountPassword')?.value || '').trim();
+    const errEl = document.getElementById('deleteAccountError');
+    const btn = document.getElementById('deleteAccountBtn');
+    const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
+
+    if (!password) { showErr('Please enter your current password.'); return; }
+
+    // Re-authenticate: verify the password before sending the deletion request.
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+    errEl.style.display = 'none';
+
+    const userResp = await _sb.auth.getUser().catch(() => ({ data: { user: null } }));
+    const email = userResp?.data?.user?.email;
+    if (!email) { showErr('Session expired — please log in again.'); btn.disabled = false; btn.textContent = 'Permanently delete my account'; return; }
+
+    const { error: reAuthErr } = await _sb.auth.signInWithPassword({ email, password });
+    if (reAuthErr) {
+      showErr('Incorrect password. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Permanently delete my account';
+      return;
+    }
+
+    btn.textContent = 'Deleting…';
+
+    // Get the fresh session JWT to send to the server-side endpoint.
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session?.access_token) {
+      showErr('Could not retrieve session. Please log in again.');
+      btn.disabled = false;
+      btn.textContent = 'Permanently delete my account';
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        showErr(json.error || `Deletion failed (${resp.status}). Please try again or contact support.`);
+        btn.disabled = false;
+        btn.textContent = 'Permanently delete my account';
+        return;
+      }
+    } catch (e) {
+      showErr('Network error. Please check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Permanently delete my account';
+      return;
+    }
+
+    // Success — wipe local cache and return to logged-out state.
+    _clearUserScopedLocal();
+    chatMessages.length = 0;
+    try { await _sb.auth.signOut(); } catch (_) {}
+    closeDeleteAccountModal();
     location.reload();
   }
 
@@ -17135,12 +17632,23 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
         : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
       [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
+      // Reset bar-row flex constraints so the empty-state (which is taller than
+      // the 90px bar height) doesn't overflow upward into the card-title.
+      bars.style.height = 'auto';
+      bars.style.minHeight = '';
+      bars.style.alignItems = 'center';
+      bars.style.paddingTop = '0';
       bars.innerHTML = `<div class="empty-state"><span class="emoji">📈</span><p class="empty-state-title">Your trends will appear here</p><p class="empty-state-body">${cta || 'Log a workout on the Home tab to see your training history.'}</p></div>`;
       if (axis) axis.innerHTML = '';
       if (discBars) discBars.innerHTML = '';
       if (topSess) topSess.innerHTML = '';
       return;
     }
+    // Restore bar-row to its natural chart layout when data is present.
+    bars.style.height = '';
+    bars.style.minHeight = '';
+    bars.style.alignItems = '';
+    bars.style.paddingTop = '';
 
     // Summary tiles
     const totalMins = acts.reduce((a, x) => a + (x.moving_min || 0), 0);
@@ -18380,6 +18888,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       renderAll();
       if (typeof loadCoachHistory === 'function') loadCoachHistory();
       if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
+
+      // Periodic Apple HealthKit sync. Fires on startup, every 15 minutes,
+      // and whenever the user returns to the app after backgrounding it.
+      // No-op on web (webkit.messageHandlers doesn't exist there).
+      (function() {
+        function syncHealth() { try { _requestHealthKitIfNative(); } catch (_) {} }
+        syncHealth();
+        setInterval(syncHealth, 15 * 60 * 1000);
+        document.addEventListener('visibilitychange', function() {
+          if (!document.hidden) syncHealth();
+        });
+      })();
     } catch (initErr) {
       console.error('[Adapt] init error:', initErr);
       // Best-effort fallback: show the onboard/welcome screen so the app is
@@ -18453,22 +18973,51 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // double-quote escape mess that was silently breaking chip clicks.
     const row = document.getElementById('suggestRow');
     if (row) {
-      // Make the "why" chip reflect the user's actual Saturday session.
-      const _satS = (planState.sessions || {})['Sat'];
-      const _satChipLabel = _satS && _satS.type !== 'rest'
-        ? `Why ${_satS.type === 'brick' ? "Saturday's brick?" : _satS.type === 'run' || _satS.type === 'quality' ? "Saturday's long run?" : `Saturday's ${_satS.type}?`}`
-        : "Why long session?";
-      const _satChipPrompt = _satS && _satS.type !== 'rest'
-        ? `Why is ${_satS.name || "Saturday's session"} so important in my plan?`
-        : "Why is the long session the most important session each week?";
-      const chips = [
-        ["What's today?", "What's today's session and how should it feel?"],
-        [_satChipLabel, _satChipPrompt],
-        ['Move Sat → Sun', 'Move Saturday to Sunday'],
-        ['Only 30 min Wed', 'I only have 30 minutes on Wednesday'],
-        ['Skipped today', "I'm skipping today's session"],
-        ['My knee hurts', "My knee is sore. flag it as a low-grade injury"],
-      ];
+      // Fix 11 Part 2: Dynamic chips based on today's session, injury, check-in
+      const _todayDay = (typeof getTodayDay === 'function') ? getTodayDay() : 'Mon';
+      const _todayS = (planState.sessions || {})[_todayDay];
+      const _todayCompleted = _todayS && _todayS.completed;
+      const _todayIsRest = !_todayS || _todayS.type === 'rest' || !_todayS.duration;
+      const _hasInjury = !!(planState.injury && planState.injury.area);
+      const _hasCheckin = !!(planState.lastCheckin);
+      const _todayName = _todayS && _todayS.name ? _todayS.name : "today's session";
+
+      // Find the next long session (Sat or last training day)
+      const _longDay = ['Sat','Sun','Fri','Thu'].find(d => { const s = (planState.sessions||{})[d]; return s && s.type !== 'rest' && s.duration >= 60; }) || 'Sat';
+      const _longS = (planState.sessions||{})[_longDay];
+      const _longLabel = _longS ? `Why ${_longDay}'s ${_longS.type === 'brick' ? 'brick' : 'long run'}?` : "Why the long session?";
+      const _longPrompt = _longS ? `Why is ${_longS.name || _longDay + "'s session"} structured this way?` : "Why is the long session important?";
+
+      const chips = [];
+      // Primary chip: today's context
+      if (_todayCompleted) {
+        chips.push(["How'd I do?", `I just completed ${_todayName}. how does it compare to what was prescribed?`]);
+      } else if (_todayIsRest) {
+        chips.push(["Train anyway?", "Today is a rest day but I want to train. what should I do and will it affect recovery?"]);
+      } else {
+        chips.push([`Why ${_todayName}?`, `Why is ${_todayName} in my plan today and how should it feel?`]);
+      }
+      // Injury chip
+      if (_hasInjury) {
+        const inj = planState.injury;
+        chips.push([`${inj.area} update`, `My ${inj.area} ${inj.severity === 'improving' ? 'is improving' : 'still hurts'}. Can we update the injury flag and adjust my plan?`]);
+      } else {
+        chips.push(["I'm injured", "I'm dealing with an injury. tell me the area and severity and I'll flag it and adapt the plan."]);
+      }
+      // Check-in chip
+      if (!_hasCheckin) {
+        chips.push(["I feel off today", "I haven't checked in today. I'm feeling off — can we adjust today's session?"]);
+      } else {
+        chips.push(["Adjust today", `I only have limited time today. What's the minimum effective version of ${_todayName}?`]);
+      }
+      // Long session chip
+      chips.push([_longLabel, _longPrompt]);
+      // Reschedule chip
+      if (!_todayIsRest && !_todayCompleted) {
+        chips.push(['Skip today', `I need to skip ${_todayName}. Flag it as skipped and tell me the impact.`]);
+      }
+      // Race chip
+      chips.push(['Race week plan', 'What should my race week look like in terms of sessions, sleep, and nutrition?']);
       const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       row.innerHTML = chips.map(([label, prompt]) =>
         `<button class="suggest-chip" data-prompt="${escAttr(prompt)}">${escAttr(label)}</button>`
@@ -18481,6 +19030,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         if (p) askSuggested(p);
       };
       row.style.display = '';
+    }
+
+    // Fix 15 Part 1: Session-anchored greeting when chat history is empty.
+    const greeting = document.getElementById('chatModeGreeting');
+    if (greeting && (!chatMessages || chatMessages.length === 0)) {
+      const _day = (typeof getTodayDay === 'function') ? getTodayDay() : '';
+      const _s = _day && (planState.sessions || {})[_day];
+      const _isRest = !_s || _s.type === 'rest' || !_s.duration;
+      const _name = _s && _s.name ? _s.name : null;
+      const _dur = _s && _s.duration ? _s.duration + ' min' : null;
+      let msg;
+      if (_isRest) {
+        msg = `Rest day today. Recovery is part of the plan. Ask me anything about your training, or tell me what to change.`;
+      } else if (_name) {
+        msg = `Today is ${_name}${_dur ? ' (' + _dur + ')' : ''}. Ask me why it's structured this way, how it should feel, or tell me if something needs to change.`;
+      } else {
+        msg = `Your coach is here. Ask me anything about your plan, or tell me what to change.`;
+      }
+      greeting.textContent = msg;
     }
   }
 
@@ -18760,20 +19328,31 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // `bubble` as they arrive, accumulate any tool_calls, execute them locally
   // against planState, and loop until the model finishes (no more tool calls).
   async function askMistral(userText, bubble) {
+    // Sliding window: keep only the 20 most-recent messages before adding the
+    // new user turn. This caps context to ~20 exchanges regardless of session
+    // length (BEFORE: up to 50 msgs × ~150 tok ≈ 7,500 ctx tokens; AFTER: 21
+    // msgs × ~150 tok ≈ 3,150 ctx tokens). Tool-call back-and-forth within a
+    // single turn still accumulates normally in the iter loop below.
+    while (chatMessages.length > 20) chatMessages.shift();
     chatMessages.push({ role: 'user', content: userText });
     const savedHistory = chatMessages.length;
     let visibleText = '';
 
     try {
       for (let iter = 0; iter < 6; iter++) {
+        // 30-second per-turn abort so a hung Mistral request doesn't block forever.
+        const _chatCtrl = new AbortController();
+        const _chatTimeout = setTimeout(() => _chatCtrl.abort(), 30000);
         const resp = await fetch('/api/coach/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: _chatCtrl.signal,
           body: JSON.stringify({
             messages: chatMessages,
             context: buildCoachContext(),
           }),
         });
+        clearTimeout(_chatTimeout);
 
         if (!resp.ok) {
           let msg = 'HTTP ' + resp.status;
@@ -19746,7 +20325,7 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     const prompt = `Just checked in. Body: ${ci.body}. Sleep: ${ci.sleep}. Stress: ${ci.stress}.${notesLine} ${sessLine} Should we adjust today's plan?`;
 
     _pendingCoachPrompt = prompt;
-    if (typeof trackEvent === 'function') trackEvent('checkin_to_coach', { body: ci.body, sleep: ci.sleep, stress: ci.stress });
+    if (typeof trackEvent === 'function') trackEvent('checkin_to_coach');
     showScreen('ask');
     // updateChatState handles the "show privacy disclosure vs active chat" gating.
     if (typeof updateChatState === 'function') updateChatState();
@@ -19929,12 +20508,12 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     const stress = document.querySelector('#ciStress .chip.active')?.textContent || 'Normal';
     const notes = document.getElementById('ciNotes').value.trim();
     planState.lastCheckin = { body, sleep, stress, notes, when: Date.now() };
-    trackEvent('morning_checkin', { body, sleep, stress, hasNotes: !!notes });
+    trackEvent('morning_checkin', { hasNotes: !!notes });
 
     if (notes) {
       const parsed = parseSorenessNotes(notes);
       if (parsed) {
-        trackEvent('soreness_parsed', { area: parsed.area, severity: parsed.severity, side: parsed.side });
+        trackEvent('soreness_parsed', { severity: parsed.severity });
         showSorenessUnderstood(parsed);
       }
     }
@@ -20044,10 +20623,30 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     if (!s || s.type === 'rest') { alert("Today is a rest day. nothing to mark done."); return; }
     if (s.completed) { alert("Today's session is already marked done."); return; }
     lastSnapshot = JSON.parse(JSON.stringify(planState));
-    // Direct apply — quick action is its own confirmation. Plus renderAll
-    // so Today hero flips to "Done" state instantly.
     _runToolDirect('completeSession', { day: today });
     if (typeof renderAll === 'function') renderAll();
+    // Show RPE prompt after a brief delay so the hero card updates first.
+    setTimeout(() => {
+      const sub = document.getElementById('rpePromptSub');
+      if (sub && s.name) sub.textContent = `How hard did ${escapeHtml(s.name)} feel?`;
+      document.getElementById('rpePromptModal').classList.add('show');
+      document.getElementById('rpePromptModal').dataset.day = today;
+    }, 350);
+  }
+  function saveQuickRpe(val, label) {
+    const modal = document.getElementById('rpePromptModal');
+    const day = modal && modal.dataset.day;
+    if (day && planState.sessions[day]) {
+      planState.sessions[day].rpe = val;
+      planState.sessions[day].rpeLabel = label;
+      saveUserData();
+      if (typeof trackEvent === 'function') trackEvent('quick_rpe_saved', { day, rpe: val, label });
+    }
+    closeRpePrompt();
+  }
+  function closeRpePrompt() {
+    const modal = document.getElementById('rpePromptModal');
+    if (modal) modal.classList.remove('show');
   }
   function quickReschedule() {
     const today = getTodayDay();
@@ -20516,6 +21115,18 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     window.addEventListener('offline', createBanner);
     window.addEventListener('online', removeBanner);
   })();
+
+  // Retry a pending Supabase save when the device comes back online.
+  // Last-write-wins: the local state at reconnect time is the authoritative snapshot.
+  window.addEventListener('online', () => {
+    if (_sbSavePending && (typeof _isSupabase === 'function') && _isSupabase()) {
+      _sbSavePending = false;
+      _sbSave().catch(e => {
+        _sbSavePending = true;
+        console.warn('[Adapt] Reconnect save failed:', e && e.message);
+      });
+    }
+  });
 </script>
 
 </body>

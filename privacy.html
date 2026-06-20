@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Adapt</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #F6F4F1;
+      color: #1a1a1a;
+      line-height: 1.7;
+      padding: 32px 20px 64px;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    .logo { font-size: 22px; font-weight: 700; color: #2E6B51; margin-bottom: 32px; letter-spacing: -0.5px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.5px; }
+    .meta { font-size: 13px; color: #666; margin-bottom: 32px; }
+    h2 { font-size: 17px; font-weight: 700; margin: 32px 0 10px; }
+    p { margin-bottom: 12px; font-size: 15px; color: #2a2a2a; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { font-size: 15px; color: #2a2a2a; margin-bottom: 8px; }
+    a { color: #2E6B51; }
+    .draft-banner {
+      background: #fef6e0;
+      border: 1px solid #e8c46b;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #7a5a18;
+      margin-bottom: 28px;
+      display: none; /* remove this line when policy is finalised */
+    }
+    .todo { background: #fde8e8; border-radius: 4px; padding: 2px 6px; font-size: 13px; color: #c44545; font-weight: 600; }
+    .back { font-size: 13px; color: #2E6B51; text-decoration: none; display: inline-block; margin-bottom: 24px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">adapt</div>
+    <a class="back" href="/">← Back to Adapt</a>
+
+    <!-- Remove this banner once all TODO fields are filled and policy is finalised -->
+    <div class="draft-banner">
+      <strong>DRAFT</strong> — fill in all <span class="todo">TODO</span> fields before App Store submission.
+    </div>
+
+    <h1>Privacy Policy</h1>
+    <p class="meta">
+      Operated by <strong>Danny Spencer</strong> &nbsp;·&nbsp;
+      Effective date: <span class="todo">TODO: insert date</span> &nbsp;·&nbsp;
+      Contact: <a href="mailto:TODO@yourdomain.com"><span class="todo">TODO: privacy email</span></a>
+    </p>
+
+    <h2>What this policy covers</h2>
+    <p>This policy applies to the Adapt mobile app and web app ("Adapt," "we," "us"). It explains what information we collect, how we use it, and your rights as a user.</p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><strong>Account information:</strong> your first name and email address, provided at sign-up.</li>
+      <li><strong>Training data:</strong> goals, race dates, weekly hours, session logs, check-in answers, and plan preferences you enter in the app.</li>
+      <li><strong>Usage data:</strong> which screens you visit and which features you use, collected anonymously for analytics (see PostHog below).</li>
+    </ul>
+    <p>We do not collect payment information, precise location, contacts, photos, or browsing history.</p>
+
+    <h2>Health data</h2>
+    <p>The native iOS version of Adapt can read resting heart rate, HRV, and sleep duration from Apple Health if you grant permission. This data is read locally on your device and used only to personalise your daily readiness score. It is <strong>not</strong> transmitted to our servers.</p>
+
+    <h2>Third-party services</h2>
+    <p>Your data is processed by the following third parties. By using Adapt you acknowledge this processing.</p>
+    <ul>
+      <li>
+        <strong>Supabase</strong> — account authentication and data storage.
+        Data is stored in the US. <a href="https://supabase.com/privacy" target="_blank">Privacy policy</a>
+      </li>
+      <li>
+        <strong>Mistral AI</strong> — AI coaching responses. Your messages and training-plan context are forwarded to Mistral's API to generate coaching advice. Mistral's policy states it does not train models on API traffic.
+        <a href="https://mistral.ai/terms/" target="_blank">Terms</a>
+      </li>
+      <li>
+        <strong>PostHog</strong> — anonymous usage analytics (which screens you visit, which features you use). No health data or personally identifiable information is included in analytics events.
+        <a href="https://posthog.com/privacy" target="_blank">Privacy policy</a>
+      </li>
+      <li>
+        <strong>Vercel</strong> — application hosting and serverless functions.
+        <a href="https://vercel.com/legal/privacy-policy" target="_blank">Privacy policy</a>
+      </li>
+    </ul>
+    <p>We do not sell your personal information to any third party.</p>
+
+    <h2>How we use your data</h2>
+    <ul>
+      <li>To provide and personalise your training plan and coaching responses.</li>
+      <li>To authenticate your account and sync your data across devices.</li>
+      <li>To send workout reminders and check-in notifications (only if you enable them).</li>
+      <li>To understand how the app is used and improve it (anonymous analytics only).</li>
+    </ul>
+
+    <h2>Data retention and deletion</h2>
+    <p>You may delete your account at any time from the app: <strong>You tab → Delete account</strong>. Deletion is permanent and immediate — your account and all associated data are removed from our servers at the moment you confirm. This cannot be undone.</p>
+
+    <h2>Your rights (California residents — CCPA)</h2>
+    <p>If you are a California resident, you have the following rights under the California Consumer Privacy Act:</p>
+    <ul>
+      <li><strong>Right to know:</strong> you may request details about the personal information we collect, use, disclose, and sell (we do not sell your data).</li>
+      <li><strong>Right to delete:</strong> you may request deletion of your personal information. Use the in-app "Delete account" feature for immediate deletion, or email us at <a href="mailto:TODO@yourdomain.com"><span class="todo">TODO: privacy email</span></a>.</li>
+      <li><strong>Right to opt out of sale:</strong> we do not sell your personal information. No opt-out is needed.</li>
+      <li><strong>Right to non-discrimination:</strong> we will not discriminate against you for exercising any of your CCPA rights.</li>
+    </ul>
+
+    <h2>Security</h2>
+    <p>We use industry-standard security measures including encrypted connections (HTTPS), Supabase row-level security, and server-side secret management. No method of transmission over the internet is 100% secure; we cannot guarantee absolute security.</p>
+
+    <h2>Children</h2>
+    <p>Adapt is not directed at children under 13 and we do not knowingly collect data from children. If you believe a child has provided us with personal information, contact us and we will delete it.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>We may update this policy from time to time. We will notify you of material changes by updating the effective date above and, where appropriate, via in-app notice.</p>
+
+    <h2>Contact</h2>
+    <p>
+      Danny Spencer<br>
+      <a href="mailto:TODO@yourdomain.com"><span class="todo">TODO: privacy email</span></a>
+    </p>
+
+    <p style="margin-top: 40px; font-size: 12px; color: #999;">
+      © <span id="yr"></span> Danny Spencer. Adapt is an independent product.
+    </p>
+  </div>
+  <script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>

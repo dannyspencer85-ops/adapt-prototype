@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/coach/plan.js": { "maxDuration": 60 }
+    "api/coach/plan.js": { "maxDuration": 60 },
+    "api/delete-account.js": { "maxDuration": 30 }
   },
   "crons": [
     {
@@ -10,6 +11,14 @@
     {
       "path": "/api/notifications/race-milestone",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/notifications/workout-preview",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/notifications/morning-checkin",
+      "schedule": "0 12 * * *"
     }
   ]
 }

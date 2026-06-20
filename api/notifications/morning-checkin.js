@@ -1,69 +1,77 @@
 // api/notifications/morning-checkin.js
-// Cron: every 15 min  (*/15 * * * *)
+// Cron: 0 12 * * *
+// = 7 am CDT (UTC-5, daylight saving time).
+// DRIFTS: when clocks fall back to CST (UTC-6) this fires at 6 am Central.
+// [CHANGE ME if you want a different time — update vercel.json schedule to match.]
 //
-// Sends a morning check-in prompt to users whose preferred check-in time
-// falls in the current 15-minute window AND who have a non-rest session
-// today AND who haven't already checked in.
+// Category: "check_in" → morning_checkin_enabled column in notification_preferences.
+// Audience: users with morning_checkin_enabled = true who have NOT already
+//   completed today's check-in.
+// Payload: fixed coaching-voice copy.
+// Guardrails:
+//   - Skips users who already checked in today (reads plan_state.lastCheckin.when).
+//   - Max once/day enforced by cron schedule (single daily run) + tag dedup on device.
+//   - "Opened app in last hour" suppression: OUT OF SCOPE (app-open events not stored
+//     server-side). Future work: write a last_active_at timestamp to user_data on login.
 //
-// Adapt stores check-in state in planState (localStorage / Supabase).
-// We approximate "already checked in" by checking the last_checkin_date
-// column we write when the user submits a check-in.
+// TODO: per-user timezone scheduling is OUT OF SCOPE for this pass.
+// All users receive this at the same UTC time (7 am CDT).
 
 import { makeServiceClient, sendPushToUser } from '../_utils/sendPush.js';
 
 export default async function handler(req) {
-  // Vercel Cron passes a secret header — reject other callers in production.
-  if (process.env.CRON_SECRET) {
-    const auth = req.headers.get?.('authorization') ?? req.headers['authorization'];
-    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers['authorization'] ?? req.headers.get?.('authorization') ?? '';
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return new Response('Unauthorized', { status: 401 });
   }
 
   const supabase = makeServiceClient();
-  const now = new Date();
-  const utcH = now.getUTCHours();
-  const utcM = now.getUTCMinutes();
-  const todayStr = now.toISOString().split('T')[0];
+  // "today" in UTC — at 12:00 UTC (7am CDT) this matches the user's calendar day.
+  const todayStr = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 
-  // Time window ±7 min around current UTC time
-  const windowStart = `${String(utcH).padStart(2,'0')}:${String(Math.max(0, utcM - 7)).padStart(2,'0')}`;
-  const windowEnd   = `${String(utcH).padStart(2,'0')}:${String(Math.min(59, utcM + 7)).padStart(2,'0')}`;
-
-  const { data: users, error } = await supabase
+  const { data: prefs, error: prefsErr } = await supabase
     .from('notification_preferences')
-    .select('user_id, morning_checkin_time')
-    .eq('morning_checkin_enabled', true)
-    .gte('morning_checkin_time', windowStart)
-    .lte('morning_checkin_time', windowEnd);
+    .select('user_id')
+    .eq('morning_checkin_enabled', true);
 
-  if (error) {
-    console.error('[morning-checkin] query error:', error);
-    return new Response('Error', { status: 500 });
+  if (prefsErr) {
+    console.error('[morning-checkin] prefs error:', prefsErr.message);
+    return new Response(JSON.stringify({ error: prefsErr.message }), { status: 500 });
   }
 
   let sent = 0;
-  for (const user of (users ?? [])) {
-    // Skip if user already checked in today (column set by the app on submit)
-    const { data: state } = await supabase
-      .from('user_plan_state')
-      .select('last_checkin_date')
-      .eq('user_id', user.user_id)
+  let skipped = 0;
+
+  for (const pref of (prefs ?? [])) {
+    // Check if user already completed today's check-in.
+    // planState.lastCheckin.when is stored as a Unix ms timestamp.
+    const { data: row } = await supabase
+      .from('user_data')
+      .select('plan_state')
+      .eq('user_id', pref.user_id)
       .maybeSingle();
 
-    if (state?.last_checkin_date === todayStr) continue;
+    const lastCheckin = row?.plan_state?.lastCheckin;
+    if (lastCheckin?.when) {
+      const checkinDate = new Date(lastCheckin.when).toISOString().split('T')[0];
+      if (checkinDate === todayStr) {
+        skipped++; // already checked in — don't nudge
+        continue;
+      }
+    }
 
-    await sendPushToUser(user.user_id, {
-      title: 'Morning check-in',
-      body: "How's the body today? 15 seconds — shapes your session.",
-      tag: 'morning-checkin',
-      url: '/?action=checkin',
+    await sendPushToUser(pref.user_id, {
+      title: 'Daily check-in',
+      body: "How's your body today? 30 seconds — shapes today's session.",
+      tag: 'check-in', // dedup: only one per device per day
+      url: '/#home',
       notificationType: 'morning_checkin',
     }, supabase);
     sent++;
   }
 
-  return new Response(JSON.stringify({ sent }), {
+  return new Response(JSON.stringify({ ok: true, sent, skipped }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });

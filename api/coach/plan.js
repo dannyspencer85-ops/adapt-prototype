@@ -541,15 +541,26 @@ Your plans MUST reflect these established frameworks:
 • Use ONLY the user's selected training days for sessions. Other days = full rest. Do not invent training days.
 • **DISCIPLINE LOCK**: only prescribe session.type values from the user's availableDisciplines list. For run-only events (5K/10K/HM/Marathon) — EVEN IF the user has 'swim' or 'bike' in their available disciplines — NEVER prescribe swim or bike sessions. Swim/bike exist ONLY in triathlon plans. For run events, every session is either run, rest, strength, mobility, or cross (if 'cross' is in availableDisciplines).
 • For run events: allowed types are STRICTLY ${hasCross ? (hasStrength ? "{'run','rest','strength','mobility','cross'}" : "{'run','rest','mobility','cross'}") : (hasStrength ? "{'run','rest','strength','mobility'}" : "{'run','rest','mobility'}")}. TYPE 'swim' AND TYPE 'bike' ARE FORBIDDEN regardless of discipline list.
-• **'cross' session type** (low-impact cross-training): Use when 'cross' is in availableDisciplines. Prescribe elliptical, rowing machine, aqua jogging, or pool running at Zone 2. Place on recovery days — ideally the day after quality work. Name: 'Low-impact cross-training', prescription must name specific machine options.
+• **'cross' session type** (low-impact cross-training): Use when 'cross' is in availableDisciplines. Place on recovery days — ideally the day after quality work. ALWAYS prescribe a specific machine + duration + zone (never generic). Examples:
+  - Elliptical: "Elliptical 40 min Z2, cadence 80-90 rpm, arm drive engaged throughout."
+  - Rowing: "Rowing machine 30 min Z2 at 20 spm, maintain flat-back posture."
+  - Aqua jogging: "Aqua jogging 35 min Z2 with flotation belt, simulate run mechanics, no push-off from wall."
+  - Pool running: "Deep-water running 30 min Z2, vertical posture."
+  Name: 'Low-impact cross-training'. Intensity: 'Z2'. Duration: 25-50 min. durationMin is TOTAL session time.
 • For triathlon events: types follow the discipline allocation rules in the discipline note.
 • Total weekly minutes must be within ±15% of the user's stated weekly hours × 60. (User said ${hours} hrs/week → target ~${Math.round(hours * 60)} min/week.)
-• Each week must have at least one full rest day (duration:0, type:'rest'). Two if hours <= 4.
+• Rest day requirements by training phase — HARD minimums, not suggestions:
+  - Base phase: MINIMUM 2 full rest days per week (type:'rest', duration:0). Aerobic adaptation requires recovery.
+  - Build phase: MINIMUM 1 full rest day per week. Quality work demands proper recovery.
+  - Peak phase: MINIMUM 1 full rest day per week.
+  - Taper phase (final 2 weeks before race): MINIMUM 2 full rest days per week. Legs must arrive fresh.
+  A rest day = type:'rest' AND duration:0. A 20-min mobility session is NOT a rest day. A "light walk" is NOT a rest day.
 • Quality (high-intensity) sessions must be spaced at least 48 hours apart, ideally 72.
 • No week-over-week total-hours jump exceeds +25% or drops more than 35% (deload/taper aside).
 • Long session is on Sat or Sun if those are training days; otherwise on the last selected day.
 • **RACE DAY ENDS THE CYCLE.** In race week, the LAST training session is race day itself. Every day STRICTLY AFTER race day inside race week must be type:'rest' with duration:0 — recovery, not training. Don't schedule a "long swim" on the Saturday after a Thursday race. The plan ENDS at race day.
 • Every session has: name, type (run/bike/swim/strength/brick/mobility/rest/quality/cross), durationMin (integer), intensity ('Z2','Z3','Z4','Z5','mixed','rest'), prescription (1 sentence max — specific zone/interval/drill, not generic), targets (HR/pace/RPE in ≤15 words).
+• durationMin is TOTAL session time including warmup and cooldown — not the main set alone. "10 min WU + 30 min Z3 + 10 min CD" = durationMin:50.
 • prescription: be terse. "10 min WU, 3×10 min Z3, 5 min CD" not a paragraph. NEVER exceed 20 words.
 • targets: ≤15 words. "Z2 HR 130-145 bpm, conversational pace" is enough.
 • prescription MUST be populated on every non-rest session — never leave it blank.
