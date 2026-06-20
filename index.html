@@ -16696,7 +16696,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       planned.stravaId = primary.id;
       planned.stravaName = compatActs.length === 1
         ? primary.name
-        : `${compatActs.length} workouts · ${compatActs.map(a => mapStravaTypeToSessionType(a.type)).join(' + ')}`;
+        : (() => {
+            const typeLabel = { run: 'run', bike: 'ride', swim: 'swim', strength: 'strength',
+                                walk: 'walk', mobility: 'mobility', cross: 'cross-train', other: 'workout' };
+            const labels = compatActs.map(a => typeLabel[mapStravaTypeToSessionType(a.type)] || 'workout');
+            const unique = [...new Set(labels)];
+            return unique.length === 1
+              ? `${compatActs.length} ${unique[0]} workouts`
+              : `${compatActs.length} workouts · ${labels.join(' + ')}`;
+          })();
       planned.stravaDistance_km = totalDist > 0.05 ? totalDist : null;
       const totalCals = compatActs.reduce((s, a) => s + (a.calories_kcal || 0), 0);
       planned.stravaCalories = totalCals > 0 ? Math.round(totalCals) : null;
