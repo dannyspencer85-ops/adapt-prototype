@@ -10968,9 +10968,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         ? String(session.prescription)
         : `${session.name}. ${session.meta || ''}`;
       const presBody = rawPres
-        .replace(/[≈~]\s*\d+\s*min(?:utes?)?\b\.?/gi, '')
-        .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')
-        .replace(/\(\s*total\s+\d+\s*min(?:utes?)?\s*\)/gi, '')
+        .replace(/\(\s*[≈~][^)]*\)/gi, '')           // (≈45 min total) whole paren
+        .replace(/[≈~]\s*\d+\s*min(?:utes?)?(?:\s+total)?\b\.?/gi, '')  // ≈ 40 min total.
+        .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')               // 40 min total.
+        .replace(/\(\s*total\s+\d+\s*min(?:utes?)?\s*\)/gi, '')          // (total 40 min)
+        .replace(/\s+\./g, '.')                       // "threshold ." → "threshold."
         .replace(/\s{2,}/g, ' ').trim();
       const main = dur > 0
         ? `${dur} min total. ${presBody}`
@@ -14572,9 +14574,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         // Strip ≈/total duration summaries that may contradict the canonical
         // duration shown in heroDuration just above.
         const cleanedPres = String(s.prescription)
-          .replace(/[≈~]\s*\d+\s*min(?:utes?)?\b\.?/gi, '')
+          .replace(/\(\s*[≈~][^)]*\)/gi, '')
+          .replace(/[≈~]\s*\d+\s*min(?:utes?)?(?:\s+total)?\b\.?/gi, '')
           .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')
           .replace(/\(\s*total\s+\d+\s*min(?:utes?)?\s*\)/gi, '')
+          .replace(/\s+\./g, '.')
           .replace(/\s{2,}/g, ' ').trim();
         presEl.innerHTML = markupGlossaryTerms(cleanedPres);
         presEl.style.display = 'block';
