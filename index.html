@@ -5977,7 +5977,7 @@
     if (name === 'ask') { updateChatState(); if (typeof _updateChatCapWarning === 'function') _updateChatCapWarning(); }
     if (name === 'plan' || name === 'today') renderAll();
     if (name === 'prep') { autofillCheckin(); if (typeof renderPrepScreen === 'function') renderPrepScreen(); }
-    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderStravaUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); renderNotifPrefs(); }
+    if (name === 'profile') { renderPrimarySourceUI(); renderComplexityProfileUI(); renderThemeProfileUI(); renderProfileScheduleSummary(); renderProfileInputs(); renderPlanIntensity(); renderNotifPrefs(); }
   }
   function getPlanIntensity() {
     const d = localStorage.getItem('plan-difficulty-adjust');
@@ -15032,7 +15032,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof renderRaceDayCard === 'function') renderRaceDayCard();
     if (typeof renderPRBanner === 'function') renderPRBanner();
     if (typeof renderWeeklyRecap === 'function') renderWeeklyRecap();
-    if (typeof renderStravaAuthBanner === 'function') renderStravaAuthBanner();
     if (typeof renderNotifBadge === 'function') renderNotifBadge();
   }
 
@@ -15743,11 +15742,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // STRAVA INTEGRATION — PAUSED. Set STRAVA_ENABLED=true to revive. While
-  // false: no connect UI, no OAuth, no background sync, Pulse shows an
-  // "Apple Health coming soon" placeholder. The plumbing below stays defined
-  // (dormant) so it's a one-flag flip — or a clean template for Apple Health.
-  // credentials live in localStorage only, never in source
+  // STRAVA INTEGRATION — disabled (STRAVA_ENABLED=false). Apple Health is the
+  // live data source: workouts arrive via the native iOS bridge, get merged into
+  // planState.stravaActivities, and flow through all the same downstream logic.
+  // The OAuth/sync plumbing below is dormant but intact; set STRAVA_ENABLED=true
+  // to revive it. Credentials live in localStorage only, never in source.
   // ──────────────────────────────────────────────────────────────────────
   function getStravaConfig() {
     if (!STRAVA_ENABLED) return null;
@@ -16511,10 +16510,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const syncedMins = planState.stravaSyncedAt ? Math.round((Date.now() - planState.stravaSyncedAt) / 60000) : null;
     const syncedLabel = syncedMins == null ? '' : syncedMins < 1 ? 'just now' : syncedMins < 60 ? `${syncedMins} min ago` : `${Math.round(syncedMins/60)}h ago`;
 
+    const isNative = !!(window.__ADAPT_NATIVE__ || (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.adaptBridge));
     slot.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px;">
-        <div style="font-size:11px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">From Strava ${syncedLabel ? '· synced ' + syncedLabel : ''}</div>
-        <button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">Sync</button>
+        <div style="font-size:11px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">Recent workouts ${syncedLabel ? '· synced ' + syncedLabel : ''}</div>
+        ${isNative ? `<button onclick="_requestHealthKitIfNative()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:12px; cursor:pointer; font-family:inherit;">Re-sync</button>` : ''}
       </div>
       ${recent.map(a => `
         <div class="session-row done" style="display: block; position: relative;">
@@ -17662,11 +17662,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     if (acts.length === 0) {
       const stravaConnected = !!getStravaConfig();
-      const cta = !STRAVA_ENABLED
-        ? 'Log your workouts on the <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">Log tab</a> and your trends fill in here. Apple Health sync is coming soon.'
-        : stravaConnected
-        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
-        : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your training history.';
+      const cta = 'Workouts from Apple Health appear here automatically. You can also <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">log sessions manually</a>.';
       [totalEl, sessionsEl, distanceEl, avgHrEl].forEach(el => { if (el) el.textContent = '—'; });
       // Reset bar-row flex constraints so the empty-state (which is taller than
       // the 90px bar height) doesn't overflow upward into the card-title.
@@ -17913,11 +17909,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const stravaConnected = !!getStravaConfig();
 
     if (acts.length === 0) {
-      const cta = !STRAVA_ENABLED
-        ? 'Log your workouts on the <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">Log tab</a> to build your history. Apple Health sync is coming soon.'
-        : stravaConnected
-        ? '<button onclick="syncStravaFromProfile()" style="background:none; border:0; color:var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Sync from Strava</button>'
-        : '<a onclick="showScreen(\'profile\')" style="color:var(--primary); cursor:pointer; font-weight:600;">Connect Strava in Profile</a> to see your real numbers here.';
+      const cta = 'Workouts from Apple Health appear here automatically. You can also <a onclick="openLogForDay(getTodayDay())" style="color:var(--primary); cursor:pointer; font-weight:600;">log sessions manually</a>.';
       sumCard.innerHTML = `<div class="card-title">7-day summary</div>
         <div style="font-size:13px; color:var(--text-soft); padding: 6px 0;">No data yet. ${cta}</div>`;
       bars.innerHTML = '';
