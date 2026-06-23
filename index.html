@@ -15740,6 +15740,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     saveAccounts(accounts);
   }
 
+  // Hydrate planState from localStorage activity cache (used in non-Supabase
+  // dev mode and as a pre-load before _sbLoad completes in prod).
+  function loadCachedStravaActivities() {
+    try {
+      const raw = localStorage.getItem('strava-activities');
+      if (raw) planState.stravaActivities = JSON.parse(raw);
+      const ts = localStorage.getItem('strava-synced-at');
+      if (ts) planState.stravaSyncedAt = parseInt(ts, 10);
+      const days = localStorage.getItem('strava-sync-days');
+      if (days) planState.stravaSyncDays = parseInt(days, 10);
+    } catch (e) {}
+  }
+
   // Strava activity → display icon
   // Maps any type string (Strava or plan) → a SPORT_COLORS key
   function typeToSportKey(typeStr) {
@@ -16027,14 +16040,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     });
     if (marked > 0) saveUserData();
     return marked;
-  }
-  // Pull HR/HR-time-series streams for one activity (used by Session Detail modal)
-  async function fetchStravaActivityStreams(activityId) {
-    return _stravaApiCall(`/activities/${activityId}/streams?keys=heartrate,time,distance,altitude,latlng&key_by_type=true`);
-  }
-  // Fetch the full detailed activity (basic list response doesn't include the polyline / splits)
-  async function fetchStravaActivityFull(activityId) {
-    return _stravaApiCall(`/activities/${activityId}`);
   }
   // Decode Google's encoded polyline format → array of [lat, lng]
   function decodePolyline(encoded) {
@@ -17568,128 +17573,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       document.getElementById('sessionReportModal').classList.add('show');
       return; // skip Strava API calls
     }
-
-    // ── Strava activity — lazy-fetch polyline + streams ─────────────────────
-    html += `<div class="detail-section" style="margin-top: 18px;" id="srRouteSlot">
-      <div class="detail-label">Route</div>
-      <div style="font-size: 12px; color: var(--text-soft);">Loading map…</div>
-    </div>`;
-    html += `<div class="detail-section" style="margin-top: 14px;" id="srElevSlot"></div>`;
-    html += `<div class="detail-section" style="margin-top: 14px;" id="srStreamsSlot">
-      <div class="detail-label">Heart rate over time</div>
-      <div style="font-size: 12px; color: var(--text-soft);">Loading…</div>
-    </div>`;
-    html += `<div class="detail-section" style="margin-top: 14px;" id="srSplitsSlot"></div>`;
-
-    html += `<div class="detail-section" style="margin-top: 14px; font-size: 12px; color: var(--text-soft);">
-      <div>Source: Strava activity #${a.id}</div>
-      <div><a href="https://www.strava.com/activities/${a.id}" target="_blank" style="color: var(--primary);">View on Strava ↗</a></div>
-    </div>`;
-
-    document.getElementById('srBody').innerHTML = html;
-    document.getElementById('sessionReportModal').classList.add('show');
-
-    // Lazy-fetch full activity (polyline + splits) in parallel with streams
-    Promise.allSettled([
-      fetchStravaActivityFull(a.id),
-      fetchStravaActivityStreams(a.id)
-    ]).then(([fullRes, streamsRes]) => {
-      const full = fullRes.status === 'fulfilled' ? fullRes.value : null;
-      const streams = streamsRes.status === 'fulfilled' ? streamsRes.value : null;
-
-      // 1. Route map — prefer full.map.summary_polyline, fall back to streams.latlng
-      const routeSlot = document.getElementById('srRouteSlot');
-      if (routeSlot) {
-        let latlngs = null;
-        if (full && full.map && full.map.summary_polyline) {
-          latlngs = decodePolyline(full.map.summary_polyline);
-        } else if (streams && streams.latlng && streams.latlng.data) {
-          latlngs = streams.latlng.data;
-        }
-        if (latlngs && latlngs.length > 1) {
-          routeSlot.innerHTML = `
-            <div class="detail-label">Route</div>
-            ${renderRouteSVG(latlngs)}
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
-              <div>○ Start</div>
-              <div>${a.distance_km.toFixed(2)} km total</div>
-              <div>● Finish</div>
-            </div>`;
-        } else {
-          routeSlot.innerHTML = `<div class="detail-label">Route</div>
-            <div style="font-size:12px; color:var(--text-soft);">No GPS data recorded for this activity.</div>`;
-        }
-      }
-
-      // 2. Elevation profile
-      const elevSlot = document.getElementById('srElevSlot');
-      if (elevSlot && streams && streams.altitude && streams.altitude.data) {
-        const alt = streams.altitude.data;
-        const dist = streams.distance && streams.distance.data;
-        const minA = Math.round(Math.min(...alt) * 3.28);
-        const maxA = Math.round(Math.max(...alt) * 3.28);
-        elevSlot.innerHTML = `
-          <div class="detail-label">Elevation</div>
-          ${renderElevationSVG(alt, dist)}
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
-            <div>Low ${minA} ft</div>
-            <div>${Math.round(a.elevation_m * 3.28)} ft total gain</div>
-            <div>High ${maxA} ft</div>
-          </div>`;
-      } else if (elevSlot) {
-        elevSlot.innerHTML = '';
-      }
-
-      // 3. HR chart
-      const hrSlot = document.getElementById('srStreamsSlot');
-      if (hrSlot) {
-        const hr = streams && streams.heartrate && streams.heartrate.data;
-        const t = streams && streams.time && streams.time.data;
-        if (hr && hr.length > 0) {
-          hrSlot.innerHTML = `
-            <div class="detail-label">Heart rate over time</div>
-            ${renderHrChartSVG(hr, t)}
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:6px;">
-              <div>Min ${Math.min(...hr)}</div>
-              <div>Avg ${a.avg_hr ? Math.round(a.avg_hr) : '—'}</div>
-              <div>Max ${Math.max(...hr)}</div>
-            </div>`;
-        } else {
-          hrSlot.innerHTML = `<div class="detail-label">Heart rate</div>
-            <div style="font-size:12px; color:var(--text-soft);">No HR data recorded.</div>`;
-        }
-      }
-
-      // 4. Splits (km splits)
-      const splitsSlot = document.getElementById('srSplitsSlot');
-      if (splitsSlot && full && full.splits_metric && full.splits_metric.length > 0) {
-        const splits = full.splits_metric.slice(0, 12);
-        const fastestPace = Math.min(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
-        const slowestPace = Math.max(...splits.map(s => s.elapsed_time / (s.distance / 1000)));
-        splitsSlot.innerHTML = `
-          <div class="detail-label">Splits (per km)</div>
-          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
-            ${splits.map((s, i) => {
-              const paceSec = s.elapsed_time / (s.distance / 1000);
-              const pmin = Math.floor(paceSec / 60);
-              const psec = Math.round(paceSec % 60);
-              const pct = ((paceSec - fastestPace) / Math.max(1, slowestPace - fastestPace));
-              const barW = Math.max(8, Math.round((1 - pct) * 100));
-              return `
-                <div style="display: grid; grid-template-columns: 30px 1fr 60px; gap: 8px; align-items: center;">
-                  <div style="color: var(--text-soft); font-weight: 600;">${i + 1}</div>
-                  <div style="height: 6px; background: var(--bg-soft); border-radius: 3px; overflow: hidden;">
-                    <div style="height: 100%; width: ${barW}%; background: var(--primary);"></div>
-                  </div>
-                  <div style="text-align: right; font-weight: 600; font-feature-settings: 'tnum';">${pmin}:${String(psec).padStart(2,'0')}</div>
-                </div>`;
-            }).join('')}
-          </div>
-          ${full.splits_metric.length > 12 ? `<div style="font-size:11px; color:var(--text-soft); margin-top:6px;">Showing first 12 of ${full.splits_metric.length} splits.</div>` : ''}`;
-      } else if (splitsSlot) {
-        splitsSlot.innerHTML = '';
-      }
-    });
   }
 
   function markOnboardingComplete() {
