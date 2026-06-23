@@ -30,6 +30,7 @@ export default async function handler(req) {
   const hasSupabaseUrl       = !!process.env.SUPABASE_URL;
   const hasSupabaseServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const hasVapid             = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT);
+  const hasCronSecret        = !!process.env.CRON_SECRET;
   const hasGoogleCse         = !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_ID);
 
   const issues = [];
@@ -37,6 +38,7 @@ export default async function handler(req) {
   if (!hasSupabaseUrl)        issues.push('SUPABASE_URL missing — account deletion will fail');
   if (!hasSupabaseServiceRole) issues.push('SUPABASE_SERVICE_ROLE_KEY missing — account deletion will fail (App Store blocker)');
   if (!hasVapid)              issues.push('VAPID keys missing — push notifications will not work');
+  if (!hasCronSecret)         issues.push('CRON_SECRET missing — notification crons will return 401 and never fire');
 
   const body = {
     ok: true,
@@ -49,6 +51,7 @@ export default async function handler(req) {
       supabaseUrl: hasSupabaseUrl,
       supabaseServiceRole: hasSupabaseServiceRole,
       vapid: hasVapid,
+      cronSecret: hasCronSecret,
       googleCse: hasGoogleCse,
     },
     issues,

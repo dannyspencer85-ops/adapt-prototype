@@ -5,6 +5,8 @@
 //
 // Edge runtime so we get streaming SSE without buffering.
 
+import { createClient } from '@supabase/supabase-js';
+
 export const config = {
   runtime: 'edge',
 };
@@ -18,27 +20,40 @@ const TOOL_MODEL = 'mistral-small-latest';
 // 4-part response pattern + multi-tool calls in one turn need more headroom.
 const MAX_OUTPUT_TOKENS = 1500;
 
-// Per-IP rate limit: simple in-memory map. Resets on cold start.
-// Bumped to 200/day for the closed test group (small group, shared offices/WiFi
-// burned through the original 50/day fast). Tighten when this goes public.
+// Per-user rate limit: in-memory map keyed by userId|date. Resets on cold start,
+// but cold starts are infrequent on a warm edge function. Primary defence is the
+// JWT requirement below — only authenticated users reach this check.
 // Also enforces a per-instance global cap as a runaway-loop guard.
-const _rate = new Map(); // key: ip|date, value: count
+const _rate = new Map(); // key: userId|date, value: count
 const _globalRate = new Map(); // key: date, value: count
 const DAILY_CAP = 50;          // matches the in-app "50 messages/day" promise + bounds per-user cost
 const GLOBAL_DAILY_CAP = 1500; // hard ceiling per-instance to prevent runaway costs
 
-function rateLimitOk(ip) {
+function rateLimitOk(userId) {
   const day = new Date().toISOString().slice(0, 10);
-  // Global ceiling first — any single instance shouldn't exceed this no matter
-  // how many distinct IPs we see (protects against accidental loops or abuse).
+  // Global ceiling first.
   const gn = _globalRate.get(day) || 0;
   if (gn >= GLOBAL_DAILY_CAP) return { ok: false, reason: 'global' };
-  const key = `${ip}|${day}`;
+  const key = `${userId}|${day}`;
   const n = _rate.get(key) || 0;
-  if (n >= DAILY_CAP) return { ok: false, reason: 'ip' };
+  if (n >= DAILY_CAP) return { ok: false, reason: 'cap' };
   _rate.set(key, n + 1);
   _globalRate.set(day, gn + 1);
   return { ok: true };
+}
+
+// Service-role Supabase client for JWT validation. Reused across requests
+// within the same edge function instance (module-level, same as _rate).
+let _authClient = null;
+function getAuthClient() {
+  if (!_authClient) {
+    _authClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false } }
+    );
+  }
+  return _authClient;
 }
 
 export default async function handler(req) {
@@ -63,6 +78,13 @@ export default async function handler(req) {
     return jsonError(500, 'Server misconfigured: MISTRAL_API_KEY env var missing.');
   }
 
+  // Require authentication — only Adapt users can use the coach.
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return jsonError(401, 'Sign in to start coaching.');
+  const { data: { user: authUser }, error: authErr } = await getAuthClient().auth.getUser(token);
+  if (authErr || !authUser) return jsonError(401, 'Session expired — sign in again to continue.');
+
   // Parse body
   let body;
   try {
@@ -75,13 +97,12 @@ export default async function handler(req) {
     return jsonError(400, '`messages` array is required');
   }
 
-  // Rate limit (per-IP daily, plus a global per-instance ceiling).
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-  const rl = rateLimitOk(ip);
+  // Rate limit by user ID (survives shared IPs / VPNs; resets on cold start).
+  const rl = rateLimitOk(authUser.id);
   if (!rl.ok) {
     const msg = rl.reason === 'global'
       ? 'Global daily limit reached for this instance. Try again tomorrow.'
-      : `Daily limit reached (${DAILY_CAP} messages from your IP). Resets at midnight UTC.`;
+      : `Daily message limit reached (${DAILY_CAP}/day). Resets at midnight UTC.`;
     return jsonError(429, msg);
   }
 
