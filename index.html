@@ -3324,7 +3324,7 @@
     <div class="screen-inner">
       <div class="card" style="font-size:13px; line-height:1.7; color:var(--text);">
         <div class="card-title" style="margin-bottom:4px;">Privacy policy</div>
-        <p style="font-size:11px; color:var(--text-soft); margin-bottom:14px;">Operated by <strong>Danny Spencer</strong> · Effective date: [TODO: insert date] · <a href="mailto:[TODO: privacy email]" style="color:var(--primary);">[TODO: privacy email]</a></p>
+        <p style="font-size:11px; color:var(--text-soft); margin-bottom:14px;">Operated by <strong>Danny Spencer</strong> · Effective date: June 22, 2026 · <a href="mailto:dannyspencer85@gmail.com" style="color:var(--primary);">dannyspencer85@gmail.com</a></p>
 
         <p style="font-weight:600; margin-top:8px;">What we collect</p>
         <p>Your first name, email address, and the training data you enter — goals, race dates, session logs, and check-in answers. We do not collect payment information, location, contacts, or photos.</p>
@@ -3354,7 +3354,7 @@
         </ul>
 
         <p style="font-weight:600; margin-top:14px;">Contact</p>
-        <p>Danny Spencer · <a href="mailto:[TODO: privacy email]" style="color:var(--primary);">[TODO: privacy email]</a></p>
+        <p>Danny Spencer · <a href="mailto:dannyspencer85@gmail.com" style="color:var(--primary);">dannyspencer85@gmail.com</a></p>
       </div>
     </div>
   </div>
@@ -4186,7 +4186,7 @@
     'triFocus', 'raceWeek', 'postRace', 'activeWeekIdx',
     'stravaActivities', 'stravaSyncedAt', 'stravaSyncDays',
     'stravaAuthError', 'lastCheckin', 'notifications',
-    'aiPlanError', 'profile', 'onboardingComplete',
+    'aiPlanError', 'profile', 'onboardingComplete', 'timezone',
   ];
 
   // Keys that are user-specific (scoped to account, not device).
@@ -8064,15 +8064,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   async function _notifyAdaptation(toolName, input) {
     if (!_ADAPTATION_TOOLS.has(toolName) || !_sb) return;
     try {
-      const { data: { user } } = await _sb.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await _sb.auth.getSession();
+      if (!session) return;
       const sessionName = input.newName || input.fromDay && `session on ${input.fromDay}` || 'your session';
       const dayName     = input.toDay   || input.day    || 'Tomorrow';
       const reason      = input.reason  || '';
       fetch('/api/notifications/plan-adjustment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, sessionName, dayName, reason }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ userId: session.user.id, sessionName, dayName, reason }),
       }).catch(() => {}); // fire-and-forget; push failure must never break the UI
     } catch (_) {}
   }
@@ -18455,6 +18455,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function enterApp() {
+    // Stamp the device timezone into planState so server-side crons can
+    // schedule notifications at the right local hour for each user.
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && tz !== planState.timezone) { planState.timezone = tz; saveUserData(); }
+    } catch (_) {}
+
     const username = currentUser();
     const accounts = getAccounts();
     const acct = accounts[username];

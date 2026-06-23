@@ -13,11 +13,6 @@
 //     Counter stored in plan_adj_sends_today / plan_adj_sends_date columns.
 //   - Tag dedup on device: 'adaptation' (one notification slot; new ones replace old).
 //
-// TODO: authenticate the caller — currently any client can POST any userId.
-// Impact is limited to sending a push notification (no data mutation).
-// Future fix: require the user's own JWT in Authorization header, validate via
-// supabase.auth.getUser(token), and assert userId === authenticated user.
-
 import { makeServiceClient, sendPushToUser } from '../_utils/sendPush.js';
 
 const MAX_PER_DAY = 2; // max plan-adaptation pushes per user per UTC day
@@ -45,7 +40,15 @@ export default async function handler(req) {
   const { userId, sessionName = 'your session', dayName = 'Tomorrow', reason } = body;
   if (!userId) return new Response('Missing userId', { status: 400 });
 
+  // Validate the caller's JWT — must match the userId in the body.
+  const authHeader = req.headers['authorization'] ?? req.headers.get?.('authorization') ?? '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return new Response('Missing Authorization header', { status: 401 });
+
   const supabase = makeServiceClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !user) return new Response('Invalid or expired session', { status: 401 });
+  if (user.id !== userId) return new Response('Forbidden', { status: 403 });
   const todayStr = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 
   // Fetch prefs + per-day counter

@@ -14,10 +14,27 @@
 //   - "Opened app in last hour" suppression: OUT OF SCOPE (app-open events not stored
 //     server-side). Future work: write a last_active_at timestamp to user_data on login.
 //
-// TODO: per-user timezone scheduling is OUT OF SCOPE for this pass.
-// All users receive this at the same UTC time (7 am CDT).
+// Per-user timezone scheduling: if the user's device timezone is stored in
+// plan_state.timezone, only send when it is currently 7 am ± 30 min in their
+// local time. Users without a stored timezone always receive the notification
+// (preserves previous behaviour for existing accounts).
 
 import { makeServiceClient, sendPushToUser } from '../_utils/sendPush.js';
+
+// Returns true if it is currently targetHour ± windowMins in the given IANA timezone.
+// Falls back to true (always send) for unknown/missing timezones.
+function isLocalHour(timezone, targetHour, windowMins = 30) {
+  if (!timezone) return true;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone, hour: 'numeric', minute: 'numeric', hour12: false,
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10);
+    const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10);
+    const diff = Math.abs(h * 60 + m - targetHour * 60);
+    return diff <= windowMins || diff >= (24 * 60 - windowMins);
+  } catch { return true; }
+}
 
 export default async function handler(req) {
   const secret = process.env.CRON_SECRET;
@@ -60,6 +77,9 @@ export default async function handler(req) {
         continue;
       }
     }
+
+    // Timezone gate: only send if it's currently 7 am ± 30 min for this user.
+    if (!isLocalHour(row?.plan_state?.timezone, 7)) { skipped++; continue; }
 
     await sendPushToUser(pref.user_id, {
       title: 'Daily check-in',
