@@ -1,4 +1,4 @@
-// Adapt service worker — v50
+// Adapt service worker — v53
 //
 // Responsibilities:
 //   1. Evict stale caches on activate so PWA clients pick up the latest index.html.
@@ -7,7 +7,7 @@
 //   4. Handle notification clicks — focus existing window or open new one,
 //      then post a NAVIGATE message so the app routes to the right screen.
 
-const CACHE_VERSION = 'adapt-v50';
+const CACHE_VERSION = 'adapt-v53';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());

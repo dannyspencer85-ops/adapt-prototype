@@ -1909,8 +1909,10 @@
         </div>
       </div>
 
-      <!-- Demo persona launcher placeholder — removed. Re-add when demo accounts
-           are provisioned in Supabase and the persona picker modal is rebuilt. -->
+      <div style="text-align:center; margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+        <p style="font-size:12px; color:var(--text-soft); margin:0 0 10px;">Just exploring? No account needed.</p>
+        <button onclick="_loadDemoMode()" style="background:none;border:1px solid var(--border);color:var(--text-soft);font-size:13px;font-weight:600;padding:9px 20px;border-radius:100px;cursor:pointer;font-family:inherit;width:100%;">Try demo athlete →</button>
+      </div>
     </div>
   </div>
 
@@ -1951,7 +1953,7 @@
         <div class="onboard-actions">
           <button class="btn btn-primary btn-lg btn-full landing-cta" onclick="handleGetStarted()">Get started</button>
         </div>
-        <div class="landing-secondary-cta">Already have an account? Same button. Log in on the next screen.</div>
+        <div class="landing-secondary-cta">Already have an account? <span onclick="handleGetStarted()" style="color:var(--primary); font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">Sign in →</span></div>
       </div>
 
       <div id="onb-1" style="display:none;">
@@ -2496,15 +2498,24 @@
            prior week's training. Dismissible per-week. -->
       <div id="weeklyRecapCard" style="display:none; margin-bottom:14px;"></div>
 
-      <!-- DAILY READINESS — the "today's number" most successful fitness apps
-           lead with (Whoop recovery, Garmin training readiness, intervals.icu
-           form). One look-at-it card, big number, color-coded verdict. Taps
-           into the existing readiness modal for the deeper breakdown. -->
+      <!-- CONTEXT STRIP (Phase 2a) — single slim tappable line that replaces
+           the separate readiness card + race banner. Shows: days-to-race,
+           body score, race-ready score. Rendered by renderReadinessPills(). -->
+      <div id="homeContextStrip" onclick="openReadinessModal()" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:9px 14px; margin-bottom:14px; cursor:pointer; font-size:12px; color:var(--text);"></div>
+
+      <!-- DAILY READINESS — kept in DOM for the readiness modal drill-in,
+           but hidden on Home in favour of the slim context strip above. -->
       <div id="todayReadinessCard" onclick="openReadinessModal()" style="display:none; padding:14px 16px; border-radius:14px; margin-bottom:14px; cursor:pointer; transition:transform 0.1s;"></div>
 
       <!-- Today's workout — THE primary "what do I do" answer, full hero -->
       <div class="section-label s-today" id="heroSectionLabel">Today's workout</div>
       <div class="card hero-card" id="heroCard">
+        <!-- Empty state: shown when the user has no plan yet (no sessions at all). -->
+        <div id="heroEmptyState" style="display:none; text-align:center; padding:12px 0 8px;">
+          <div style="font-size:15px; font-weight:700; margin-bottom:6px;">No plan yet</div>
+          <div style="font-size:13px; color:rgba(255,255,255,0.75); margin-bottom:16px;">Answer 5 questions and your first week is ready in seconds.</div>
+          <button onclick="showScreen('onboard')" style="background:#fff; color:var(--primary); border:0; border-radius:100px; padding:10px 24px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;">Build my plan →</button>
+        </div>
         <div id="heroAdjustedBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.22); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ WORKOUT ADJUSTED</div>
         <div id="heroDoneBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.25); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ COMPLETED</div>
         <div id="heroTapArea" style="cursor: pointer; padding-bottom: 4px;">
@@ -4848,13 +4859,67 @@
     saveUserData();
   }
 
-  // ─── Demo personas ───────────────────────────────────────────────────
-  // Six pre-built athlete profiles testers can load with one tap so they
-  // experience different parts of the app without going through onboarding.
-  // Each persona populates first-name, age, weight, sex, race + date + location,
-  // weekly hours, training days, experience level, sleep, complexity-mode, and
-  // course intel. After loading, AI plan generation runs against the persona's
-  // inputs the same way it would for a real onboard.
+  // ─── Demo mode ─────────────────────────────────────────────────────
+  // Loads a fully populated demo athlete into planState without requiring
+  // Supabase auth. For testing and previewing the logged-in UI only —
+  // data saves are no-ops since there's no authenticated user.
+  function _loadDemoMode() {
+    localStorage.setItem('first-name', 'Alex');
+    // Seed demo planState inline — enough to pass _hasRealPlan() and
+    // render all five tabs without a live Supabase session.
+    const demoSessions = {
+      Mon: { name: 'Easy run', meta: '25 min · Zone 2', duration: 25, type: 'run', prescription: 'Warm up 5 min walk/jog, then 15 min easy run at conversational pace, cool down 5 min walk.' },
+      Tue: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Wed: { name: 'Easy run', meta: '30 min · Zone 2', duration: 30, type: 'run', prescription: 'Warm up 5 min, 20 min easy zone 2 run, cool down 5 min walk.' },
+      Thu: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Fri: { name: 'Easy run', meta: '25 min · Zone 2', duration: 25, type: 'run', prescription: 'Easy effort — you should be able to hold a conversation throughout.' },
+      Sat: { name: 'Rest day', meta: 'Recovery', duration: 0, type: 'rest' },
+      Sun: { name: 'Long run', meta: '40 min · Zone 2', duration: 40, type: 'run', prescription: 'Warm up 5 min, 30 min long easy run, cool down 5 min. Keep pace slow enough to talk.' },
+    };
+    const makeWeek = (sessions, label, focus, hrs, isCurrent) => ({ sessions, label, focus, weeklyTotalMin: hrs * 60 });
+    Object.assign(planState, {
+      onboardingComplete: true,
+      raceEvent: '5K',
+      raceDate: '2026-09-21',
+      raceLocation: 'City Park',
+      profile: { exp: 'beginner', freq: 4, hoursPerWeek: 4 },
+      activeWeekIdx: 1,
+      sessions: demoSessions,
+      fullPlan: {
+        weeks: [
+          makeWeek({
+            Mon: { name: 'Easy run', duration: 20, type: 'run', meta: '20 min · Zone 2' },
+            Tue: { name: 'Rest day', duration: 0, type: 'rest' },
+            Wed: { name: 'Easy run', duration: 25, type: 'run', meta: '25 min · Zone 2' },
+            Thu: { name: 'Rest day', duration: 0, type: 'rest' },
+            Fri: { name: 'Easy run', duration: 20, type: 'run', meta: '20 min · Zone 2' },
+            Sat: { name: 'Rest day', duration: 0, type: 'rest' },
+            Sun: { name: 'Long run', duration: 35, type: 'run', meta: '35 min · Zone 2' },
+          }, 'Week 1 · Base', 'Start easy', 1),
+          makeWeek(demoSessions, 'Week 2 · Base', 'Build consistency', 2),
+          makeWeek({
+            Mon: { name: 'Easy run', duration: 30, type: 'run', meta: '30 min · Zone 2' },
+            Tue: { name: 'Rest day', duration: 0, type: 'rest' },
+            Wed: { name: 'Run intervals', duration: 35, type: 'quality', meta: '35 min · 4×90s fast' },
+            Thu: { name: 'Rest day', duration: 0, type: 'rest' },
+            Fri: { name: 'Easy run', duration: 25, type: 'run', meta: '25 min · Zone 2' },
+            Sat: { name: 'Rest day', duration: 0, type: 'rest' },
+            Sun: { name: 'Long run', duration: 45, type: 'run', meta: '45 min · Zone 2' },
+          }, 'Week 3 · Build', 'Add a quality run', 3),
+        ]
+      },
+      weekArc: [
+        { dates: 'Week 1 · Base', hours: '1:40', focus: 'Start easy', current: false },
+        { dates: 'Week 2 · Base', hours: '2:00', focus: 'Build consistency', current: true },
+        { dates: 'Week 3 · Build', hours: '2:15', focus: 'Add a quality run', current: false },
+      ],
+      aiPlanSummary: 'A 3-week beginner 5K plan focused on building a consistent aerobic base. Runs are short and easy — the goal is showing up, not pushing pace.',
+      insights: [],
+    });
+    _sbUsername = 'Alex';
+    goHome();
+    renderAll();
+  }
 
   // Copy the feedback email to clipboard for users whose device has no
   // configured mail client (Chrome on a fresh Mac, kiosk modes, etc.).
@@ -5012,6 +5077,12 @@
   // Replaces the former static "Swim + Bike intervals / Saturday's long
   // brick" placeholder HTML with real data from planState.
   function renderPrepScreen() {
+    // Time-aware card title: Morning / Daily / Evening check-in
+    const _ciCardTitle = document.querySelector('#checkinCard .card-title');
+    if (_ciCardTitle && !/Today/.test(_ciCardTitle.textContent)) {
+      const _h = new Date().getHours();
+      _ciCardTitle.textContent = _h < 12 ? 'Morning check-in' : _h < 17 ? 'Daily check-in' : 'Evening check-in';
+    }
     _renderPrepTodaySession();
     _renderPrepLastSession();
   }
@@ -5632,15 +5703,32 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  // Extract the total-duration marker the AI writes at the end of a prescription,
+  // e.g. "≈30 min", "= 35 min total", "(total 28 min)". Returns integer or null.
+  function _extractPrescriptionTotal(prescription) {
+    if (!prescription) return null;
+    const m = prescription.match(/[≈~=]\s*(\d+)\s*min(?:utes?)?(?:\s+total)?\b/i)
+           || prescription.match(/\btotal[:\s]+(\d+)\s*min(?:utes?)?\b/i)
+           || prescription.match(/\(\s*(\d+)\s*min(?:utes?)?\s+total\s*\)/i);
+    const n = m ? parseInt(m[1], 10) : null;
+    return (n && n >= 5 && n <= 600) ? n : null;
+  }
+
   function _aiSessionToRuntime(s) {
     if (!s) return { name: 'Rest', meta: 'Recovery', duration: 0, type: 'rest', prescription: '', targets: '', intensity: 'rest' };
     const cleanName = s.name && /rest/i.test(String(s.name)) ? String(s.name) : sanitizeSessionName(s.name || 'Easy session');
+    const cleanPres = cleanAIText(s.prescription || '');
+    // If the prescription contains a "≈N min total" marker, that is the true
+    // warmup+main+cooldown sum — use it so card and structure always agree.
+    // Fall back to the AI's durationMin when no prescription total is present.
+    const presTotal = _extractPrescriptionTotal(cleanPres);
+    const dur = presTotal || Number(s.durationMin) || 0;
     return {
       name: cleanName,
-      meta: buildSessionMeta(s),
-      duration: Number(s.durationMin) || 0,
+      meta: buildSessionMeta({ durationMin: dur, intensity: s.intensity }),
+      duration: dur,
       type: s.type || 'rest',
-      prescription: cleanAIText(s.prescription || ''),
+      prescription: cleanPres,
       targets: cleanAIText(s.targets || ''),
       intensity: s.intensity || '',
     };
@@ -7166,11 +7254,15 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (!raceStr) return null;
     const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
     if (/General fitness/i.test(event)) return null;
-    const race = new Date(raceStr + 'T00:00:00');
-    if (isNaN(race.getTime())) return null;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    return Math.ceil((race - today) / (1000 * 60 * 60 * 24));
+    // Use UTC noon for both dates so DST transitions (which happen at 2am local)
+    // never cause a ±1 day error. Math.round is exact because noon-to-noon
+    // differences are always whole numbers of days.
+    const parts = raceStr.split('-').map(Number);
+    if (parts.length < 3 || isNaN(parts[0])) return null;
+    const raceNoon = Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+    const t = new Date();
+    const todayNoon = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate(), 12, 0, 0);
+    return Math.round((raceNoon - todayNoon) / (1000 * 60 * 60 * 24));
   }
   function getCurrentWeekIdx() {
     const days = getDaysToRace();
@@ -8906,7 +8998,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     </div>`;
 
     el.innerHTML = `
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${legendHtml}</div>
       <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:14px;">
         ${headerHtml}
         <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;">${dayHeaderHtml}</div>
@@ -9010,9 +9101,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   // cell — could be days/weeks out, or could be race day itself.
   // ──────────────────────────────────────────────────────────────────────
   function _showRaceDayPepTalk(targetDate) {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const targetMidnight = new Date(targetDate); targetMidnight.setHours(0,0,0,0);
-    const daysOut = Math.round((targetMidnight - today) / (24*60*60*1000));
+    // Use canonical getDaysToRace() so this always agrees with the Home banner.
+    const daysOut = getDaysToRace() ?? 0;
     const event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || 'your race';
     const location = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -12050,8 +12140,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
     if (!hasLong && _longRunCheckEnabled(_rrEvent)) { score -= 25; issues.push(`No long session (${_rrLongMin}+ min) this week. Biggest fitness driver is missing.`); }
     else if (hasLong) { wins.push(`Long session scheduled (${Math.max(...activeSessions.map(s => s.duration))} min)`); }
-    if (!hasQuality) { score -= 15; issues.push('No quality session this week. Intensity drives adaptation.'); }
-    else { wins.push('Quality session scheduled'); }
+    // Base-phase weeks and beginner plans are intentionally all-easy — no quality session expected.
+    // Only penalise missing quality when the arc explicitly calls for it (Build/Peak/Race phases).
+    const _arcLabel = ((currentArc && currentArc.dates) || '').toLowerCase();
+    const _arcFocus = ((currentArc && currentArc.focus) || '').toLowerCase();
+    const _isBasePhase = /base/.test(_arcLabel) || /start easy|build consistency|build base/.test(_arcFocus);
+    const _isBeginner  = !!(planState.profile && planState.profile.exp === 'beginner');
+    if (!hasQuality && !_isBasePhase && !_isBeginner) {
+      score -= 15;
+      issues.push('No quality session this week. Intensity drives adaptation.');
+    } else if (hasQuality) {
+      wins.push('Quality session scheduled');
+    }
     if (ratio < 0.7) { score -= 20; issues.push(`Volume ${Math.round((1 - ratio) * 100)}% under target (${formatMins(total)} of ${formatMins(targetMins)} planned)`); }
     else if (ratio > 1.15) { score -= 10; issues.push(`Volume ${Math.round((ratio - 1) * 100)}% over target. Raises injury risk.`); }
     else { wins.push(`Weekly volume on target (${formatMins(total)})`); }
@@ -12105,7 +12205,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     // Splitting them prevents the misleading single-number that conflated
     // "I slept badly" with "my plan is behind."
     const card = document.getElementById('todayReadinessCard');
-    if (!card) return;
+    const strip = document.getElementById('homeContextStrip');
+    // Full readiness card is replaced by the slim context strip on Home.
+    // Keep the card in DOM so the readiness modal (openReadinessModal) can
+    // still read scores — but never show it on the Home feed.
+    if (card) card.style.display = 'none';
+
     // Don't render until plan data has loaded — avoids the 100→65 flicker
     // where the score computes a default (high) value before sessions/plan are
     // available, then recomputes lower once the full state is in memory.
@@ -12114,8 +12219,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try { race = (typeof computeRaceReadiness === 'function') ? computeRaceReadiness() : null; } catch (e) {}
     try { body = (typeof computeBodyReadiness === 'function') ? computeBodyReadiness() : null; } catch (e) {}
     const days = (typeof getDaysToRace === 'function') ? getDaysToRace() : null;
+    if (!strip) return;
     if (!race || days == null || days < 0) {
-      card.style.display = 'none';
+      strip.style.display = 'none';
       return;
     }
     // Force "pending" display until the plan is loaded so the score doesn't flicker.
@@ -12131,11 +12237,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ? { bg: '#fef6e0', border: '#e8c46b', text: '#7a5a18' }
       : { bg: '#DCEADF', border: '#3B8968', text: '#2E6B51' };
 
-    card.style.background = palette.bg;
-    card.style.border = `1px solid ${palette.border}`;
-    card.style.color = palette.text;
-    card.style.display = 'block';
-
     // Race readiness uses race.status mapped to a color.
     const raceColor = race.status === 'on-track' ? '#3B8968' : race.status === 'slightly-behind' ? '#D9A94A' : '#C44545';
 
@@ -12143,45 +12244,22 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bodyPending = !planState.lastCheckin && !planState.injury;
     const racePending = race.status === 'pending';
 
-    // Plan status line
-    const planStatusText = (() => {
-      if (racePending) return 'Plan is still building';
-      if (race.score >= 80) return 'Plan is on track';
-      const todayIdx = (typeof getTodayIdx === 'function') ? getTodayIdx() : 3;
-      const missed = Object.values(planState.sessions || {}).filter((s, i) => i <= todayIdx && s && s.type !== 'rest' && !s.completed).length;
-      if (race.score >= 65) return missed > 0 ? `Plan slightly behind — ${missed} session${missed > 1 ? 's' : ''} not yet logged` : 'Plan is slightly behind';
-      return missed > 0 ? `Plan needs attention — ${missed} session${missed > 1 ? 's' : ''} not logged this week` : 'Plan is behind — adjust this week';
-    })();
+    // Slim context strip — one line: days · event | body score | race-ready score
+    const event = (planState.raceEvent || localStorage.getItem('race-event') || '').split('(')[0].trim();
+    const bodyScore = bodyPending ? '—' : body.score;
+    const bodyColor = bodyPending ? 'var(--text-soft)' : (body.score >= 80 ? '#3B8968' : body.score >= 60 ? '#D9A94A' : '#C44545');
+    const raceScore = racePending ? '—' : race.score;
 
-    // Track first open for first-week explanations (Fix 4 Part 2)
-    if (!localStorage.getItem('adapt-first-open')) localStorage.setItem('adapt-first-open', Date.now());
-    const _firstOpenMs = parseInt(localStorage.getItem('adapt-first-open') || '0', 10);
-    const _isFirstWeek = _firstOpenMs > 0 && (Date.now() - _firstOpenMs) < 7 * 24 * 3600 * 1000;
-
-    // Body dot — colored indicator for body readiness
-    const bodyDotColor = body.score >= 80 ? '#3B8968' : body.score >= 60 ? '#D9A94A' : '#C44545';
-
-    card.innerHTML = `
-      <div style="display:flex; align-items:flex-start; gap:14px;">
-        <div style="flex:1; min-width:0;">
-          <div style="font-size:10px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; opacity:0.75; margin-bottom:4px;">Race ready</div>
-          <div style="display:flex; align-items:baseline; gap:5px;">
-            <div style="font-family:var(--font-heading); font-size:40px; font-weight:700; color:${raceColor}; line-height:1; letter-spacing:-0.03em;">${racePending ? '—' : race.score}</div>
-            ${racePending ? '' : '<div style="font-size:11px; font-weight:500; opacity:0.65; align-self:flex-end; padding-bottom:4px;">/ 100</div>'}
-          </div>
-          <div style="font-size:12px; line-height:1.4; margin-top:5px; opacity:0.9;">${escapeHtml(planStatusText)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.5); border-radius:10px; padding:8px 12px; min-width:90px; text-align:right;">
-          <div style="font-size:10px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; opacity:0.65;">Body today</div>
-          <div style="display:flex; align-items:center; justify-content:flex-end; gap:5px; margin-top:4px;">
-            <div style="width:7px; height:7px; border-radius:50%; background:${bodyDotColor};"></div>
-            <div style="font-family:var(--font-heading); font-size:20px; font-weight:600; color:${bodyDotColor}; letter-spacing:-0.02em;">${bodyPending ? '—' : body.score}</div>
-          </div>
-          <div style="font-size:11px; line-height:1.3; margin-top:3px; opacity:0.8;">${escapeHtml(bodyPending ? 'Check in' : body.label)}</div>
-        </div>
-      </div>
-      <div style="font-size:12px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07); opacity:0.85;">${escapeHtml(bodyPending ? 'Log a check-in to see your body readiness score.' : body.verdict)}</div>
-      ${_isFirstWeek ? `<div style="font-size:11px; margin-top:8px; padding:8px 10px; background:rgba(0,0,0,0.05); border-radius:8px; line-height:1.5; opacity:0.85;"><strong>New to these scores?</strong> Race ready (0–100) tracks how on-plan you are. Body today reflects how you feel. Both improve as you log sessions and check in daily.</div>` : ''}
+    strip.style.display = 'flex';
+    strip.style.alignItems = 'center';
+    strip.innerHTML = `
+      <span style="font-weight:700; white-space:nowrap; color:var(--text);">${days}</span>
+      <span style="font-size:11px; color:var(--text-soft); margin-left:3px; white-space:nowrap;">days · ${escapeHtml(event)}</span>
+      <span style="flex:1;"></span>
+      <span style="font-size:11px; color:var(--text-soft); margin-right:4px;">Body</span><span style="font-size:15px; font-weight:800; color:${bodyColor};">${bodyScore}</span>
+      <span style="color:var(--border); padding:0 8px;">·</span>
+      <span style="font-size:11px; color:var(--text-soft); margin-right:4px; opacity:0.7;">Race</span><span style="font-size:12px; font-weight:600; color:${raceColor}; opacity:0.8;">${raceScore}</span>
+      <span style="color:var(--text-soft); margin-left:8px; font-size:14px;">›</span>
     `;
   }
 
@@ -12904,38 +12982,46 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         </div>`).join('')
       : `<div style="font-size:13px; color:var(--text-soft); font-style:italic; padding:4px 0;">Complete your morning check-in to get a real body score.</div>`;
 
+    // First-week explainers (4c): one-line descriptions for users in days 1–7.
+    if (!localStorage.getItem('adapt-first-open')) localStorage.setItem('adapt-first-open', Date.now());
+    const _firstOpenMs4 = parseInt(localStorage.getItem('adapt-first-open') || '0', 10);
+    const _isFirstWeek4 = _firstOpenMs4 > 0 && (Date.now() - _firstOpenMs4) < 7 * 24 * 3600 * 1000;
+
     const bodySection = `<div style="margin-bottom:16px;">
       <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-soft); margin-bottom:6px;">BODY TODAY</div>
       <div style="background:${b.color}; color:#fff; padding:14px 16px; border-radius:12px 12px 0 0;">
         <div style="display:flex; align-items:baseline; gap:8px;">
-          <div style="font-family:var(--font-heading); font-size:32px; font-weight:600; letter-spacing:-0.02em;">${hasCheckin ? b.score : '—'}</div>
+          <div style="font-family:var(--font-heading); font-size:40px; font-weight:700; letter-spacing:-0.03em;">${hasCheckin ? b.score : '—'}</div>
           <div style="font-size:11px; font-weight:400; opacity:0.8;">${hasCheckin ? '/ 100' : ''}</div>
-          <div style="margin-left:auto; font-size:13px; font-weight:600;">${b.label}</div>
+          <div style="margin-left:auto; font-size:13px; font-weight:700;">${b.label}</div>
         </div>
         <div style="font-size:13px; margin-top:4px; opacity:0.9;">${escapeHtml(b.verdict)}</div>
+        ${_isFirstWeek4 ? `<div style="font-size:12px; margin-top:8px; opacity:0.8; font-style:italic;">How you feel today — sleep, soreness, energy, and injury status.</div>` : ''}
       </div>
       <div style="padding:10px 14px; background:#fff; border:1px solid var(--border); border-top:0; border-radius:0 0 12px 12px;">
         <div style="font-size:11px; color:var(--text-soft); margin-bottom:6px;">Each factor's contribution to your score (base 100):</div>
         ${bodyFactorRows}
       </div>
     </div>
-    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-soft); margin-bottom:6px;">RACE READINESS</div>`;
+    `;
 
     if (mode === 'simple') {
       el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
-        <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
-          <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
-            <div style="font-family:var(--font-heading); font-size: 36px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
+        <div style="background: ${r.color}; color: #fff; padding: 12px 16px;">
+          <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; opacity:0.8; margin-bottom:4px;">RACE READINESS</div>
+          <div style="display: flex; align-items: baseline; gap: 8px;">
+            <div style="font-family:var(--font-heading); font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
             <div style="font-size: 11px; font-weight: 400; opacity: 0.8;">/ 100</div>
             <div style="margin-left: auto; font-size: 13px; font-weight: 600;">${emoji} ${r.label}</div>
           </div>
           <div style="font-size: 13px; margin-top: 6px; opacity: 0.9;">${escapeHtml(simpleSummary)}</div>
+          ${_isFirstWeek4 ? `<div style="font-size:12px; margin-top:6px; opacity:0.8; font-style:italic;">Long-arc metric — tracks whether your plan is on schedule for race day.</div>` : ''}
         </div>
         <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
           <button onclick="toggleReadinessDetail(this)" style="display:block; background:none; border:0; color:${r.color}; font-weight:600; font-size:13px; cursor:pointer; padding:0; font-family:inherit; text-align:left;">Tell me more →</button>
           <div style="display:none; margin-top:10px;">
             ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('check',{size:12,color:'var(--primary)'})} WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
-            ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
+            ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul><button onclick="closeReadinessModal(); showScreen('plan');" style="background:var(--primary); color:#fff; border:0; border-radius:100px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; width:100%;">See your plan →</button>` : ''}
             ${r.issues.length === 0 ? `<div style="font-size: 13px; color: var(--text-soft); font-style: italic;">Everything checks out. Stay consistent.</div>` : ''}
           </div>
         </div>
@@ -12944,17 +13030,19 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     }
 
     el.innerHTML = bodySection + `<div class="card" style="padding: 0; overflow: hidden; border: 0;">
-      <div style="background: ${r.color}; color: #fff; padding: 16px 18px;">
-        <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
-          <div style="font-family:var(--font-heading); font-size: 36px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
+      <div style="background: ${r.color}; color: #fff; padding: 12px 16px;">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; opacity:0.8; margin-bottom:4px;">RACE READINESS</div>
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <div style="font-family:var(--font-heading); font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">${r.score}</div>
           <div style="font-size: 11px; font-weight: 400; opacity: 0.8;">/ 100</div>
           <div style="margin-left: auto; font-size: 13px; font-weight: 600;">${emoji} ${r.label}</div>
         </div>
         <div style="font-size: 13px; margin-top: 6px; opacity: 0.9;">${escapeHtml(headline)}</div>
+        ${_isFirstWeek4 ? `<div style="font-size:12px; margin-top:6px; opacity:0.8; font-style:italic;">Long-arc metric — tracks whether your plan is on schedule for race day.</div>` : ''}
       </div>
       <div style="padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-top: 0;">
         ${r.wins.length > 0 ? `<div style="font-size: 12px; color: var(--primary); font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('check',{size:12,color:'var(--primary)'})} WHAT'S WORKING</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
-        ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
+        ${r.issues.length > 0 ? `<div style="font-size: 12px; color: ${r.color}; font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:4px;">${icon('flag',{size:12,color:r.color})} NEEDS ATTENTION</div><ul style="margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.5;">${r.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul><button onclick="closeReadinessModal(); showScreen('plan');" style="background:var(--primary); color:#fff; border:0; border-radius:100px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; width:100%;">See your plan →</button>` : ''}
         ${r.issues.length === 0 ? `<div style="font-size: 13px; color: var(--text-soft); font-style: italic;">Everything checks out. Stay consistent.</div>` : ''}
       </div>
     </div>`;
@@ -13236,12 +13324,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const bottom = document.getElementById('raceLabelBottom');
     if (!banner) return;
 
-    // No race date (general fitness, or unset) — hide the countdown banner.
-    if (days == null) {
-      banner.style.display = 'none';
-      return;
-    }
-    banner.style.display = 'flex';
+    // Race banner replaced by slim homeContextStrip — always hidden here.
+    // The state flags planState.postRace / raceWeek below still need to run.
+    if (banner) banner.style.display = 'none';
+    if (days == null) return;
     // Compact design: use pill color for urgency, keep card neutral.
     banner.style.background = '';
     banner.style.color = '';
@@ -14458,7 +14544,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderTodayHero() {
     const todayDay = getTodayDay();
     const s = planState.sessions[todayDay];
-    if (!s) return;
+    const heroEmptyState = document.getElementById('heroEmptyState');
+    if (!s) {
+      // No plan yet — check if sessions object is entirely empty (not just a rest day)
+      const _hasPlan = planState.sessions && Object.keys(planState.sessions).length > 0;
+      if (!_hasPlan) {
+        if (heroEmptyState) heroEmptyState.style.display = 'block';
+        const sectionLabel = document.getElementById('heroSectionLabel');
+        if (sectionLabel) sectionLabel.style.display = 'none';
+      }
+      return;
+    }
+    if (heroEmptyState) heroEmptyState.style.display = 'none';
     const label = document.getElementById('heroLabel');
     const name = document.getElementById('heroName');
     const duration = document.getElementById('heroDuration');
@@ -14571,8 +14668,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (presEl) {
       if (showPrescription && s.prescription) {
         // Strip ≈/total duration summaries that may contradict the canonical
-        // duration shown in heroDuration just above.
+        // duration shown in heroDuration just above. Also strip bracketed
+        // internal rationale (e.g. "[Capped from 45 to 32 min: beginner limit]").
         const cleanedPres = String(s.prescription)
+          .replace(/\[[^\]]{1,200}\]/g, '')                            // [bracketed rationale]
           .replace(/\(\s*[≈~][^)]*\)/gi, '')
           .replace(/[≈~]\s*\d+\s*min(?:utes?)?(?:\s+total)?\b\.?/gi, '')
           .replace(/\b\d+\s*min(?:utes?)?\s+total\.?/gi, '')
@@ -18435,7 +18534,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     try { availableDisciplines = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
     // Explicit top-level field so the AI never has to look up sessions[today.day]
     // and can't confuse it with nextWeekSessions or any other sessions field.
-    const todaySession = (planState.sessions || {})[todayDay] || null;
+    // Apply _safeSession so the AI receives the same normalised name/meta
+    // that the Home hero card displays — prevents the "Easy run (15 min)"
+    // vs "Easy run · 25 min" disagreement that confused the coach.
+    const todaySession = _safeSession((planState.sessions || {})[todayDay]) || null;
     return {
       today: { day: todayDay, label: todayDateStr },
       todaySession,   // single authoritative source — mirrors exactly what Home shows
