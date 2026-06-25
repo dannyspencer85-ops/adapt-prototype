@@ -2057,7 +2057,7 @@
           <div class="step-dot"></div>
         </div>
         <h1>Your goal.</h1>
-        <p class="sub">Pick an event or just say "get fitter." We'll show you an honest timeline either way.</p>
+        <p class="sub">Pick your event and date. We'll build your training blocks from there.</p>
         <div class="field">
           <label>What distance are you training for?</label>
           <select id="eventSelect" onchange="updateTriFocusVisibility(); adjustCourseDetailsForEvent(); adjustFmAdvancedVisibility();">
@@ -2344,20 +2344,19 @@
             </div>
             <div class="field" style="margin:0;">
               <label style="font-size:12px;">When</label>
-              <select id="fmRunWhen" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff;">
-                <option value="">—</option>
-                <option value="last-month">Last month</option>
-                <option value="3-months">Last 3 months</option>
-                <option value="6-months">Last 6 months</option>
-                <option value="1-year">Within last year</option>
-                <option value="older">Older</option>
-              </select>
+              <div class="chip-row" id="fmRunWhen" style="margin-top:4px; flex-wrap:wrap;">
+                <button type="button" class="chip" data-val="last-month" onclick="singleChip(this)">Last month</button>
+                <button type="button" class="chip" data-val="3-months" onclick="singleChip(this)">3 months</button>
+                <button type="button" class="chip" data-val="6-months" onclick="singleChip(this)">6 months</button>
+                <button type="button" class="chip" data-val="1-year" onclick="singleChip(this)">1 year</button>
+                <button type="button" class="chip" data-val="older" onclick="singleChip(this)">Older</button>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="field">
-          <label>🫀 Heart rate</label>
+          <label style="display:flex; align-items:center; gap:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--alert)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></svg>Heart rate</label>
           <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">If you know either. Resting HR = morning bpm. Max HR = highest you've seen on a hard effort.</div>
           <div class="two-col">
             <div class="field" style="margin:0;">
@@ -2810,7 +2809,13 @@
           </div>
           <div>
             <label style="font-size:11px; color:var(--text-soft); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Effort feel</label>
-            <input type="text" id="logActualFeel" placeholder="e.g. strong, flat, heavy" style="width:100%; margin-top:4px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; background:#fff;">
+            <div class="chip-row" id="logActualFeel" style="margin-top:6px; flex-wrap:wrap;">
+              <button type="button" class="chip" data-val="Strong" onclick="singleChip(this)">Strong</button>
+              <button type="button" class="chip" data-val="Good" onclick="singleChip(this)">Good</button>
+              <button type="button" class="chip" data-val="Flat" onclick="singleChip(this)">Flat</button>
+              <button type="button" class="chip" data-val="Heavy" onclick="singleChip(this)">Heavy</button>
+              <button type="button" class="chip" data-val="Sore" onclick="singleChip(this)">Sore</button>
+            </div>
           </div>
         </div>
       </div>
@@ -4660,7 +4665,7 @@
     }
     const setVal = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
     setVal('fmRunTime', m.runRace && m.runRace.time);
-    setVal('fmRunWhen', m.runRace && m.runRace.when);
+    document.querySelectorAll('#fmRunWhen .chip').forEach(c => c.classList.toggle('active', c.dataset.val === (m.runRace && m.runRace.when)));
     setVal('fmRhr', m.restingHr);
     setVal('fmHrMax', m.maxHr);
     setVal('fmFtp', m.ftp);
@@ -4682,7 +4687,7 @@
     const distChip = document.querySelector('#fmRunDist .chip.active');
     const dist = distChip ? (distChip.dataset.val || '') : '';
     const runTime = (document.getElementById('fmRunTime')?.value || '').trim();
-    const runWhen = (document.getElementById('fmRunWhen')?.value || '').trim();
+    const runWhen = document.querySelector('#fmRunWhen .chip.active')?.dataset.val || '';
     const rhr = parseInt(document.getElementById('fmRhr')?.value || '', 10);
     const hrmax = parseInt(document.getElementById('fmHrMax')?.value || '', 10);
     const ftp = parseInt(document.getElementById('fmFtp')?.value || '', 10);
@@ -6979,7 +6984,7 @@
     const actualMins = parseInt(document.getElementById('logActualMins')?.value || '', 10);
     const actualHr = parseInt(document.getElementById('logActualHr')?.value || '', 10);
     const actualDist = (document.getElementById('logActualDist')?.value || '').trim();
-    const actualFeel = (document.getElementById('logActualFeel')?.value || '').trim();
+    const actualFeel = document.querySelector('#logActualFeel .chip.active')?.dataset.val || '';
     const actualType = document.querySelector('#logActualType .chip.active')?.dataset.type || null;
     if (s) {
       s.completed = true;
@@ -7071,9 +7076,10 @@
     analyzeLoggedSession(today, analysisRpe);
     setChange(`Logged ${todayFull} session (RPE ${rpe || '—'}${actualMins ? `, ${actualMins} min` : ''}). Engine reassessing week.`);
     // Clear the manual inputs so the next log starts fresh.
-    ['logActualMins', 'logActualHr', 'logActualDist', 'logActualFeel', 'logBrickBike', 'logBrickRun'].forEach(id => {
+    ['logActualMins', 'logActualHr', 'logActualDist', 'logBrickBike', 'logBrickRun'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    document.querySelectorAll('#logActualFeel .chip').forEach(c => c.classList.remove('active'));
     _extraWorkouts = [];
     if (typeof renderExtraWorkouts === 'function') renderExtraWorkouts();
     // Reset the log target back to today for the next time.
@@ -13086,7 +13092,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setVal('logActualMins', primary ? primary.mins : s.actualMins);
     setVal('logActualHr', primary ? primary.hr : s.actualHr);
     setVal('logActualDist', primary ? primary.dist : s.actualDistance);
-    setVal('logActualFeel', s.actualFeel);
+    document.querySelectorAll('#logActualFeel .chip').forEach(c => c.classList.toggle('active', c.dataset.val === s.actualFeel));
     // RPE buttons — highlight the saved value if present.
     document.querySelectorAll('#rpe .rpe-btn').forEach(b => {
       b.classList.toggle('active', s.rpe != null && parseInt(b.textContent, 10) === s.rpe);
@@ -17075,7 +17081,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       bars.style.minHeight = '';
       bars.style.alignItems = 'center';
       bars.style.paddingTop = '0';
-      bars.innerHTML = `<div class="empty-state"><span class="emoji">📈</span><p class="empty-state-title">Your trends will appear here</p><p class="empty-state-body">${cta || 'Log a workout on the Home tab to see your training history.'}</p></div>`;
+      bars.innerHTML = `<div class="empty-state"><span class="emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span><p class="empty-state-title">Your trends will appear here</p><p class="empty-state-body">${cta || 'Log a workout on the Home tab to see your training history.'}</p></div>`;
       if (axis) axis.innerHTML = '';
       if (discBars) discBars.innerHTML = '';
       if (topSess) topSess.innerHTML = '';
