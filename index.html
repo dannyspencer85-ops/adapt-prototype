@@ -2060,7 +2060,7 @@
         <p class="sub">Pick your event and date. We'll build your training blocks from there.</p>
         <div class="field">
           <label>What distance are you training for?</label>
-          <select id="eventSelect" onchange="updateTriFocusVisibility(); adjustCourseDetailsForEvent(); adjustFmAdvancedVisibility();">
+          <select id="eventSelect" onchange="updateTriFocusVisibility(); _resetCourseChips(); adjustCourseDetailsForEvent(); adjustFmAdvancedVisibility();">
             <optgroup label="Run">
               <option>5K</option>
               <option>10K</option>
@@ -3029,7 +3029,7 @@
           <label>How's your body today?</label>
           <div class="chip-row" id="ciBody">
             <button class="chip" onclick="singleChip(this)">Fresh</button>
-            <button class="chip" onclick="singleChip(this)">OK</button>
+            <button class="chip active" onclick="singleChip(this)">OK</button>
             <button class="chip" onclick="singleChip(this)">Drained</button>
             <button class="chip" onclick="singleChip(this)">Exhausted</button>
           </div>
@@ -3040,7 +3040,7 @@
             <button class="chip" onclick="singleChip(this)">Under 5h</button>
             <button class="chip" onclick="singleChip(this)">5-6h</button>
             <button class="chip" onclick="singleChip(this)">6-7h</button>
-            <button class="chip" onclick="singleChip(this)">7-8h</button>
+            <button class="chip active" onclick="singleChip(this)">7-8h</button>
             <button class="chip" onclick="singleChip(this)">8h+</button>
           </div>
         </div>
@@ -6641,9 +6641,13 @@
       : 'Not set';
 
     const NOT_SET = '<span style="color:var(--text-soft); font-weight:500;">Not set — tap to add</span>';
+    const raceEvent = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const raceDate  = (planState && planState.raceDate)  || localStorage.getItem('race-date')  || '';
+    const raceParts = [raceEvent, raceDate].filter(Boolean);
     const rows = [
       { label: 'Name', value: name ? esc(name.charAt(0).toUpperCase() + name.slice(1)) : NOT_SET, step: 1 },
       { label: 'Current fitness & background', value: bgParts.length ? esc(bgParts.join(' · ')) : NOT_SET, step: 2 },
+      { label: 'Race & course details', value: raceParts.length ? esc(raceParts.join(' · ')) : NOT_SET, step: 3 },
       { label: 'Weekly training hours', value: (Number.isFinite(hoursRaw) && hoursRaw > 0) ? `${hoursRaw} hrs / week` : NOT_SET, step: 4 },
       { label: 'Training days', value: (Array.isArray(days) && days.length) ? esc(days.join(', ')) : NOT_SET, step: 4 },
       { label: 'Disciplines you can train', value: esc(discSummary), step: 4 },
@@ -6881,6 +6885,17 @@
   // Show/hide course-detail fields based on event type. Run-only events
   // hide the swim and bike-profile fields. Triathlons add the bike profile
   // and swim type. The header copy adapts so users see what's relevant.
+  function _resetCourseChips() {
+    const defaults = { courseTerrainChips: 'flat', courseBikeChips: 'flat', courseSurfaceChips: 'road', courseSwimChips: 'lake', courseClimateChips: 'temperate', courseAltitudeToggle: 'no' };
+    Object.entries(defaults).forEach(([id, val]) => {
+      document.querySelectorAll(`#${id} .chip`).forEach(c => c.classList.toggle('active', c.dataset.val === val));
+    });
+    const altWrap = document.getElementById('courseAltitudeLevelWrap');
+    if (altWrap) altWrap.style.display = 'none';
+    const notes = document.getElementById('courseNotes');
+    if (notes) notes.value = '';
+  }
+
   function adjustCourseDetailsForEvent() {
     const event = document.getElementById('eventSelect')?.value || '';
     const isTri = /Ironman|Triathlon/i.test(event);
