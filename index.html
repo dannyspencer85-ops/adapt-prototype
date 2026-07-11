@@ -13108,9 +13108,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     setVal('logActualHr', primary ? primary.hr : s.actualHr);
     setVal('logActualDist', primary ? primary.dist : s.actualDistance);
     document.querySelectorAll('#logActualFeel .chip').forEach(c => c.classList.toggle('active', c.dataset.val === s.actualFeel));
-    // RPE buttons — highlight the saved value if present.
+    // RPE buttons — restore saved value, or keep the HTML default (7) for first-time logs.
     document.querySelectorAll('#rpe .rpe-btn').forEach(b => {
-      b.classList.toggle('active', s.rpe != null && parseInt(b.textContent, 10) === s.rpe);
+      b.classList.toggle('active', parseInt(b.textContent, 10) === (s.rpe != null ? s.rpe : 7));
     });
     // Workout-type chips — default to what was actually logged, else the
     // planned type. Maps unknown types onto the closest available chip.
@@ -15369,6 +15369,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     planState.stravaActivities = [];
     planState.stravaSyncedAt = null;
     document.querySelectorAll('#onb-1 .chip, #onb-2 .chip, #onb-3 .chip, #onb-4 .chip, #hoursChips .chip, #daysChips .chip, #discChips .chip, #complexityChips .chip, #themeChips .chip, #ciBody .chip, #ciSleep .chip, #ciStress .chip').forEach(c => c.classList.remove('active'));
+    // Restore check-in defaults so the form never shows a blank state.
+    document.querySelectorAll('#ciBody .chip').forEach(c => c.classList.toggle('active', c.textContent.trim() === 'OK'));
+    document.querySelectorAll('#ciSleep .chip').forEach(c => c.classList.toggle('active', c.textContent.trim() === '7-8h'));
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="number"], input[type="date"]').forEach(el => { if (!['posthogKeyInput','apiKeyInput','loginEmail','loginPassword','signupName','signupEmail','signupPassword','signupConfirm','customMins','ciNotes'].includes(el.id)) el.value = ''; });
     if (document.getElementById('ciNotes')) document.getElementById('ciNotes').value = '';
     // ── Restore stable data so onbStep(1) / onbStep(2) pre-fill correctly ───
