@@ -3046,7 +3046,7 @@
         </div>
         <div class="field">
           <label>Anything else? <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
-          <input type="text" id="ciNotes" placeholder="e.g. right calf tight, stressed, poor sleep quality…">
+          <input type="text" id="ciNotes" placeholder="e.g. stressed, poor sleep quality, travel day…">
         </div>
         <!-- ciStress hidden — kept for downstream logic compatibility, always defaults to Normal -->
         <div id="ciStress" style="display:none;"></div>
@@ -3519,7 +3519,7 @@
       </div>
       <div style="font-size:14px; line-height:1.6; color: var(--text);">
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I change my plan?</strong><br>Tap any session on Today or Plan to view details. From there, tap Edit. Or talk to the chat: "move Saturday to Sunday."</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 scale. 85+ is on track. 65-84 means small things to tighten up. Below 65 means real risks. Tap the pill anywhere to see the full breakdown.</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 estimated coaching score. 85+ is on track. 65-84 means a few things to tighten up. Below 65 means the plan needs significant adjustment — tap the pill to see what to address. This is a training estimate, not a medical assessment.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What if I'm injured?</strong><br>Say "my [area] hurts" in chat, or log it at morning check-in. Engine auto-adjusts. See a doctor or PT for actual medical advice. The app flags, it doesn't diagnose.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>Can't run today? What do I do?</strong><br>Tap "Adjust today" on the workout card. Deselect the disciplines you can't do. Workout adapts automatically.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Workouts sync automatically from Apple Health on the native app. You can also tap any session on Today or Plan, then tap "Log this" to add manually (useful for sessions not recorded on a watch).</div>
@@ -9351,7 +9351,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         </div>
         <div><strong>${escapeHtml(inj.area)}</strong> · ${escapeHtml(sev)} severity${daysTxt ? ' · ' + daysTxt : ''}.
         ${sev === 'high' ? ' Sessions paused until a doctor or PT clears you.' : sev === 'moderate' ? ' Quality sessions reduced 40% across the week.' : ' Monitoring. let me know if it worsens.'}</div>
-        <div style="margin-top:6px;">${trendLine}</div>
+        <div style="margin-top:6px; display:flex; align-items:center; justify-content:space-between;">
+          ${trendLine}
+          <button onclick="updateInjuryStatus()" style="background:none; border:0; color:var(--primary); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; padding:0; margin-left:8px; white-space:nowrap; text-decoration:underline;">Update status →</button>
+        </div>
         ${suggestClear}
       </div>`;
 
@@ -9385,6 +9388,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof updateChatState === 'function') updateChatState();
     flushPendingCoachPrompt();
     if (typeof trackEvent === 'function') trackEvent('injury_clear_via_coach', { days, streak });
+  }
+
+  function updateInjuryStatus() {
+    const inj = planState.injury;
+    if (!inj) return;
+    const days = (typeof injuryDaysFlagged === 'function') ? injuryDaysFlagged() : '?';
+    const prompt = `My ${inj.area} (${inj.severity} severity, day ${days}): I want to update how it feels today. Is it better, the same, or worse? Tell me what to do with training and update the injury flag if appropriate.`;
+    _pendingCoachPrompt = prompt;
+    showScreen('ask');
+    if (typeof updateChatState === 'function') updateChatState();
+    flushPendingCoachPrompt();
+    if (typeof trackEvent === 'function') trackEvent('injury_status_update', { source: 'plan_banner' });
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -12950,6 +12965,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (btn) btn.innerHTML = btn.innerHTML.replace('Turn on workout reminders', '✓ Workout reminders on');
     }
   });
+  let _visibilityRefetchTimer = null;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     maybePingTodayReminder();
@@ -12960,6 +12976,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (localStorage.getItem('local-reminders-enabled') === '1' &&
         _hasNotificationApi() && Notification.permission === 'granted') {
       scheduleAllUpcomingReminders();
+    }
+    // Re-fetch from Supabase when user tabs back — debounced 2s so rapid
+    // tab-switches don't fire multiple round-trips.
+    if (_isSupabase && _isSupabase()) {
+      clearTimeout(_visibilityRefetchTimer);
+      _visibilityRefetchTimer = setTimeout(async () => {
+        try {
+          await _sbLoad();
+          if (typeof renderAll === 'function') renderAll();
+          localStorage.setItem('_lastSyncTime', Date.now().toString());
+        } catch (_) {}
+      }, 2000);
     }
   });
 
@@ -12984,7 +13012,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       ? 'You\'re ready to keep building.'
       : r.status === 'slightly-behind'
       ? 'A few things to tighten up.'
-      : 'Plan needs attention. real risks to race day.';
+      : 'Plan needs attention — adjust now to protect race day.';
 
     const mode = getComplexityMode();
     const simpleSummary = r.status === 'on-track'
@@ -15470,6 +15498,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (data.user_scoped) {
       Object.entries(data.user_scoped).forEach(([k, v]) => { if (v != null) localStorage.setItem(k, v); });
     }
+    localStorage.setItem('_lastSyncTime', Date.now().toString());
   }
 
   async function _sbSave() {
@@ -15705,7 +15734,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       try {
         const displayName = name || email.split('@')[0];
         const { data, error } = await _sb.auth.signUp({
-          email, password, options: { data: { display_name: displayName } }
+          email, password, options: { data: { display_name: displayName, consent_at: new Date().toISOString() } }
         });
         if (error) { showError('signupError', error.message.includes('already') ? 'An account with that email already exists.' : error.message); return; }
         if (data.user) {
@@ -17066,6 +17095,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const connectBanner = document.getElementById('pulseConnectBanner');
     if (connectBanner) {
       connectBanner.style.display = 'none';
+    }
+    // "Last updated" affordance — shows when data was last pulled from Supabase.
+    const syncNotice = document.getElementById('perfSyncNotice');
+    if (syncNotice) {
+      const ts = parseInt(localStorage.getItem('_lastSyncTime') || '0', 10);
+      if (ts) {
+        const mins = Math.round((Date.now() - ts) / 60000);
+        const label = mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)}h ago`;
+        syncNotice.textContent = `Last updated ${label}`;
+      } else {
+        syncNotice.textContent = '';
+      }
     }
     // Sync the range chips with the saved selection
     const savedRange = getPerfRange();
