@@ -3769,6 +3769,7 @@
         <button onclick="saveQuickRpe(7,'Hard')" style="padding:14px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text); display:flex; flex-direction:column; align-items:center; gap:6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8941F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Hard<div style="font-size:11px; font-weight:400; color:var(--text-soft);">RPE 7–8</div></button>
         <button onclick="saveQuickRpe(10,'Max')" style="padding:14px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:var(--text); display:flex; flex-direction:column; align-items:center; gap:6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C44545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>Max<div style="font-size:11px; font-weight:400; color:var(--text-soft);">RPE 9–10</div></button>
       </div>
+      <input type="text" id="rpePromptNotes" placeholder="Anything to note? (optional)" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-family:inherit; font-size:13px; background:var(--bg); margin-bottom:12px;">
       <button onclick="closeRpePrompt()" style="background:none; border:0; color:var(--text-soft); font-size:13px; cursor:pointer; font-family:inherit; padding:4px;">Skip</button>
     </div>
   </div>
@@ -8407,7 +8408,18 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // Only mark a past day as "done" if there's an actual completed session
       const cls = 'day-pill' + (isToday ? ' today' : isCompleted ? ' done' : '');
       const hasSession = session && session.type !== 'rest';
-      const dot = hasSession ? '<div class="dot"></div>' : '';
+      // Colour-code the dot by session character so the week reads at a
+      // glance: amber = quality/hard, purple = strength, teal = brick,
+      // green = endurance/easy. Today keeps the white dot for contrast.
+      let dotColor = '';
+      if (hasSession && !isToday) {
+        const _int = String(session.intensity || '');
+        if (session.type === 'quality' || /hard|threshold|vo2|interval|z4|z5/i.test(_int)) dotColor = '#E8941F';
+        else if (session.type === 'strength') dotColor = '#7B5EA7';
+        else if (session.type === 'brick') dotColor = '#4A90A4';
+        else dotColor = '#3B8968';
+      }
+      const dot = hasSession ? `<div class="dot"${dotColor ? ` style="background:${dotColor}; opacity:0.9;"` : ''}></div>` : '';
       const opacity = viewWeekOffset !== 0 ? 'opacity:0.7;' : '';
       const click = `onclick="openSessionModal('${day}', ${viewWeekOffset})" style="cursor:pointer; ${opacity}"`;
       html += `<div class="${cls}" ${click}><div class="dow">${day}</div><div class="dnum">${dayNum}</div>${dot}</div>`;
@@ -18583,6 +18595,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
             avgHR: s.actualHr ?? null,
             rpe: s.rpe ?? null,
             feel: s.actualFeel ?? null,
+            notes: s.sessionNotes ?? null,
             trainingLoad: s.trainingLoad ?? null,
             workouts: Array.isArray(s.loggedWorkouts)
               ? s.loggedWorkouts.map(w => ({ type: w.type, min: w.mins ?? null, rpe: w.rpe ?? null, hr: w.hr ?? null }))
@@ -19597,12 +19610,19 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     if (!el) return;
     const used = _chatMsgsToday();
     const remaining = _CHAT_DAILY_CAP - used;
-    if (remaining <= 5 && remaining > 0) {
+    if (remaining <= 0) {
       el.style.display = '';
-      el.textContent = `${remaining} message${remaining === 1 ? '' : 's'} left today. Resets at midnight UTC.`;
-    } else if (remaining <= 0) {
-      el.style.display = '';
+      el.style.background = '#fdecec'; el.style.borderColor = '#e0a0a0'; el.style.color = '#a03030';
       el.textContent = 'Daily chat limit reached (50/day). Resets at midnight UTC.';
+    } else if (remaining <= 5) {
+      el.style.display = '';
+      el.style.background = '#fef6e0'; el.style.borderColor = '#e8c46b'; el.style.color = '#7a5a18';
+      el.textContent = `${remaining} message${remaining === 1 ? '' : 's'} left today. Resets at midnight UTC.`;
+    } else if (remaining <= 15) {
+      // Early heads-up so the cap is never a surprise — subtle styling.
+      el.style.display = '';
+      el.style.background = 'var(--bg-soft)'; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--text-soft)';
+      el.textContent = `${remaining} of 50 daily messages left.`;
     } else {
       el.style.display = 'none';
     }
@@ -20062,14 +20082,19 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     if (day && planState.sessions[day]) {
       planState.sessions[day].rpe = val;
       planState.sessions[day].rpeLabel = label;
+      const notesEl = document.getElementById('rpePromptNotes');
+      const notes = notesEl ? notesEl.value.trim() : '';
+      if (notes) planState.sessions[day].sessionNotes = notes;
       saveUserData();
-      if (typeof trackEvent === 'function') trackEvent('quick_rpe_saved', { day, rpe: val, label });
+      if (typeof trackEvent === 'function') trackEvent('quick_rpe_saved', { day, rpe: val, label, hasNotes: !!notes });
     }
     closeRpePrompt();
   }
   function closeRpePrompt() {
     const modal = document.getElementById('rpePromptModal');
     if (modal) modal.classList.remove('show');
+    const notesEl = document.getElementById('rpePromptNotes');
+    if (notesEl) notesEl.value = '';
   }
   function quickReschedule() {
     const today = getTodayDay();
