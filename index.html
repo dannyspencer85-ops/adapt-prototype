@@ -2724,7 +2724,7 @@
       <div class="card">
         <div class="card-title">Today's session</div>
         <div style="font-size: 17px; font-weight: 700;" id="logSessionName">Today's session</div>
-        <div style="color: var(--text-soft); margin-top: 4px;" id="logSessionMeta">Loading…</div>
+        <div style="color: var(--text-soft); margin-top: 4px;" id="logSessionMeta">—</div>
       </div>
 
       <div class="section-label plain">How did it feel?</div>
@@ -3204,6 +3204,16 @@
         <div id="healthSyncCardBody" style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px;">
           Workouts, sleep, heart rate, and HRV sync automatically from <strong>Apple Health</strong> on the native app. On first open you'll be asked to grant access. Approve all to get the full experience.
         </div>
+      </div>
+
+      <!-- Coach Chat management — lets users who accepted the coach consent
+           turn it off later (the gate screen itself no longer offers this). -->
+      <div class="card" id="coachChatManageCard" style="display:none;">
+        <div class="card-title">Coach Chat</div>
+        <div style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px; margin-bottom:10px;">
+          Coach Chat is on. Your questions and training context are sent to our AI provider to generate answers.
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="resetCoach(); renderCoachChatManageCard();">Turn off Coach Chat</button>
       </div>
 
 
@@ -3691,19 +3701,27 @@
         <button class="btn btn-ghost btn-sm btn-full" onclick="unhideAllStravaActivities()">Restore all hidden workouts</button>
       </div>
 
-      <details style="margin-top: 8px;">
-        <summary style="font-size: 12px; color: var(--text-soft); font-weight: 600; cursor: pointer; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Analytics (advanced)</summary>
-        <div class="card" style="margin-top: 6px;">
-          <div style="font-size: 12px; color: var(--text-soft); margin-bottom: 10px;">Tracking is on by default. Paste a different PostHog project key to override. Leave blank to use the default.</div>
-          <input type="text" id="posthogKeyInputModal" placeholder="phc_xxxxxxxxxxxx" style="width:100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 13px; background: #fff; margin-bottom: 8px;">
-          <div style="display: flex; gap: 6px;">
-            <button class="btn btn-primary btn-sm" onclick="savePosthogKeyFromModal()" style="flex:1;">Save</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearPosthogKey()" style="flex:1;">Reset to default</button>
-          </div>
-        </div>
-      </details>
-
       <button class="btn btn-ghost btn-full" onclick="closeSettings()" style="margin-top: 14px;">Close</button>
+    </div>
+  </div>
+
+  <!-- START OVER confirmation — replaces the bare browser confirm() so the
+       user sees exactly what a plan reset deletes before committing. -->
+  <div class="modal-bg" id="startOverConfirmModal">
+    <div class="modal">
+      <h2 style="font-size:20px; margin:0 0 10px;">Start over?</h2>
+      <div style="font-size:14px; line-height:1.6; color:var(--text);">
+        <p style="margin:0 0 8px;">This will permanently delete:</p>
+        <ul style="text-align:left; margin:0 0 12px; padding-left:20px;">
+          <li>Your current training plan and all coach adjustments</li>
+          <li>Your race goal, schedule, and course details</li>
+          <li>Coach Chat history</li>
+          <li>Synced workout and check-in history</li>
+        </ul>
+        <p style="margin:0 0 16px;"><strong>These will be kept:</strong> your account, your name, and your training background (pre-filled next time).</p>
+      </div>
+      <button class="btn btn-full" style="background:#C0392B; color:#fff; border:0;" onclick="confirmStartOver()">Yes, start over</button>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeStartOverModal()">Keep my plan</button>
     </div>
   </div>
 
@@ -5307,7 +5325,16 @@
     }
   }
 
-  function renderPrimarySourceUI() { renderIntegrations(); renderHealthSyncCard(); }
+  // Show the "Coach Chat" management card only after the user has accepted
+  // the coach consent — gives them a place to turn it off later.
+  function renderCoachChatManageCard() {
+    const card = document.getElementById('coachChatManageCard');
+    if (!card) return;
+    const accepted = (typeof hasAcceptedCoach === 'function') && hasAcceptedCoach();
+    card.style.display = accepted ? 'block' : 'none';
+  }
+
+  function renderPrimarySourceUI() { renderIntegrations(); renderHealthSyncCard(); renderCoachChatManageCard(); }
 
   function populateDisciplineChips() {
     const event = document.getElementById('eventSelect').value;
@@ -6693,9 +6720,6 @@
   function openSettings() {
     const modal = document.getElementById('settingsModal');
     if (!modal) return;
-    // Pre-fill posthog input from localStorage
-    const phInput = document.getElementById('posthogKeyInputModal');
-    if (phInput) phInput.value = localStorage.getItem('posthog-user-key') || '';
     // Reflect current chip selections
     if (typeof renderComplexityProfileUI === 'function') renderComplexityProfileUI();
     if (typeof renderThemeProfileUI === 'function') renderThemeProfileUI();
@@ -6748,18 +6772,6 @@
     const modal = document.getElementById('settingsModal');
     if (modal) modal.classList.remove('show');
   }
-  // Adapter for the Settings-modal posthog input
-  function savePosthogKeyFromModal() {
-    const v = (document.getElementById('posthogKeyInputModal') || {}).value || '';
-    if (!v.trim()) {
-      localStorage.removeItem('posthog-user-key');
-      alert('Reverted to default analytics key.');
-      return;
-    }
-    localStorage.setItem('posthog-user-key', v.trim());
-    alert('Saved your PostHog key.');
-  }
-
   // ──────────────────────────────────────────────────────────────────────
   // HIDE / UNHIDE STRAVA ACTIVITIES (e.g. accidentally-recorded watch starts)
   // ──────────────────────────────────────────────────────────────────────
@@ -10596,32 +10608,6 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function renderComplexityProfileUI() {
     const mode = getComplexityMode();
     document.querySelectorAll('#complexityProfileChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === mode));
-    const phKey = document.getElementById('posthogKeyInput');
-    if (phKey) phKey.value = getAnalyticsKey();
-  }
-  function toggleAnalyticsCard() {
-    const card = document.getElementById('analyticsCard');
-    const btn = document.getElementById('analyticsToggleBtn');
-    if (!card || !btn) return;
-    const opening = card.style.display === 'none';
-    card.style.display = opening ? 'block' : 'none';
-    btn.textContent = opening ? 'Hide ↑' : 'Advanced ›';
-  }
-  function savePosthogKey() {
-    const v = document.getElementById('posthogKeyInput').value.trim();
-    if (!v) { localStorage.removeItem('posthog-key'); alert('Reset to default key.'); toggleAnalyticsCard(); return; }
-    if (!v.startsWith('phc_')) { alert('PostHog keys start with "phc_". Double-check what you pasted.'); return; }
-    localStorage.setItem('posthog-key', v);
-    initAnalytics();
-    trackEvent('analytics_configured');
-    alert('Saved. Events flow to your PostHog now.');
-    toggleAnalyticsCard();
-  }
-  function clearPosthogKey() {
-    localStorage.removeItem('posthog-key');
-    document.getElementById('posthogKeyInput').value = '';
-    alert('Reset to default key.');
-    toggleAnalyticsCard();
   }
   function toggleInsightDetail(btn) {
     const detail = btn.nextElementSibling;
@@ -14598,6 +14584,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       // No plan yet — check if sessions object is entirely empty (not just a rest day)
       const _hasPlan = planState.sessions && Object.keys(planState.sessions).length > 0;
       if (!_hasPlan) {
+        // Guard: while the initial Supabase load is still in flight, a returning
+        // user's plan simply hasn't arrived yet. Showing "No plan yet" here
+        // reads as data loss — leave the static "Loading…" hero in place instead.
+        if (_planLoadState !== 'loaded') return;
         if (heroEmptyState) heroEmptyState.style.display = 'block';
         const sectionLabel = document.getElementById('heroSectionLabel');
         if (sectionLabel) sectionLabel.style.display = 'none';
@@ -15296,6 +15286,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const focus = planState.triFocus;
     const limiter = focus ? focus.limiter : (localStorage.getItem('tri-limiter') || 'run');
     document.querySelectorAll('#paLimiter .chip').forEach(c => c.classList.toggle('active', c.dataset.focus === limiter));
+    // Triathlon focus picker only makes sense for multi-sport events — hide
+    // it for runners/cyclists so their adjust modal matches their sport.
+    const _paEvent = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const _paTriField = document.getElementById('paTriFocusField');
+    if (_paTriField) _paTriField.style.display = /Ironman|Triathlon/i.test(_paEvent) ? 'block' : 'none';
     const planChoice = localStorage.getItem('plan-choice') || 'B';
     document.querySelectorAll('#paStyle .chip').forEach(c => c.classList.toggle('active', c.dataset.style === planChoice));
     refreshPlanAdjustImpact();
@@ -15370,12 +15365,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
 
   function startOverFresh() {
-    if (!confirm('Rebuild your plan from scratch? Your current plan resets and you go through onboarding again.')) return;
+    openStartOverModal();
+  }
+
+  // Confirmation modal for plan reset — both entry points ("Start over with a
+  // new plan" on the You tab and "Start completely over" in plan adjust)
+  // funnel through here so the user always sees what gets deleted.
+  function openStartOverModal() {
+    const m = document.getElementById('startOverConfirmModal');
+    if (m) { m.classList.add('show'); return; }
+    // Fallback if the modal is missing for any reason — never silently wipe.
+    if (confirm('Start over? This deletes your current plan, race goal, schedule, chat history, and synced workouts. Your account and name are kept.')) startFreshOnboarding(true);
+  }
+  function closeStartOverModal() {
+    const m = document.getElementById('startOverConfirmModal');
+    if (m) m.classList.remove('show');
+  }
+  function confirmStartOver() {
+    closeStartOverModal();
+    if (typeof closePlanAdjust === 'function') closePlanAdjust();
     startFreshOnboarding(true);
   }
 
   function startFreshOnboarding(skipConfirm) {
-    if (!skipConfirm && !confirm('Pick a new race and rebuild your plan? Your name, background, and fitness profile carry over, just the race, schedule, and training history reset.')) return;
+    if (!skipConfirm) { openStartOverModal(); return; }
     // ── Save stable, non-race data before the wipe ──────────────────────────
     // Name, endurance background, training frequency, and sleep are personal
     // attributes that don't change when you pick a new race. Pre-populate them
@@ -15439,7 +15452,12 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const text = document.getElementById('profileTriFocusText');
     if (!el || !text) return;
     const focus = planState.triFocus;
-    if (!focus) { el.style.display = 'none'; return; }
+    // Only meaningful for multi-sport athletes — planState.triFocus can be
+    // set for single-discipline events too (noted preference, no rebuild),
+    // and a 5K runner seeing "Triathlon focus" reads as a profile mix-up.
+    const _event = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+    const _isTri = /Ironman|Triathlon/i.test(_event);
+    if (!focus || !_isTri) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     const labels = {
       focus: { swim: 'Swim-focused build. extra swim session + mid-week CSS intervals', bike: 'Bike-focused build. longer brick, trainer intervals, bike-heavy', run: 'Run-focused build. extra run, longer long run, run-specific quality', balanced: 'Balanced build across all three' },
@@ -18217,9 +18235,25 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── End Push Notification Manager ───────────────────────────────────────────
 
+  // Tracks the initial data load so empty states don't flash before the
+  // Supabase fetch resolves. 'pending' → 'loaded' (set even on failure so the
+  // app never wedges in a loading state).
+  let _planLoadState = 'pending';
+
   document.addEventListener('DOMContentLoaded', async () => {
     // Safety net: if anything in init throws, fall back to the onboard screen
     // rather than leaving the user staring at a blank white page.
+    // If the network hangs, after 10 s swap the hero's "Loading…" for an
+    // explicit error + retry so it never looks silently broken.
+    const _loadTimeoutId = setTimeout(() => {
+      if (_planLoadState !== 'pending') return;
+      const heroName = document.getElementById('heroName');
+      if (heroName && /Loading/.test(heroName.textContent)) {
+        heroName.innerHTML = '<span style="font-size:15px;">Couldn’t load your plan</span>';
+        const heroDuration = document.getElementById('heroDuration');
+        if (heroDuration) heroDuration.innerHTML = '<button onclick="location.reload()" style="background:rgba(255,255,255,0.25); color:#fff; border:0; border-radius:100px; padding:8px 20px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:8px;">Try again</button>';
+      }
+    }, 10000);
     try {
       if (!localStorage.getItem('chat-mode')) localStorage.setItem('chat-mode', 'rule');
       initAnalytics();
@@ -18254,6 +18288,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         if (typeof onbStep === 'function') onbStep(0);
       }
 
+      _planLoadState = 'loaded';
+      clearTimeout(_loadTimeoutId);
       renderAll();
       if (typeof loadCoachHistory === 'function') loadCoachHistory();
       if (typeof checkStravaOAuthCallback === 'function') checkStravaOAuthCallback();
@@ -18271,6 +18307,8 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       })();
     } catch (initErr) {
       console.error('[Adapt] init error:', initErr);
+      _planLoadState = 'loaded';
+      clearTimeout(_loadTimeoutId);
       // Best-effort fallback: show the onboard/welcome screen so the app is
       // usable even when something in the startup path threw unexpectedly.
       try {
@@ -18288,6 +18326,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   }
   function acceptCoach() {
     localStorage.setItem(COACH_ACCEPT_KEY, '1');
+    // Push to Supabase immediately — the key is user-scoped and gets wiped on
+    // next login's _clearUserScopedLocal(), so without this save the consent
+    // gate would reappear every new session.
+    if (typeof saveUserData === 'function') saveUserData();
     updateChatState();
     // If a flow (like the morning check-in) handed off a prompt before the
     // user had accepted, fire it now so they don't have to re-enter info.
@@ -18298,6 +18340,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     localStorage.removeItem(COACH_ACCEPT_KEY);
     localStorage.removeItem(COACH_HISTORY_KEY);
     chatMessages.length = 0;
+    if (typeof saveUserData === 'function') saveUserData();
     updateChatState();
   }
 
