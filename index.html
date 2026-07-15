@@ -1851,7 +1851,7 @@
         </div>
         <div class="auth-error" id="forgotError" style="display:none;"></div>
         <div id="forgotSuccess" style="display:none; background:var(--good-soft); color:var(--good); border-radius:10px; padding:12px 14px; font-size:13px; line-height:1.5; margin-bottom:12px;">
-          Check your inbox. A reset link is on its way.
+          Check your inbox. A reset link is on its way. Don't see it? Check your spam folder.
         </div>
         <div class="onboard-actions" style="padding-top:0;">
           <button class="btn btn-primary btn-full btn-lg" onclick="doForgotPassword()">Send reset link</button>
@@ -2556,6 +2556,10 @@
       <!-- 4. Coach insights — categorized, collapsible -->
       <div id="todayInsights"></div>
 
+      <!-- Contextual learn row — one compact link to the Learn article that
+           matches today's session type. Rendered by renderHomeLearnRow(). -->
+      <div id="homeLearnRow" style="display:none;"></div>
+
       <!-- "Coming up" was here. Removed — the month calendar on the Plan
            tab covers it visually and prevents Home from competing with
            Plan for "what's next" attention. The renderTodayComingUp()
@@ -3185,7 +3189,7 @@
       <div class="card" id="healthSyncCard">
         <div class="card-title">Device &amp; health sync</div>
         <div id="healthSyncCardBody" style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px;">
-          Workouts, sleep, heart rate, and HRV sync automatically from <strong>Apple Health</strong> on the native app. On first open you'll be asked to grant access. Approve all to get the full experience.
+          Workouts, sleep, heart rate, and HRV will sync automatically from <strong>Apple Health</strong> when the Adapt iPhone app launches. <span style="display:inline-block; font-size:10px; font-weight:600; background:#E8F5E9; color:#2E7D32; padding:2px 7px; border-radius:100px; text-transform:uppercase; letter-spacing:0.04em; vertical-align:middle;">Coming soon</span>
         </div>
       </div>
 
@@ -3515,7 +3519,7 @@
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What does my readiness score mean?</strong><br>0-100 estimated coaching score. 85+ is on track. 65-84 means a few things to tighten up. Below 65 means the plan needs significant adjustment — tap the pill to see what to address. This is a training estimate, not a medical assessment.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>What if I'm injured?</strong><br>Say "my [area] hurts" in chat, or log it at morning check-in. Engine auto-adjusts. See a doctor or PT for actual medical advice. The app flags, it doesn't diagnose.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>Can't run today? What do I do?</strong><br>Tap "Adjust today" on the workout card. Deselect the disciplines you can't do. Workout adapts automatically.</div>
-        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Workouts sync automatically from Apple Health on the native app. You can also tap any session on Today or Plan, then tap "Log this" to add manually (useful for sessions not recorded on a watch).</div>
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do I log a workout?</strong><br>Tap any session on Today or Plan, then tap "Log this" to record what you did. Apple Health auto-sync arrives with the Adapt iPhone app (coming soon).</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How do notifications work?</strong><br>When your logged workout data suggests an adjustment, a notification appears on the bell. Tap Accept to apply, Reject to dismiss.</div>
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);"><strong>How does the chat work?</strong><br>Coach Chat uses an AI model to answer your training questions and adjust your plan via tools (move sessions, shorten, flag injury, etc.). Structural changes show an Apply / Cancel card. You confirm before they take effect. Free during the prototype, capped at 50 messages/day.</div>
         <div style="padding: 10px 0;"><strong>I want to start over</strong><br>Profile tab → "Start over with a new plan." Your current plan resets, you go through onboarding again.</div>
@@ -5288,8 +5292,9 @@
     const hasSynced = !!(planState.healthKit && planState.healthKit.syncedAt);
 
     if (!isNative) {
-      // Web browser — keep the static explanation
-      body.innerHTML = 'Workouts, sleep, heart rate, and HRV sync automatically from <strong>Apple Health</strong> on the native app. On first open you\'ll be asked to grant access. Approve all to get the full experience.';
+      // Web browser — Apple Health only works in the native iPhone app,
+      // which isn't in the App Store yet. Don't imply it works here today.
+      body.innerHTML = 'Workouts, sleep, heart rate, and HRV will sync automatically from <strong>Apple Health</strong> when the Adapt iPhone app launches. <span style="display:inline-block; font-size:10px; font-weight:600; background:#E8F5E9; color:#2E7D32; padding:2px 7px; border-radius:100px; text-transform:uppercase; letter-spacing:0.04em; vertical-align:middle;">Coming soon</span>';
       return;
     }
 
@@ -9553,6 +9558,30 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       `,
     },
   };
+  // Contextual learn row on Home — surfaces the one Learn article that matches
+  // today's session so education arrives when it's relevant, not buried at the
+  // bottom of the Progress tab. Maps to EXISTING topics only.
+  function renderHomeLearnRow() {
+    const slot = document.getElementById('homeLearnRow');
+    if (!slot) return;
+    const s = (planState.sessions || {})[getTodayDay()];
+    let topicId = null;
+    if (s) {
+      if (s.type === 'rest') topicId = 'rest';
+      else if (s.type === 'quality' || s.type === 'brick') topicId = 'hr';
+      else if (s.duration > 0) topicId = 'zone2';
+    }
+    const topic = topicId && LEARN_TOPICS[topicId];
+    if (!topic) { slot.style.display = 'none'; return; }
+    slot.style.display = 'block';
+    slot.innerHTML = `
+      <div onclick="openLearnTopic('${topicId}')" style="cursor:pointer; margin-top:10px; padding:10px 14px; background:var(--card); border:1px solid var(--border); border-radius:12px; display:flex; align-items:center; gap:10px;">
+        <span style="font-size:15px;">📖</span>
+        <span style="flex:1; font-size:13px; font-weight:600;">${escapeHtml(topic.title)}</span>
+        <span style="color:var(--text-soft); font-size:16px;">›</span>
+      </div>`;
+  }
+
   function openLearnTopic(id) {
     const topic = LEARN_TOPICS[id];
     if (!topic) return;
@@ -15161,6 +15190,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (typeof autoMarkSessionsFromStrava === 'function') autoMarkSessionsFromStrava();
     renderSmartSummary();
     renderTodayHero();
+    renderHomeLearnRow();
     renderTomorrowPreview();
     renderWeekVolumeBar();
     // Note: renderFitnessPulse() removed from Home — Smart Summary's Body row covers it
@@ -15676,11 +15706,28 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       await _sb.auth.resetPasswordForEmail(email, { redirectTo });
       document.getElementById('forgotError').style.display = 'none';
       document.getElementById('forgotSuccess').style.display = 'block';
+      // Resend countdown — keeps a fallback path if the email never lands
+      // while preventing rapid-fire resends.
+      if (btn) {
+        let _cd = 60;
+        btn.disabled = true;
+        btn.textContent = `Resend in ${_cd}s`;
+        const _cdTimer = setInterval(() => {
+          _cd--;
+          if (_cd <= 0) {
+            clearInterval(_cdTimer);
+            btn.disabled = false;
+            btn.textContent = 'Resend email';
+          } else {
+            btn.textContent = `Resend in ${_cd}s`;
+          }
+        }, 1000);
+      }
+      return;
     } catch (e) {
       showError('forgotError', 'Could not send reset email. Try again in a moment.');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Send reset link'; }
     }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send reset link'; }
   }
 
   async function doSetNewPassword() {
