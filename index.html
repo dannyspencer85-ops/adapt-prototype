@@ -2286,26 +2286,9 @@
           <div class="chip-row" id="discChips"></div>
         </div>
 
-        <div class="field">
-          <label>Coaching detail level</label>
-          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">How much explanation do you want with your training advice? You can change this later.</div>
-          <div class="chip-row" id="complexityChips">
-            <button class="chip active" data-mode="simple" onclick="singleChip(this)">Simple — plain English</button>
-            <button class="chip" data-mode="detailed" onclick="singleChip(this)">Detailed — full reasoning</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Color theme</label>
-          <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">Pick a vibe. You can change later.</div>
-          <div class="chip-row" id="themeChips">
-            <button class="chip active" data-theme="forest" onclick="pickTheme(this, 'forest')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3B8968; vertical-align:middle; margin-right:6px;"></span>Forest</button>
-            <button class="chip" data-theme="ocean" onclick="pickTheme(this, 'ocean')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#2980B9; vertical-align:middle; margin-right:6px;"></span>Ocean</button>
-            <button class="chip" data-theme="sunset" onclick="pickTheme(this, 'sunset')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#E27D3F; vertical-align:middle; margin-right:6px;"></span>Sunset</button>
-            <button class="chip" data-theme="berry" onclick="pickTheme(this, 'berry')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#8E44AD; vertical-align:middle; margin-right:6px;"></span>Berry</button>
-            <button class="chip" data-theme="slate" onclick="pickTheme(this, 'slate')"><span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#546E7A; vertical-align:middle; margin-right:6px;"></span>Slate</button>
-          </div>
-        </div>
+        <!-- Coaching detail level + color theme moved to Settings (gear icon)
+             — zero-value questions before the user has seen the app. Defaults:
+             simple detail, forest theme. -->
         <div class="onboard-actions">
           <button class="btn btn-primary btn-full btn-lg" onclick="confirmHoursFloorThenNext()">Next</button>
         </div>
@@ -2415,7 +2398,7 @@
 
         <div class="onboard-actions" style="margin-top:14px;">
           <button class="btn btn-primary btn-full btn-lg" onclick="finishOnboard()">Build my plan</button>
-          <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="finishOnboard()">Skip — I'll add later</button>
+          <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="finishOnboard()">Use estimated values</button>
         </div>
       </div>
 
@@ -3753,6 +3736,14 @@
       </div>
       <div class="sub">Move <strong id="rescheduleSession"></strong> from <strong id="rescheduleFromDay"></strong> to which day?</div>
       <div class="chip-row" id="rescheduleDayChips" style="margin-top: 14px; margin-bottom: 14px;"></div>
+      <div style="font-size:12px; color:var(--text-soft); margin-bottom:6px;">Reason <span style="font-weight:400;">(optional — helps the coach)</span></div>
+      <div class="chip-row" id="rescheduleReasonChips" style="margin-bottom: 14px;">
+        <button class="chip" data-reason="Travel" onclick="singleChip(this)">Travel</button>
+        <button class="chip" data-reason="Work" onclick="singleChip(this)">Work</button>
+        <button class="chip" data-reason="Family" onclick="singleChip(this)">Family</button>
+        <button class="chip" data-reason="Tired" onclick="singleChip(this)">Tired</button>
+        <button class="chip" data-reason="Weather" onclick="singleChip(this)">Weather</button>
+      </div>
       <div style="font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 14px;">If the day already has a session, the two will swap. Plan re-evaluates after.</div>
       <button class="btn btn-ghost btn-full" onclick="closeRescheduleModal()">Cancel</button>
     </div>
@@ -5429,7 +5420,10 @@
     const _chipDays = [...document.querySelectorAll('#daysChips .chip.active')].map(c => c.textContent.trim());
     const _prevDays = (() => { try { return JSON.parse(localStorage.getItem('training-days') || '[]'); } catch(e) { return []; } })();
     const activeDays = _chipDays.length ? _chipDays : _prevDays;
-    const complexity = document.querySelector('#complexityChips .chip.active')?.dataset.mode || 'simple';
+    // Onboarding no longer asks for coaching detail — keep whatever the user
+    // set in Settings (default 'simple'). Only write if nothing is stored.
+    const complexity = document.querySelector('#complexityChips .chip.active')?.dataset.mode
+      || localStorage.getItem('complexity-mode') || 'simple';
     localStorage.setItem('complexity-mode', complexity);
     localStorage.setItem('race-event', event);
     localStorage.setItem('race-date', eventDate);
@@ -7827,10 +7821,13 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
   function updateRebuildPlanRowVisibility() {
     const row = document.getElementById('rebuildPlanRow');
     if (!row) return;
+    // Developer fallback, not a user feature — only surfaced with ?debug=true.
+    // Normal users rebuild through Profile → "Start over with a new plan".
+    const debugMode = new URLSearchParams(location.search).get('debug') === 'true';
     const chatActive = document.getElementById('chatActive');
     const inChatMode = chatActive && chatActive.style.display !== 'none';
     const hasPlan = !!(planState.fullPlan && planState.fullPlan.length);
-    row.style.display = (inChatMode && hasPlan) ? 'block' : 'none';
+    row.style.display = (debugMode && inChatMode && hasPlan) ? 'block' : 'none';
   }
 
   // Quiet plan regen that stays in chat — no navigation away. Runs the same
@@ -8478,9 +8475,11 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         rowClass = 'session-row done';
         badgeHtml = sportBadge(s.type, { size: 40, completed: true });
       } else if (isPast) {
-        // Past but no real workout — show muted, "Skipped" or "Rest" depending on plan
+        // Past but no real workout — "Rest" for rest days; for training days
+        // an amber "Log it?" nudge (we can't know missed vs done-but-unlogged,
+        // so invite the log rather than assert a miss).
         const wasRest = s.type === 'rest';
-        statusText = wasRest ? 'Rest' : 'Not logged';
+        statusText = wasRest ? 'Rest' : '<span style="color:#E07020; font-weight:600;">Log it?</span>';
         rowClass = 'session-row';
         badgeHtml = sportBadge(s.type, { size: 40, muted: true });
       } else if (isToday) {
@@ -8506,7 +8505,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
       if (isPast && !isCompleted) {
         // Past + not done: show the session name so the week is scannable;
-        // the "Not logged" status badge already communicates it wasn't done.
+        // the "Log it?" status badge already communicates it wasn't logged.
         if (s.type === 'rest') {
           nameToShow = 'Rest';
           metaToShow = 'Recovery';
@@ -13203,7 +13202,10 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (planGreet) {
       const weekIdx = getCurrentWeekIdx();
       const arc = (planState.weekArc || []);
-      planGreet.textContent = days < 0 ? `Race complete · ${eventOnly}` : days === 0 ? `Race day · ${eventOnly}` : arc.length > 0 ? `Week ${weekIdx + 1} of ${arc.length} · ${eventOnly}` : eventOnly;
+      // Include the training phase (weekArc focus, e.g. "Base") so the week
+      // header answers "what is this week FOR", not just where it sits.
+      const _phaseFocus = (arc[weekIdx] && arc[weekIdx].focus) ? ` · ${arc[weekIdx].focus}` : '';
+      planGreet.textContent = days < 0 ? `Race complete · ${eventOnly}` : days === 0 ? `Race day · ${eventOnly}` : arc.length > 0 ? `Week ${weekIdx + 1} of ${arc.length}${_phaseFocus} · ${eventOnly}` : eventOnly;
     }
 
     const pg = document.getElementById('progressGreeting');
@@ -20135,19 +20137,25 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     const fromDay = modal.dataset.fromDay;
     if (!fromDay) { modal.classList.remove('show'); return; }
     lastSnapshot = JSON.parse(JSON.stringify(planState));
+    // Optional reason chip — travels with the move so the coach context knows
+    // WHY the week changed shape (travel/work/tired...), not just that it did.
+    const _reasonChip = document.querySelector('#rescheduleReasonChips .chip.active');
+    const _reason = _reasonChip ? `rescheduled: ${_reasonChip.dataset.reason.toLowerCase()}` : 'rescheduled via quick action';
     // The reschedule picker IS the confirmation step — the user tapped
     // a specific target day. Routing through executeTool re-gates via
     // the Coach Chat Apply/Cancel queue (invisible from this surface).
     // Use _runToolDirect so the change applies immediately.
-    _runToolDirect('moveSession', { fromDay, toDay, reason: 'rescheduled via quick action' });
+    _runToolDirect('moveSession', { fromDay, toDay, reason: _reason });
     // Force every dependent surface to re-render — Today hero, calendar,
     // week-arc, Plan tab. tool_moveSession's internal renderWeekSessions
     // only refreshes the Plan tab list.
     if (typeof renderAll === 'function') renderAll();
-    modal.classList.remove('show');
+    closeRescheduleModal();
   }
   function closeRescheduleModal() {
     document.getElementById('rescheduleModal').classList.remove('show');
+    // Reset the optional reason selection for the next open.
+    document.querySelectorAll('#rescheduleReasonChips .chip').forEach(c => c.classList.remove('active'));
   }
 
   // Single source of truth for the minutes the user selected in the
