@@ -18492,10 +18492,33 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       subscriptionStatus = 'active';
       subscriptionHasAccess = true;
       dismissPaywall();
-      setTimeout(checkSubscriptionStatus, 2000);
+      // Give Apple's server notification a moment to reach our webhook,
+      // then confirm against the server record.
+      setTimeout(checkSubscriptionStatus, 3000);
       if (typeof trackEvent === 'function') trackEvent('subscription_purchased');
     } else if (result && !result.userCancelled) {
       alert('Purchase didn’t complete. Please try again, or use Restore purchases if you already subscribed.');
+      if (typeof trackEvent === 'function') trackEvent('subscription_purchase_failed', { code: result.errorCode || 'unknown' });
+    }
+  };
+
+  // Called by the native layer after a StoreKit restore. StoreKit knows
+  // whether this Apple ID has the subscription; the server record still
+  // decides access, so re-check before unlocking.
+  window.__adaptRestoreResult = async function(result) {
+    if (result && result.restored) {
+      await checkSubscriptionStatus();
+      if (subscriptionHasAccess) {
+        dismissPaywall();
+        alert('Subscription restored — welcome back.');
+      } else {
+        // StoreKit found the purchase but our server hasn't linked it (e.g.
+        // purchase predates account linkage). Don't silently swallow it.
+        alert('We found your App Store subscription but couldn’t link it to this account automatically. Contact hello@adaptcoach.app and we’ll fix it.');
+      }
+      if (typeof trackEvent === 'function') trackEvent('subscription_restored', { linked: subscriptionHasAccess });
+    } else {
+      alert('No previous purchases found for this Apple ID.');
     }
   };
 
