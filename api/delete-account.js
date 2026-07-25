@@ -4,7 +4,8 @@
 // Uses the SUPABASE_SERVICE_ROLE_KEY server-side — never expose that key to the client.
 //
 // Tables wiped (all rows matching user_id):
-//   user_data, push_subscriptions, notification_preferences
+//   user_data, push_subscriptions, notification_preferences, subscriptions
+//   (+ subscription_events rows matching the user's apple_account_token)
 // Then: deletes the Supabase auth user itself (irreversible).
 
 import { createClient } from '@supabase/supabase-js';
@@ -44,6 +45,21 @@ export default async function handler(req) {
     return jsonResp(401, { error: 'Invalid or expired session. Please log in again.' });
   }
   const userId = user.id;
+
+  // Subscription cleanup: events are keyed by apple_account_token, so fetch
+  // the token before deleting the subscriptions row. Both tables may not
+  // exist yet on older environments — treat "relation does not exist" or
+  // "no row" as a no-op, not a failure.
+  try {
+    const { data: subRow } = await admin
+      .from('subscriptions').select('apple_account_token').eq('user_id', userId).single();
+    if (subRow?.apple_account_token) {
+      await admin.from('subscription_events').delete().eq('apple_account_token', subRow.apple_account_token);
+    }
+    await admin.from('subscriptions').delete().eq('user_id', userId);
+  } catch (e) {
+    console.warn('[delete-account] subscription cleanup skipped:', e?.message);
+  }
 
   // Delete all per-user data rows. Run in parallel for speed.
   const [r1, r2, r3] = await Promise.all([

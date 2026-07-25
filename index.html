@@ -1031,6 +1031,26 @@
     text-transform: none;
     letter-spacing: 0;
   }
+  .paywall-feature {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .locked-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px;
+    background: var(--bg-soft);
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    gap: 6px;
+  }
+  .locked-section .locked-title { font-size: 14px; color: var(--text-soft); margin: 0; }
+  .locked-section .locked-sub { font-size: 12px; color: var(--primary); font-weight: 600; }
   .streak-pill {
     display: inline-flex;
     align-items: center;
@@ -3692,6 +3712,40 @@
     </div>
   </div>
 
+  <!-- PAYWALL — subscription gate sheet. Hidden until showPaywall() is
+       called; enforcement is off until Apple IAP is live (see
+       _paywallEnforced() in the script). -->
+  <div class="modal-bg" id="paywallModal">
+    <div class="modal" style="max-height:90vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:flex-end;">
+        <button onclick="dismissPaywall()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div style="font-size:12px; font-weight:700; color:var(--primary); letter-spacing:0.04em; margin-bottom:6px;">adapt</div>
+      <h2 style="font-size:26px; line-height:1.15; margin:0 0 6px;">Train smarter.<br>Race ready.</h2>
+      <p style="font-size:14px; color:var(--text-soft); margin:0 0 18px;" id="paywallSub">Unlock everything in Adapt.</p>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;">
+        <div class="paywall-feature">✓&nbsp; AI coach that adapts to your life</div>
+        <div class="paywall-feature">✓&nbsp; Full personalised training plan, every week to race day</div>
+        <div class="paywall-feature">✓&nbsp; Readiness tracking + Apple Health sync</div>
+        <div class="paywall-feature">✓&nbsp; Race-day preparation and taper</div>
+      </div>
+      <div style="background:var(--bg-soft); border-radius:12px; padding:14px; text-align:center; margin-bottom:14px;">
+        <div style="display:flex; align-items:baseline; justify-content:center; gap:4px;">
+          <span style="font-size:30px; font-weight:700;">$9.99</span>
+          <span style="font-size:15px; color:var(--text-soft);">/ month</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-soft); margin-top:2px;">Cancel anytime. 7-day free trial.</div>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="initiateSubscription()">Start free trial</button>
+      <p style="font-size:11px; color:var(--text-soft); text-align:center; line-height:1.5; margin:10px 0;">
+        Payment processed by Apple. Auto-renews monthly at $9.99 unless cancelled
+        at least 24 hours before renewal. Manage or cancel in iPhone Settings →
+        Apple&nbsp;ID → Subscriptions.
+      </p>
+      <button onclick="restorePurchases()" style="width:100%; background:none; border:0; color:var(--text-soft); font-size:13px; cursor:pointer; font-family:inherit; padding:6px;">Restore purchases</button>
+    </div>
+  </div>
+
   <!-- START OVER confirmation — replaces the bare browser confirm() so the
        user sees exactly what a plan reset deletes before committing. -->
   <div class="modal-bg" id="startOverConfirmModal">
@@ -4104,6 +4158,41 @@
 </div>
 
 <script>
+  // ── Sentry error monitoring ────────────────────────────────────────────────
+  // INERT until a DSN is pasted: create a project at sentry.io (Browser
+  // JavaScript), copy the DSN into SENTRY_DSN below, redeploy. With the DSN
+  // empty this block does nothing — no script load, no network calls.
+  (function() {
+    const SENTRY_DSN = ''; // ← paste DSN from sentry.io to enable
+    if (!SENTRY_DSN) return;
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
+    const script = document.createElement('script');
+    script.src = 'https://browser.sentry-cdn.com/7.120.0/bundle.min.js';
+    script.crossOrigin = 'anonymous';
+    script.onload = function() {
+      if (!window.Sentry) return;
+      window.Sentry.init({
+        dsn: SENTRY_DSN,
+        environment: 'production',
+        tracesSampleRate: 0.1,
+      });
+      // Tag errors with the Supabase user id once auth resolves (id only —
+      // no email/name, consistent with the privacy policy).
+      const tagUser = () => {
+        try {
+          if (typeof _sb !== 'undefined' && _sb && _sb.auth) {
+            _sb.auth.getUser().then(({ data }) => {
+              if (data && data.user) window.Sentry.setUser({ id: data.user.id });
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      };
+      if (document.readyState === 'complete') tagUser();
+      else window.addEventListener('load', tagUser);
+    };
+    document.head.appendChild(script);
+  })();
+
   // ── Supabase configuration ─────────────────────────────────────────────────
   // 1. Go to https://supabase.com → New project (free tier).
   // 2. Settings → API → copy "Project URL" and "anon public" key below.
@@ -6077,6 +6166,9 @@
     }
   }
   function showScreen(name, fromBack) {
+    // Premium gate — the Stats screen (fitness signals, trends, PBs) is
+    // paid. No-op while _PAYWALL_ENFORCED is false.
+    if (name === 'data' && typeof requiresSubscription === 'function' && !requiresSubscription('advanced_stats')) return;
     if (currentScreen && currentScreen !== name && !fromBack) {
       screenHistory.push(currentScreen);
     }
@@ -8386,6 +8478,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const currentIdx = getCurrentWeekIdx();
     const target = currentIdx + viewWeekOffset + delta;
     if (target < 0 || target >= totalWeeks) return;
+    // Premium gate — future weeks beyond the current one are paid. Past
+    // weeks stay free. No-op while _PAYWALL_ENFORCED is false.
+    if (delta > 0 && target > currentIdx && !requiresSubscription('full_plan')) return;
     viewWeekOffset += delta;
     renderWeekSessions();
   }
@@ -15561,6 +15656,9 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       Object.entries(data.user_scoped).forEach(([k, v]) => { if (v != null) localStorage.setItem(k, v); });
     }
     localStorage.setItem('_lastSyncTime', Date.now().toString());
+    // Refresh subscription status alongside every data load (init, login,
+    // tab-return refetch). Fire-and-forget — must never block or fail load.
+    if (typeof checkSubscriptionStatus === 'function') checkSubscriptionStatus();
   }
 
   async function _sbSave() {
@@ -18296,6 +18394,111 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 
   // ── End Push Notification Manager ───────────────────────────────────────────
 
+  // ══════════════════════════════════════════════════════════════════════
+  // SUBSCRIPTION (Apple IAP) — status lives server-side in the
+  // `subscriptions` table; /api/subscription/status is the source of truth.
+  //
+  // ENFORCEMENT IS OFF (_PAYWALL_ENFORCED = false) until the App Store IAP
+  // is live: the native StoreKit purchase flow doesn't exist yet, so
+  // enforcing now would lock every current user out of Coach Chat with no
+  // way to pay. Flip the flag once the subscription product is approved and
+  // the native purchase path works. Preview the gates without flipping it
+  // by loading the app with ?paywall=preview.
+  // ══════════════════════════════════════════════════════════════════════
+  const _PAYWALL_ENFORCED = false;
+  let subscriptionStatus = 'free';
+  let subscriptionHasAccess = false;
+
+  function _paywallEnforced() {
+    if (_PAYWALL_ENFORCED) return true;
+    try { return new URLSearchParams(location.search).get('paywall') === 'preview'; }
+    catch (_) { return false; }
+  }
+  // True when the user may use premium features (subscribed, or paywall off).
+  function userHasAccess() {
+    return subscriptionHasAccess || !_paywallEnforced();
+  }
+  // Gate helper — returns true to proceed, else shows the paywall.
+  function requiresSubscription(featureName) {
+    if (userHasAccess()) return true;
+    showPaywall(featureName);
+    return false;
+  }
+
+  // Fetch current status from the server. Fire-and-forget from _sbLoad();
+  // any failure leaves the user on the free experience — never locks out.
+  async function checkSubscriptionStatus() {
+    try {
+      if (!_isSupabase || !_isSupabase()) return;
+      const { data: s } = await _sb.auth.getSession();
+      const token = s && s.session && s.session.access_token;
+      if (!token) return;
+      const resp = await fetch('/api/subscription/status', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      subscriptionStatus = data.status || 'free';
+      subscriptionHasAccess = !!data.hasAccess;
+      if (data.appleAccountToken) window._appleAccountToken = data.appleAccountToken;
+    } catch (e) { /* offline / endpoint missing — stay free, never lock out */ }
+  }
+
+  function showPaywall(fromFeature) {
+    const labels = {
+      coach_chat: 'Unlock Coach Chat and everything else in Adapt.',
+      advanced_stats: 'Unlock fitness signals, trends, and everything else in Adapt.',
+      full_plan: 'Unlock every training week to race day and everything else in Adapt.',
+    };
+    const sub = document.getElementById('paywallSub');
+    if (sub) sub.textContent = labels[fromFeature] || 'Unlock everything in Adapt.';
+    const m = document.getElementById('paywallModal');
+    if (m) m.classList.add('show');
+    if (typeof trackEvent === 'function') trackEvent('paywall_shown', { from: fromFeature || 'unknown' });
+  }
+  function dismissPaywall() {
+    const m = document.getElementById('paywallModal');
+    if (m) m.classList.remove('show');
+  }
+
+  // Purchase runs through the native shell (StoreKit). The web app only
+  // sends the intent over the React Native WebView bridge; on plain web
+  // there is nothing to buy — point at the App Store.
+  function initiateSubscription() {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'INITIATE_SUBSCRIPTION',
+        productId: 'com.adaptcoach.app.monthly',
+        appAccountToken: window._appleAccountToken || ''
+      }));
+    } else {
+      alert('Subscriptions are available in the Adapt iPhone app.\n\nDownload it from the App Store to subscribe.');
+    }
+    if (typeof trackEvent === 'function') trackEvent('subscription_initiated', { native: !!window.ReactNativeWebView });
+  }
+  function restorePurchases() {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'RESTORE_PURCHASES' }));
+    } else {
+      alert('Restore purchases is available in the Adapt iPhone app.');
+    }
+  }
+
+  // Called by the native layer (via injectJavaScript) after StoreKit
+  // completes. Optimistically unlock, then re-verify against the server
+  // (the webhook is the authority).
+  window.__adaptPurchaseResult = function(result) {
+    if (result && result.success) {
+      subscriptionStatus = 'active';
+      subscriptionHasAccess = true;
+      dismissPaywall();
+      setTimeout(checkSubscriptionStatus, 2000);
+      if (typeof trackEvent === 'function') trackEvent('subscription_purchased');
+    } else if (result && !result.userCancelled) {
+      alert('Purchase didn’t complete. Please try again, or use Restore purchases if you already subscribed.');
+    }
+  };
+
   // Tracks the initial data load so empty states don't flash before the
   // Supabase fetch resolves. 'pending' → 'loaded' (set even on failure so the
   // app never wedges in a loading state).
@@ -19679,6 +19882,9 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
 
   async function sendChat() {
     if (!hasAcceptedCoach()) { updateChatState(); return; }
+    // Premium gate — AI coach messages are the main paid feature. No-op
+    // while _PAYWALL_ENFORCED is false (see subscription block).
+    if (!requiresSubscription('coach_chat')) return;
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
     if (!text) return;
