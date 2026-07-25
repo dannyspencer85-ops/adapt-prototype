@@ -4,20 +4,34 @@
 // failure...). Keeps the `subscriptions` table in sync so the app's
 // /api/subscription/status endpoint is the single source of truth.
 //
+// SIGNATURE VERIFICATION: every signedPayload (and the nested transaction /
+// renewal JWSs) is verified with Apple's official
+// @apple/app-store-server-library — x5c chain validation against the pinned
+// Apple root CAs in _utils/appleRootCerts.js, plus bundle-id and
+// environment checks. Forged or tampered payloads are rejected with 401.
+// This requires the Node runtime (Node crypto/x509), not edge.
+//
+// The one unverified read is the environment field, used only to pick which
+// verifier (Sandbox vs Production) to run — the accept/reject decision
+// always comes from full verification.
+//
 // Linkage: when the native app initiates a purchase it passes our
 // apple_account_token (a UUID minted per user in /api/subscription/status)
 // as StoreKit's appAccountToken. Apple echoes it back in every
 // notification, letting us map the transaction to a Supabase user.
 //
-// TODO before App Store submission: verify the signedPayload JWT signature
-// against Apple's public keys (x5c chain → Apple Root CA). Until then this
-// endpoint decodes without verification, which is acceptable for sandbox
-// testing only. The endpoint URL is unguessable-ish but NOT secret — do not
-// rely on obscurity in production.
+// Env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, APPLE_BUNDLE_ID
+// (defaults to com.adaptcoach.app), and — required before production
+// launch — APPLE_APP_ID (the numeric Apple ID of the app record in App
+// Store Connect; production notifications are rejected until it's set).
 
 import { createClient } from '@supabase/supabase-js';
+import { SignedDataVerifier, Environment } from '@apple/app-store-server-library';
+import { getAppleRootCerts } from './_utils/appleRootCerts.js';
 
-export const config = { runtime: 'edge' };
+export const config = { maxDuration: 30 };
+
+const BUNDLE_ID = process.env.APPLE_BUNDLE_ID || 'com.adaptcoach.app';
 
 // Apple notificationType → our subscription status. null = informational,
 // acknowledge and ignore.
@@ -40,58 +54,90 @@ const STATUS_MAP = {
   TEST: null,                        // App Store Connect "Send Test Notification"
 };
 
-// Edge runtime has no Buffer — decode base64url JWT sections with atob.
-function decodeJwtPayload(jwt) {
-  const part = (jwt || '').split('.')[1];
-  if (!part) return null;
-  const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-  const bin = atob(padded);
-  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
+// Unverified peek at the JWS payload — ONLY to select the right verifier
+// environment. Never used for the accept decision.
+function peekJwsPayload(jws) {
+  try {
+    const part = String(jws).split('.')[1];
+    if (!part) return null;
+    return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
 }
 
-export default async function handler(req) {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+function buildVerifier(environment) {
+  const roots = getAppleRootCerts();
+  if (environment === 'Sandbox') {
+    return new SignedDataVerifier(roots, true, Environment.SANDBOX, BUNDLE_ID);
+  }
+  const appAppleId = parseInt(process.env.APPLE_APP_ID || '', 10);
+  if (!Number.isFinite(appAppleId)) {
+    // Misconfiguration on our side — production notifications can't be
+    // verified without the app's numeric Apple ID. Throwing surfaces a 500
+    // so Apple retries once APPLE_APP_ID is set.
+    throw new Error('APPLE_APP_ID env var missing — required to verify production notifications');
+  }
+  return new SignedDataVerifier(roots, true, Environment.PRODUCTION, BUNDLE_ID, appAppleId);
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
     console.error('[apple-webhook] missing env vars');
-    return new Response('Server misconfigured', { status: 500 });
+    return res.status(500).send('Server misconfigured');
   }
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-  let body;
-  try { body = await req.json(); }
-  catch { return new Response('Invalid JSON', { status: 400 }); }
+  const signedPayload = req.body?.signedPayload;
+  if (!signedPayload || typeof signedPayload !== 'string') {
+    return res.status(400).send('Missing signedPayload');
+  }
+
+  // Peek (unverified) at the environment to pick the verifier, then verify.
+  const peeked = peekJwsPayload(signedPayload);
+  const environment = peeked?.data?.environment === 'Sandbox' ? 'Sandbox' : 'Production';
+
+  let verifier;
+  try {
+    verifier = buildVerifier(environment);
+  } catch (err) {
+    console.error('[apple-webhook]', err.message);
+    return res.status(500).send('Server misconfigured');
+  }
 
   let notification;
   try {
-    if (!body.signedPayload) return new Response('Missing signedPayload', { status: 400 });
-    notification = decodeJwtPayload(body.signedPayload);
+    notification = await verifier.verifyAndDecodeNotification(signedPayload);
   } catch (err) {
-    console.error('[apple-webhook] decode error:', err);
-    return new Response('Decode error', { status: 400 });
+    console.error('[apple-webhook] signature verification FAILED:', err?.message || err);
+    return res.status(401).send('Invalid signature');
   }
-  if (!notification) return new Response('Decode error', { status: 400 });
 
   const notificationType = notification.notificationType;
   const subtype = notification.subtype || null;
   const data = notification.data || {};
 
+  // Nested JWSs are verified too — a forged inner transaction inside a
+  // validly-signed envelope isn't possible, but defense in depth is cheap.
   let transactionInfo = null;
-  try { transactionInfo = data.signedTransactionInfo ? decodeJwtPayload(data.signedTransactionInfo) : null; }
-  catch { transactionInfo = null; }
+  if (data.signedTransactionInfo) {
+    try { transactionInfo = await verifier.verifyAndDecodeTransaction(data.signedTransactionInfo); }
+    catch (err) { console.error('[apple-webhook] transaction info verification failed:', err?.message); }
+  }
   let renewalInfo = null;
-  try { renewalInfo = data.signedRenewalInfo ? decodeJwtPayload(data.signedRenewalInfo) : null; }
-  catch { renewalInfo = null; }
+  if (data.signedRenewalInfo) {
+    try { renewalInfo = await verifier.verifyAndDecodeRenewalInfo(data.signedRenewalInfo); }
+    catch (err) { console.error('[apple-webhook] renewal info verification failed:', err?.message); }
+  }
 
-  const appAccountToken = transactionInfo?.appAccountToken || data?.appAccountToken || null;
+  const appAccountToken = transactionInfo?.appAccountToken || null;
   const expiresDateMs = transactionInfo?.expiresDate;
   const productId = transactionInfo?.productId || renewalInfo?.productId || null;
   const originalTransactionId = transactionInfo?.originalTransactionId || null;
-  const environment = data?.environment || notification?.data?.environment || null;
 
   // Log every event first — even ones we ignore — so sandbox testing and
   // production incidents are debuggable from the subscription_events table.
@@ -111,14 +157,14 @@ export default async function handler(req) {
   if (newStatus == null) {
     // Informational or unrecognized — acknowledge so Apple doesn't retry.
     console.log('[apple-webhook] ignoring type:', notificationType, subtype || '');
-    return new Response('OK', { status: 200 });
+    return res.status(200).send('OK');
   }
 
   if (!appAccountToken) {
     // Purchase made without our token (e.g. bought before account linkage
     // existed). Logged above; nothing to update. 200 so Apple stops retrying.
     console.error('[apple-webhook] no appAccountToken for', notificationType);
-    return new Response('OK', { status: 200 });
+    return res.status(200).send('OK');
   }
 
   const { data: row, error: findError } = await admin
@@ -129,7 +175,7 @@ export default async function handler(req) {
 
   if (findError || !row) {
     console.error('[apple-webhook] no user for token:', appAccountToken);
-    return new Response('OK', { status: 200 });
+    return res.status(200).send('OK');
   }
 
   const { error: updateError } = await admin
@@ -146,9 +192,9 @@ export default async function handler(req) {
   if (updateError) {
     console.error('[apple-webhook] update error:', updateError.message);
     // 500 → Apple retries. A failed write is a real problem we want retried.
-    return new Response('Database error', { status: 500 });
+    return res.status(500).send('Database error');
   }
 
   console.log(`[apple-webhook] ${row.user_id}: ${notificationType} → ${newStatus}`);
-  return new Response('OK', { status: 200 });
+  return res.status(200).send('OK');
 }

@@ -8,6 +8,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@supabase/supabase-js": "^2.39.3",
     "web-push": "^3.6.7"
   }
