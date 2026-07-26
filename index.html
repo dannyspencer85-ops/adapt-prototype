@@ -3152,7 +3152,7 @@
       <div class="card">
         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div class="card-title" style="margin: 0;">Your goals</div>
-          <button onclick="showScreen('onboard'); onbStep(3)" style="background:none; border:0; color: var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Edit</button>
+          <button onclick="openYouEditModal('goal')" style="background:none; border:0; color: var(--primary); font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;">Edit</button>
         </div>
 
         <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
@@ -3743,6 +3743,25 @@
         Apple&nbsp;ID → Subscriptions.
       </p>
       <button onclick="restorePurchases()" style="width:100%; background:none; border:0; color:var(--text-soft); font-size:13px; cursor:pointer; font-family:inherit; padding:6px;">Restore purchases</button>
+    </div>
+  </div>
+
+  <!-- YOU TAB EDIT MODAL — self-contained editor for profile sections.
+       Replaces the old "Edit ›" behaviour of jumping into the onboarding
+       flow (which hides the bottom nav and has no way back — a trap for
+       logged-in users). Content is built per-section by openYouEditModal(). -->
+  <div class="modal-bg" id="youEditModal">
+    <div class="modal" style="max-height:88vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 id="youEditTitle" style="font-size:20px; margin:0;">Edit</h2>
+        <button onclick="closeYouEditModal()" style="background:none; border:0; font-size:24px; color:var(--text-soft); cursor:pointer; padding:0; line-height:1;">×</button>
+      </div>
+      <div id="youEditBody"></div>
+      <div id="youEditNote" style="font-size:12px; color:var(--text-soft); text-align:center; margin:4px 0 12px;">Your plan rebuilds when you save.</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="closeYouEditModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" id="youEditSaveBtn" onclick="saveYouEdit()">Save</button>
+      </div>
     </div>
   </div>
 
@@ -6764,17 +6783,19 @@
     const raceDate  = (planState && planState.raceDate)  || localStorage.getItem('race-date')  || '';
     const raceParts = [raceEvent, raceDate].filter(Boolean);
     const rows = [
-      { label: 'Name', value: name ? esc(name.charAt(0).toUpperCase() + name.slice(1)) : NOT_SET, step: 1 },
-      { label: 'Current fitness & background', value: bgParts.length ? esc(bgParts.join(' · ')) : NOT_SET, step: 2 },
-      { label: 'Race & course details', value: raceParts.length ? esc(raceParts.join(' · ')) : NOT_SET, step: 3 },
-      { label: 'Weekly training hours', value: (Number.isFinite(hoursRaw) && hoursRaw > 0) ? `${hoursRaw} hrs / week` : NOT_SET, step: 4 },
-      { label: 'Training days', value: (Array.isArray(days) && days.length) ? esc(days.join(', ')) : NOT_SET, step: 4 },
-      { label: 'Disciplines you can train', value: esc(discSummary), step: 4 },
-      { label: 'Fitness markers', value: fmParts.length ? esc(fmParts.join(' · ')) : NOT_SET, step: 5 },
+      { label: 'Name', value: name ? esc(name.charAt(0).toUpperCase() + name.slice(1)) : NOT_SET, section: 'name' },
+      { label: 'Current fitness & background', value: bgParts.length ? esc(bgParts.join(' · ')) : NOT_SET, section: 'fitness' },
+      { label: 'Race & course details', value: raceParts.length ? esc(raceParts.join(' · ')) : NOT_SET, section: 'goal' },
+      { label: 'Weekly training hours', value: (Number.isFinite(hoursRaw) && hoursRaw > 0) ? `${hoursRaw} hrs / week` : NOT_SET, section: 'hours' },
+      { label: 'Training days', value: (Array.isArray(days) && days.length) ? esc(days.join(', ')) : NOT_SET, section: 'days' },
+      { label: 'Disciplines you can train', value: esc(discSummary), section: 'disciplines' },
+      { label: 'Fitness markers', value: fmParts.length ? esc(fmParts.join(' · ')) : NOT_SET, section: 'markers' },
     ];
 
+    // Each row opens its dedicated edit modal — NOT the onboarding flow,
+    // which hides the bottom nav and has no exit path mid-session.
     slot.innerHTML = rows.map((r, i) => `
-      <button onclick="showScreen('onboard'); onbStep(${r.step});"
+      <button onclick="openYouEditModal('${r.section}');"
         style="width:100%; text-align:left; background:none; border:0; font-family:inherit; cursor:pointer;
                display:flex; align-items:center; justify-content:space-between; gap:12px;
                padding:11px 0; ${i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -6784,6 +6805,203 @@
         </div>
         <span style="flex-shrink:0; color:var(--primary); font-weight:600; font-size:13px;">Edit ›</span>
       </button>`).join('');
+  }
+
+  // ── YOU TAB EDIT MODAL ──────────────────────────────────────────────────
+  // Self-contained per-section editors. Reads/writes the SAME stores the
+  // onboarding steps use (localStorage keys + planState), then saves and
+  // quietly rebuilds the plan in the background. Never leaves the You tab.
+  function openYouEditModal(section) {
+    const modal = document.getElementById('youEditModal');
+    const title = document.getElementById('youEditTitle');
+    const body = document.getElementById('youEditBody');
+    const note = document.getElementById('youEditNote');
+    if (!modal || !body) return;
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml : (s => String(s));
+    const chip = (val, label, active, data) => `<button type="button" class="chip${active ? ' active' : ''}" data-${data || 'val'}="${val}" onclick="singleChip(this)">${label}</button>`;
+    const mchip = (val, label, active, data) => `<button type="button" class="chip${active ? ' active' : ''}" data-${data || 'val'}="${val}" onclick="toggleChip(this)">${label}</button>`;
+    let html = '', ttl = 'Edit';
+    switch (section) {
+      case 'name': {
+        ttl = 'Your name';
+        html = `<div class="field"><label>First name</label>
+          <input type="text" id="yeName" value="${esc(getFirstName())}" placeholder="Your first name" autocomplete="given-name"></div>`;
+        break;
+      }
+      case 'fitness': {
+        ttl = 'Fitness & background';
+        const p = readUserProfile() || {};
+        html = `
+          <div class="field"><label>How often do you currently train?</label>
+            <div class="chip-row" id="yeFreq">${[['low','Not much'],['mid','1-2x / week'],['high','3+x / week']].map(([v,l]) => chip(v, l, p.freq === v)).join('')}</div></div>
+          <div class="field"><label>Endurance background</label>
+            <div class="chip-row" id="yeExp">${[['new','New to this'],['some','Some experience'],['veteran','5+ years']].map(([v,l]) => chip(v, l, p.exp === v)).join('')}</div></div>
+          <div class="field"><label>Average sleep per night</label>
+            <div class="chip-row" id="yeSleep">${[['under5','Under 5h'],['5to6','5–6h'],['6to7','6–7h'],['7to8','7–8h'],['8plus','8h+']].map(([v,l]) => chip(v, l, p.sleep === v)).join('')}</div></div>`;
+        break;
+      }
+      case 'goal': {
+        ttl = 'Race & goal';
+        const curEvent = (planState && planState.raceEvent) || localStorage.getItem('race-event') || '';
+        const curDate = (planState && planState.raceDate) || localStorage.getItem('race-date') || '';
+        const curLoc = (planState && planState.raceLocation) || localStorage.getItem('race-location') || '';
+        const groups = { 'Run': ['5K','10K','Half Marathon','Marathon'], 'Triathlon': ['Sprint Triathlon','Olympic Triathlon','Half Ironman'], 'Gravel cycling': ['Gravel 50K','Gravel 100K'], 'Road cycling': ['Road 40K','Road 100K'] };
+        html = `
+          <div class="field"><label>Event</label>
+            <select id="yeEvent">${Object.entries(groups).map(([g, opts]) =>
+              `<optgroup label="${g}">${opts.map(o => `<option${o === curEvent ? ' selected' : ''}>${o}</option>`).join('')}</optgroup>`).join('')}</select></div>
+          <div class="field"><label>Event date</label>
+            <input type="date" id="yeDate" value="${esc(curDate)}" min="${new Date().toISOString().slice(0, 10)}"></div>
+          <div class="field"><label>Location <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
+            <input type="text" id="yeLocation" value="${esc(curLoc)}" placeholder="e.g. Chicago, IL"></div>
+          <div style="font-size:12px; color:var(--text-soft); line-height:1.5; background:var(--bg-soft); border-radius:8px; padding:8px 10px;">Course details (terrain, climate) can be edited on the Plan tab under Course intel.</div>`;
+        break;
+      }
+      case 'hours': {
+        ttl = 'Weekly training hours';
+        const savedHours = parseFloat(localStorage.getItem('hours-per-week') || '');
+        // Snap the saved value to its nearest chip bucket, same as prefillStep4.
+        let bestVal = null, bestDiff = Infinity;
+        [2.5, 4, 5, 7, 10].forEach(v => { const d = Math.abs(v - savedHours); if (Number.isFinite(savedHours) && d < bestDiff) { bestDiff = d; bestVal = v; } });
+        html = `<div class="field"><label>Hours per week you can train</label>
+          <div class="chip-row" id="yeHours">${[[2.5,'2-3'],[4,'4'],[5,'5'],[7,'6-8'],[10,'9+']].map(([v,l]) => chip(v, l + ' hrs', v === bestVal, 'hours')).join('')}</div></div>`;
+        break;
+      }
+      case 'days': {
+        ttl = 'Training days';
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem('training-days') || '[]'); } catch (e) {}
+        html = `<div class="field"><label>Which days usually work?</label>
+          <div class="chip-row" id="yeDays">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => mchip(d, d, saved.includes(d))).join('')}</div></div>`;
+        break;
+      }
+      case 'disciplines': {
+        ttl = 'Disciplines you can train';
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem('available-disciplines') || '[]'); } catch (e) {}
+        html = `<div class="field"><label>Select all that apply</label>
+          <div class="chip-row" id="yeDisc">${[['run','Run'],['bike','Bike'],['trainer','Indoor trainer'],['swim','Swim'],['strength','Strength / gym']].map(([v,l]) => mchip(v, l, saved.includes(v), 'disc')).join('')}</div></div>`;
+        break;
+      }
+      case 'markers': {
+        ttl = 'Fitness markers';
+        const fm = readFitnessMarkers() || {};
+        const rr = fm.runRace || {};
+        html = `
+          <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">All optional — fill in what you know. These sharpen pace and zone targets.</div>
+          <div class="field"><label>Resting heart rate (bpm)</label>
+            <input type="number" id="yeRhr" min="30" max="120" placeholder="e.g. 58" value="${esc(fm.restingHr || '')}"></div>
+          <div class="field"><label>Max heart rate (bpm)</label>
+            <input type="number" id="yeMaxHr" min="120" max="220" placeholder="e.g. 185" value="${esc(fm.maxHr || '')}"></div>
+          <div class="field"><label>Recent race result <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
+            <div style="display:flex; gap:8px;">
+              <select id="yeRaceDist" style="flex:1;"><option value="">Distance…</option>${['5K','10K','Half Marathon','Marathon'].map(d => `<option${rr.distance === d ? ' selected' : ''}>${d}</option>`).join('')}</select>
+              <input type="text" id="yeRaceTime" placeholder="e.g. 28:30" value="${esc(rr.time || '')}" style="flex:1;">
+            </div></div>
+          <div class="field"><label>FTP (watts, cycling) <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
+            <input type="number" id="yeFtp" min="50" max="500" placeholder="e.g. 210" value="${esc(fm.ftp || '')}"></div>
+          <div class="field"><label>CSS (swim pace /100m) <span style="font-size:11px; color:var(--text-soft); font-weight:400;">(optional)</span></label>
+            <input type="text" id="yeCss" placeholder="e.g. 1:55" value="${esc(fm.css || '')}"></div>`;
+        break;
+      }
+      default: return;
+    }
+    if (title) title.textContent = ttl;
+    body.innerHTML = html;
+    if (note) note.style.display = (section === 'name') ? 'none' : 'block';
+    modal.dataset.section = section;
+    const saveBtn = document.getElementById('youEditSaveBtn');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = (section === 'name') ? 'Save' : 'Save & rebuild plan'; }
+    modal.classList.add('show');
+    if (typeof trackEvent === 'function') trackEvent('you_edit_opened', { section });
+  }
+
+  function closeYouEditModal() {
+    const modal = document.getElementById('youEditModal');
+    if (modal) modal.classList.remove('show');
+  }
+
+  function saveYouEdit() {
+    const modal = document.getElementById('youEditModal');
+    const section = modal && modal.dataset.section;
+    if (!section) return;
+    const activeVal = (id, data) => { const c = document.querySelector(`#${id} .chip.active`); return c ? c.dataset[data || 'val'] : null; };
+    let rebuild = true;
+    switch (section) {
+      case 'name': {
+        const v = (document.getElementById('yeName') || {}).value || '';
+        if (!v.trim()) { alert('Please enter your name.'); return; }
+        setFirstName(v);
+        rebuild = false;
+        break;
+      }
+      case 'fitness': {
+        const freq = activeVal('yeFreq'), exp = activeVal('yeExp'), sleep = activeVal('yeSleep');
+        const p = { ...(readUserProfile() || {}) };
+        if (freq) p.freq = freq;
+        if (exp) p.exp = exp;
+        if (sleep) p.sleep = sleep;
+        localStorage.setItem('user-profile', JSON.stringify(p));
+        // readUserProfile prefers planState.profile — keep both in sync.
+        planState.profile = p;
+        break;
+      }
+      case 'goal': {
+        const event = (document.getElementById('yeEvent') || {}).value || '';
+        const date = (document.getElementById('yeDate') || {}).value || '';
+        const loc = ((document.getElementById('yeLocation') || {}).value || '').trim();
+        if (!event) { alert('Pick an event.'); return; }
+        if (!date) { alert('Pick your event date.'); return; }
+        localStorage.setItem('race-event', event);
+        localStorage.setItem('race-date', date);
+        if (loc) localStorage.setItem('race-location', loc); else localStorage.removeItem('race-location');
+        planState.raceEvent = event;
+        planState.raceDate = date;
+        planState.raceLocation = loc;
+        break;
+      }
+      case 'hours': {
+        const h = activeVal('yeHours', 'hours');
+        if (!h) { alert('Pick your weekly hours.'); return; }
+        localStorage.setItem('hours-per-week', h);
+        break;
+      }
+      case 'days': {
+        const days = [...document.querySelectorAll('#yeDays .chip.active')].map(c => c.textContent.trim());
+        if (days.length === 0) { alert('Pick at least one training day.'); return; }
+        localStorage.setItem('training-days', JSON.stringify(days));
+        break;
+      }
+      case 'disciplines': {
+        const disc = [...document.querySelectorAll('#yeDisc .chip.active')].map(c => c.dataset.disc).filter(Boolean);
+        if (disc.length === 0) { alert('Pick at least one discipline.'); return; }
+        localStorage.setItem('available-disciplines', JSON.stringify(disc));
+        break;
+      }
+      case 'markers': {
+        const fm = { ...(readFitnessMarkers() || {}) };
+        const num = id => { const v = parseInt((document.getElementById(id) || {}).value, 10); return Number.isFinite(v) ? v : null; };
+        fm.restingHr = num('yeRhr');
+        fm.maxHr = num('yeMaxHr');
+        fm.ftp = num('yeFtp');
+        fm.css = ((document.getElementById('yeCss') || {}).value || '').trim() || null;
+        const rd = (document.getElementById('yeRaceDist') || {}).value || '';
+        const rt = ((document.getElementById('yeRaceTime') || {}).value || '').trim();
+        fm.runRace = (rd && rt) ? { distance: rd, time: rt } : (fm.runRace || null);
+        writeFitnessMarkers(fm);
+        break;
+      }
+      default: return;
+    }
+    saveUserData();
+    closeYouEditModal();
+    // Refresh every surface that shows these values.
+    renderProfileInputs();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof trackEvent === 'function') trackEvent('you_edit_saved', { section });
+    // Quiet background rebuild — stays on the You tab, posts a chat bubble
+    // when done. Skipped for name-only edits (plan doesn't depend on it).
+    if (rebuild && typeof _regeneratePlanInBackground === 'function') _regeneratePlanInBackground();
   }
 
   function saveScheduleModal() {
