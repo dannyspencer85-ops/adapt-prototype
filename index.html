@@ -3223,6 +3223,16 @@
         <button class="btn btn-ghost btn-sm" onclick="resetCoach(); renderCoachChatManageCard();">Turn off Coach Chat</button>
       </div>
 
+      <!-- SUBSCRIPTION — status + restore. Restore must be reachable outside
+           the paywall: someone who already subscribed on another device has
+           access, so they'd never see the paywall that hosts the restore
+           button. Native-only (StoreKit lives in the app shell). -->
+      <div class="card" id="subscriptionCard" style="display:none;">
+        <div class="card-title">Subscription</div>
+        <div id="subscriptionCardBody" style="font-size:13px; color:var(--text-soft); line-height:1.5; margin-top:6px; margin-bottom:10px;"></div>
+        <button class="btn btn-ghost btn-sm" onclick="restorePurchases()">Restore purchases</button>
+      </div>
+
 
       <!-- Analytics moved into Settings modal (gear icon) -->
 
@@ -3357,7 +3367,7 @@
     <div class="screen-inner">
       <div class="card" style="font-size:13px; line-height:1.7; color:var(--text);">
         <div class="card-title" style="margin-bottom:4px;">Privacy policy</div>
-        <p style="font-size:11px; color:var(--text-soft); margin-bottom:14px;">Operated by <strong>Danny Spencer</strong> · Effective date: June 22, 2026 · <a href="mailto:dannyspencer85@gmail.com" style="color:var(--primary);">dannyspencer85@gmail.com</a></p>
+        <p style="font-size:11px; color:var(--text-soft); margin-bottom:14px;">Operated by <strong>Danny Spencer</strong> · Effective date: 25 July 2026 · <a href="mailto:hello@adaptcoach.app" style="color:var(--primary);">hello@adaptcoach.app</a></p>
 
         <p style="font-weight:600; margin-top:8px;">What we collect</p>
         <p>Your first name, email address, and the training data you enter — goals, race dates, session logs, and check-in answers. We do not collect payment information, location, contacts, or photos.</p>
@@ -3375,6 +3385,9 @@
         <p style="font-weight:600; margin-top:14px;">Apple Health data</p>
         <p>On the native iOS app, if you grant Apple Health access, heart rate, HRV, and sleep data are read locally to personalise your readiness score. This data is not sent to our servers.</p>
 
+        <p style="font-weight:600; margin-top:14px;">Subscriptions and payments</p>
+        <p>Paid subscriptions are processed by Apple through the App Store. Adapt does not collect, store, or process your payment card information. Billing, refunds, and cancellation are handled by Apple — manage yours in iPhone Settings → Apple&nbsp;ID → Subscriptions. We store only your subscription status and an anonymous token linking your App Store purchase to your Adapt account.</p>
+
         <p style="font-weight:600; margin-top:14px;">Deletion</p>
         <p>Delete your account anytime: <strong>You tab → Delete account</strong>. Deletion is immediate and permanent — all your data is removed from our servers the moment you confirm.</p>
 
@@ -3387,7 +3400,7 @@
         </ul>
 
         <p style="font-weight:600; margin-top:14px;">Contact</p>
-        <p>Danny Spencer · <a href="mailto:dannyspencer85@gmail.com" style="color:var(--primary);">dannyspencer85@gmail.com</a></p>
+        <p>Danny Spencer · <a href="mailto:hello@adaptcoach.app" style="color:var(--primary);">hello@adaptcoach.app</a></p>
       </div>
     </div>
   </div>
@@ -5052,7 +5065,7 @@
   // configured mail client (Chrome on a fresh Mac, kiosk modes, etc.).
   function copyFeedbackEmail(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const email = 'dannyspencer85@gmail.com';
+    const email = 'hello@adaptcoach.app';
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(email).then(() => {
         try { alert('Email copied: ' + email); } catch (_) {}
@@ -5066,7 +5079,7 @@
   }
 
   // Suggest-an-integration: opens a mailto: with the user's request prefilled
-  // so the message lands in dannyspencer85@gmail.com without me building a
+  // so the message lands in hello@adaptcoach.app without me building a
   // server-side intake form. Clears the textarea + shows a confirmation.
   function sendIntegrationSuggestion() {
     const ta = document.getElementById('integrationSuggestionText');
@@ -5090,10 +5103,10 @@
     // from buttons without user gesture, but a click handler is a gesture so
     // this is safe. Fall back to a hidden anchor click if needed.
     try {
-      window.location.href = `mailto:dannyspencer85@gmail.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:hello@adaptcoach.app?subject=${subject}&body=${body}`;
     } catch (e) {
       const a = document.createElement('a');
-      a.href = `mailto:dannyspencer85@gmail.com?subject=${subject}&body=${body}`;
+      a.href = `mailto:hello@adaptcoach.app?subject=${subject}&body=${body}`;
       a.click();
     }
     if (msg) {
@@ -5439,7 +5452,29 @@
     card.style.display = accepted ? 'block' : 'none';
   }
 
-  function renderPrimarySourceUI() { renderIntegrations(); renderHealthSyncCard(); renderCoachChatManageCard(); }
+  // Subscription card on the You tab — shows current status and hosts the
+  // Restore purchases button. Native-only: StoreKit lives in the app shell,
+  // so on plain web there's nothing to restore.
+  function renderSubscriptionCard() {
+    const card = document.getElementById('subscriptionCard');
+    const body = document.getElementById('subscriptionCardBody');
+    if (!card || !body) return;
+    const isNative = !!(window.ReactNativeWebView || window.__ADAPT_NATIVE__);
+    if (!isNative) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    const labels = {
+      active: 'Your subscription is <strong>active</strong>.',
+      grace_period: 'Your subscription is in a <strong>grace period</strong> — Apple is retrying payment.',
+      expired: 'Your subscription has <strong>expired</strong>.',
+      refunded: 'Your subscription was <strong>refunded</strong>.',
+      free: 'You\'re on the <strong>free</strong> plan.',
+    };
+    const status = labels[subscriptionStatus] || labels.free;
+    const manage = 'Manage or cancel in iPhone Settings → Apple&nbsp;ID → Subscriptions.';
+    body.innerHTML = `${status} ${subscriptionHasAccess ? manage : 'Already subscribed on another device? Restore below.'}`;
+  }
+
+  function renderPrimarySourceUI() { renderIntegrations(); renderHealthSyncCard(); renderCoachChatManageCard(); renderSubscriptionCard(); }
 
   function populateDisciplineChips() {
     const event = document.getElementById('eventSelect').value;
