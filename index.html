@@ -2518,8 +2518,8 @@
           <div style="font-size:13px; color:rgba(255,255,255,0.75); margin-bottom:16px;">Answer 5 questions and your first week is ready in seconds.</div>
           <button onclick="showScreen('onboard')" style="background:#fff; color:var(--primary); border:0; border-radius:100px; padding:10px 24px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;">Build my plan →</button>
         </div>
-        <div id="heroAdjustedBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.22); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ WORKOUT ADJUSTED</div>
-        <div id="heroDoneBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.25); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;">✓ COMPLETED</div>
+        <div id="heroAdjustedBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.22); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg> WORKOUT ADJUSTED</div>
+        <div id="heroDoneBadge" style="display:none; margin-bottom: 10px; background: rgba(255,255,255,0.25); padding: 6px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; width: fit-content;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg> COMPLETED</div>
         <div id="heroTapArea" style="cursor: pointer; padding-bottom: 4px;">
           <div class="card-title" id="heroLabel">Wednesday · Quality day</div>
           <div class="workout-name" id="heroName">
@@ -2547,9 +2547,9 @@
         </div>
         <div style="display:none;" id="heroSyncNote"></div>
         <div id="heroActionsPending" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px;">
-          <button onclick="quickMarkDone()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✓ Done</button>
-          <button onclick="quickReschedule()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">⟲ Reschedule</button>
-          <button onclick="quickSkip()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 6px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">✕ Skip</button>
+          <button onclick="quickMarkDone()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 4px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.1em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg> Done</button>
+          <button onclick="quickReschedule()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 4px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.1em;flex-shrink:0;"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/></svg> Reschedule</button>
+          <button onclick="quickSkip()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 4px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.1em;flex-shrink:0;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg> Skip</button>
         </div>
         <div id="heroActionsDone" style="display: none; margin-top: 14px;">
           <button id="heroViewDetails" onclick="" class="btn btn-on-hero" style="width: 100%;">View workout details →</button>
@@ -3434,7 +3434,7 @@
   <!-- CELEBRATION MODAL -->
   <div class="celebrate-bg" id="celebrateBg">
     <div class="celebrate-card">
-      <span class="emoji" id="celebrateEmoji">🎉</span>
+      <span class="emoji" id="celebrateEmoji"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></span>
       <h2 id="celebrateTitle">Nice work!</h2>
       <p id="celebrateText">You just hit a milestone.</p>
       <button onclick="closeCelebrate()">Keep going</button>
@@ -3590,7 +3590,7 @@
       </div>
 
       <div style="font-size: 12px; color: var(--text-soft); margin-top: 12px; line-height: 1.5;">
-        💡 You can restore hidden workouts anytime via <strong>Settings ⚙️ → Hidden workouts</strong>.
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> You can restore hidden workouts anytime via <strong>Settings → Hidden workouts</strong>.
       </div>
 
       <div style="display: flex; gap: 8px; margin-top: 16px;">
@@ -3724,10 +3724,10 @@
       <h2 style="font-size:26px; line-height:1.15; margin:0 0 6px;">Train smarter.<br>Race ready.</h2>
       <p style="font-size:14px; color:var(--text-soft); margin:0 0 18px;" id="paywallSub">Unlock everything in Adapt.</p>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;">
-        <div class="paywall-feature">✓&nbsp; AI coach that adapts to your life</div>
-        <div class="paywall-feature">✓&nbsp; Full personalised training plan, every week to race day</div>
-        <div class="paywall-feature">✓&nbsp; Readiness tracking + Apple Health sync</div>
-        <div class="paywall-feature">✓&nbsp; Race-day preparation and taper</div>
+        <div class="paywall-feature"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B8968" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg>&nbsp; AI coach that adapts to your life</div>
+        <div class="paywall-feature"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B8968" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg>&nbsp; Full personalised training plan, every week to race day</div>
+        <div class="paywall-feature"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B8968" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg>&nbsp; Readiness tracking + Apple Health sync</div>
+        <div class="paywall-feature"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B8968" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><polyline points="4 12 10 18 20 6"/></svg>&nbsp; Race-day preparation and taper</div>
       </div>
       <div style="background:var(--bg-soft); border-radius:12px; padding:14px; text-align:center; margin-bottom:14px;">
         <div style="display:flex; align-items:baseline; justify-content:center; gap:4px;">
@@ -4455,7 +4455,7 @@
     hint.id = 'iosInstallHint';
     hint.style.cssText = 'position:fixed; left:14px; right:14px; bottom:84px; background:#fff; border:1px solid var(--primary); color:var(--text); padding:14px 16px; border-radius:14px; box-shadow:0 4px 18px rgba(0,0,0,0.12); z-index:1000; font-size:13px; line-height:1.45;';
     hint.innerHTML = `
-      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">📲 Install Adapt</div>
+      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">${icon('home', { size: 15 })} Install Adapt</div>
       <div style="margin-bottom:10px; color:var(--text-soft);">Tap the share icon (square + arrow) at the bottom of Safari, then "Add to Home Screen" so the app opens like a native app and works offline.</div>
       <button onclick="dismissIOSInstallHint()" style="background:var(--primary); color:#fff; border:0; padding:7px 14px; border-radius:100px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;">Got it</button>
     `;
@@ -5097,7 +5097,7 @@
       a.click();
     }
     if (msg) {
-      msg.textContent = '✓ Email opened. Hit send and your suggestion is on its way to the team.';
+      msg.innerHTML = icon('check', { size: 13, color: 'var(--primary)' }) + ' Email opened. Hit send and your suggestion is on its way to the team.';
       msg.style.color = 'var(--primary-dark)';
     }
     if (typeof trackEvent === 'function') trackEvent('integration_suggested', { length: text.length });
@@ -5124,7 +5124,7 @@
       const status = i.comingSoon
         ? `<span style="color: var(--text-soft); font-size: 12px; font-weight: 600;">Coming soon</span>`
         : isConnected
-        ? `<button onclick="toggleIntegration('${i.id}')" style="background: var(--primary); color: #fff; border: 0; padding: 5px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;">✓ Connected</button>`
+        ? `<button onclick="toggleIntegration('${i.id}')" style="background: var(--primary); color: #fff; border: 0; padding: 5px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;">${icon('check', { size: 12, color: '#fff', stroke: 2.5 })} Connected</button>`
         : `<button onclick="toggleIntegration('${i.id}')" style="background: #fff; color: var(--primary); border: 1px solid var(--primary); padding: 5px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;">Connect</button>`;
       return `<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border);">
         <div style="flex:1;">
@@ -5166,7 +5166,7 @@
         const sleepStr = pf.sleep ? `sleep ${pf.sleep}` : '';
         const hrvStr   = pf.hrv   ? `, HRV ${pf.hrv}ms` : '';
         const rhrStr   = pf.rhr   ? `, HR ${pf.rhr}bpm`  : '';
-        banner.innerHTML = `<strong>✓ Synced from Apple Health</strong><br>${[sleepStr, (hrvStr + rhrStr).replace(/^,\s*/, '')].filter(Boolean).join(' · ') || 'Values pre-filled'}. Adjust if anything feels off.`;
+        banner.innerHTML = `<strong>${icon('sync', { size: 14 })} Synced from Apple Health</strong><br>${[sleepStr, (hrvStr + rhrStr).replace(/^,\s*/, '')].filter(Boolean).join(' · ') || 'Values pre-filled'}. Adjust if anything feels off.`;
         sleepLabel.style.display = 'inline';
         sleepLabel.textContent = 'auto from Apple Health';
       }
@@ -5232,7 +5232,7 @@
         <div class="card">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
             <div style="font-weight:700; font-size:16px;">${escapeHtml(s.stravaName)}</div>
-            <div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">✓ Done</div>
+            <div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">${icon('check', { size: 11, color: 'var(--primary)', stroke: 2.5 })} Done</div>
           </div>
           <div style="color:var(--text-soft); font-size:13px; margin-bottom:12px;">${today ? (DAY_FULL[today] || today) : 'Today'}${dStr ? ' · ' + dStr : ''}${hrStr}</div>
           <div style="font-size:13px; color:var(--text-soft); line-height:1.5;">Plan said rest, but you trained anyway. Recovery tomorrow will matter more.</div>
@@ -5247,10 +5247,10 @@
           <div style="color:var(--text-soft); font-size:13px; margin:2px 0 12px;">${today ? (DAY_FULL[today] || today) : 'Today'} · Recovery</div>
           <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Rest day checklist</div>
           <div style="font-size:13px; line-height:1.9;">
-            <div>☐ Stay hydrated. Aim for your usual water intake</div>
-            <div>☐ Short walk (15-20 min) if you feel restless. Nothing more</div>
-            <div>☐ Foam roll or stretch any tight spots from yesterday</div>
-            <div>☐ Prioritize 7-9h sleep tonight. This is when you adapt</div>
+            <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Stay hydrated. Aim for your usual water intake</div>
+            <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Short walk (15-20 min) if you feel restless. Nothing more</div>
+            <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Foam roll or stretch any tight spots from yesterday</div>
+            <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> Prioritize 7-9h sleep tonight. This is when you adapt</div>
           </div>
         </div>`;
       return;
@@ -5268,12 +5268,12 @@
       <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
           <div style="font-weight:700; font-size:16px;">${escapeHtml(name)}</div>
-          ${isDone ? `<div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">✓ Done</div>` : ''}
+          ${isDone ? `<div style="background:var(--primary-soft); color:var(--primary); padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700;">${icon('check', { size: 11, color: 'var(--primary)', stroke: 2.5 })} Done</div>` : ''}
         </div>
         <div style="color:var(--text-soft); font-size:13px; margin:2px 0 14px;">${escapeHtml(meta)}</div>
         <div style="font-size:13px; font-weight:700; margin-bottom:8px;">Pre-session checklist</div>
         <div style="font-size:13px; line-height:1.9;">
-          ${checklist.map(item => `<div>☐ ${escapeHtml(item)}</div>`).join('')}
+          ${checklist.map(item => `<div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg> ${escapeHtml(item)}</div>`).join('')}
         </div>
         ${s.prescription ? `<div style="margin-top:12px; padding:10px 12px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.6; color:var(--text-soft);">${escapeHtml(s.prescription.slice(0, 240))}${s.prescription.length > 240 ? '…' : ''}</div>` : ''}
       </div>`;
@@ -5416,7 +5416,7 @@
       ].filter(Boolean).join(' · ');
       body.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <span style="background:var(--primary-soft); color:var(--primary-dark); border-radius:100px; padding:3px 10px; font-size:11px; font-weight:700;">✓ Connected</span>
+          <span style="background:var(--primary-soft); color:var(--primary-dark); border-radius:100px; padding:3px 10px; font-size:11px; font-weight:700;">${icon('check', { size: 12, color: 'var(--primary-dark)', stroke: 2.5 })} Connected</span>
           ${syncedDate ? `<span style="font-size:11px; color:var(--text-soft);">Last sync ${syncedDate}</span>` : ''}
         </div>
         ${details ? `<div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">${details}</div>` : ''}
@@ -7705,6 +7705,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     sync:        '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><polyline points="3 21 3 16 8 16"/>',
     pencil:      '<path d="M11 4h-7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>',
     x:           '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+    square:      '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>',
     chevronLeft: '<polyline points="15 6 9 12 15 18"/>',
     chevronRight:'<polyline points="9 6 15 12 9 18"/>',
     check:       '<polyline points="4 12 10 18 20 6"/>',
@@ -8178,7 +8179,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const b = document.createElement('div');
         b.className = 'bubble system';
         b.style.maxWidth = '100%';
-        b.innerHTML = '✓ <strong>Plan rebuilt</strong> with the new focus. Open the Plan tab to see the new distribution.';
+        b.innerHTML = icon('check', { size: 14, color: 'var(--primary)' }) + ' <strong>Plan rebuilt</strong> with the new focus. Open the Plan tab to see the new distribution.';
         const sugg = area.querySelector('#suggestRow');
         if (sugg) area.insertBefore(b, sugg);
         else area.appendChild(b);
@@ -8191,7 +8192,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const b = document.createElement('div');
         b.className = 'bubble system';
         b.style.maxWidth = '100%';
-        b.innerHTML = '⚠ Plan rebuild hit an error. Try Profile → Start over with a new plan if you want to force a fresh build.';
+        b.innerHTML = icon('statusAlert', { size: 14, color: 'var(--alert)' }) + ' Plan rebuild hit an error. Try Profile → Start over with a new plan if you want to force a fresh build.';
         area.appendChild(b);
       }
     } finally {
@@ -8426,7 +8427,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         <span style="font-weight:700; font-size:13px; color:#2E6B51;">Tap Apply to commit this change</span>
       </div>
       <div style="font-size:14px; line-height:1.5; color:var(--text); margin-bottom:14px;">${escapeHtml(pc.description)}</div>
-      <button id="pendingApplyBtn-${id}" onclick="applyPendingChange('${id}')" style="width:100%; padding:12px 14px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:8px; box-shadow:0 2px 8px rgba(59,137,104,0.25);">✓ Apply this change</button>
+      <button id="pendingApplyBtn-${id}" onclick="applyPendingChange('${id}')" style="width:100%; padding:12px 14px; background:var(--primary); color:#fff; border:0; border-radius:100px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:8px; box-shadow:0 2px 8px rgba(59,137,104,0.25);">${icon('check', { size: 14, color: '#fff', stroke: 2.5 })} Apply this change</button>
       <button onclick="cancelPendingChange('${id}')" style="width:100%; padding:9px 14px; background:transparent; color:var(--text-soft); border:0; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Cancel</button>`;
     const sugg = area.querySelector('#suggestRow');
     if (sugg) area.insertBefore(card, sugg);
@@ -8465,7 +8466,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         card.style.border = ok ? '1.5px solid #3B8968' : '1.5px solid #f5b5b5';
         card.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span style="display:inline-block; background:${ok ? '#3B8968' : '#C44545'}; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.5px; padding:3px 8px; border-radius:100px;">${ok ? '✓ APPLIED' : '⚠ FAILED'}</span>
+            <span style="display:inline-block; background:${ok ? '#3B8968' : '#C44545'}; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.5px; padding:3px 8px; border-radius:100px;">${ok ? icon('check', { size: 11, color: '#fff', stroke: 3 }) + ' APPLIED' : icon('x', { size: 11, color: '#fff', stroke: 3 }) + ' FAILED'}</span>
           </div>
           <div style="font-size:13px; line-height:1.5; color:var(--text);">${escapeHtml(pc.description)}</div>
           ${result && result.message ? `<div style="font-size:12px; color:var(--text-soft); margin-top:6px; line-height:1.4;">${escapeHtml(result.message)}</div>` : ''}
@@ -8484,7 +8485,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     if (card) {
       card.style.background = 'var(--bg-soft)';
       card.innerHTML = `
-        <div style="font-weight:700; font-size:13px; color:var(--text-soft);">✕ Cancelled</div>
+        <div style="font-weight:700; font-size:13px; color:var(--text-soft);">${icon('x', { size: 13 })} Cancelled</div>
         <div style="font-size:13px; line-height:1.5; color:var(--text-soft); margin-top:4px;">${escapeHtml(pc.description)}</div>`;
     }
     _pendingChanges.delete(id);
@@ -8650,7 +8651,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     </div>`;
 
     if (a.wins.length > 0) {
-      html += `<div class="detail-section" style="margin-top: 18px;"><div class="detail-label" style="color: var(--primary);">✓ What worked</div><ul class="detail-list">${a.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
+      html += `<div class="detail-section" style="margin-top: 18px;"><div class="detail-label" style="color: var(--primary);">${icon('check', { size: 13, color: 'var(--primary)' })} What worked</div><ul class="detail-list">${a.wins.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
     }
 
     html += `<div class="detail-section" style="margin-top: 14px;"><div class="detail-label">Proposed adjustments for next week</div>`;
@@ -9303,7 +9304,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       }
       if (isPast && isCompleted) {
         // Completed past sessions: green check overlay + slightly muted.
-        badgeHtml = `<div style="position:absolute; bottom:3px; right:4px; width:11px; height:11px; border-radius:50%; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:11px; text-align:center;">✓</div>`;
+        badgeHtml = `<div style="position:absolute; bottom:3px; right:4px; width:11px; height:11px; border-radius:50%; background:var(--primary); color:#fff; font-size:8px; font-weight:700; line-height:11px; text-align:center;">${icon('check', { size: 8, color: '#fff', stroke: 4 })}</div>`;
         opacity = '0.85';
       } else if (isPast && s && !isRest && !isCompleted) {
         // Past + planned but not logged: greyscale tint.
@@ -9671,7 +9672,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     const todayChip = `<div class="injury-chip ${sev}">
       <div class="dot"></div>
       <div class="body"><strong>${escapeHtml(inj.area)}</strong> · ${escapeHtml(sev)}${daysTxt ? ' · ' + daysTxt : ''}${streak >= 3 ? ' · ↑' + streak + 'd' : ''}</div>
-      <button class="clear-btn" onclick="clearInjuryFromUI()" aria-label="Clear injury">✕</button>
+      <button class="clear-btn" onclick="clearInjuryFromUI()" aria-label="Clear injury"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em;flex-shrink:0;"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>`;
 
     // Plan screen: full banner — the place to read context + act.
@@ -9889,7 +9890,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     slot.style.display = 'block';
     slot.innerHTML = `
       <div onclick="openLearnTopic('${topicId}')" style="cursor:pointer; margin-top:10px; padding:10px 14px; background:var(--card); border:1px solid var(--border); border-radius:12px; display:flex; align-items:center; gap:10px;">
-        <span style="font-size:15px;">📖</span>
+        <span>${icon('book', { size: 15, color: 'var(--primary)' })}</span>
         <span style="flex:1; font-size:13px; font-weight:600;">${escapeHtml(topic.title)}</span>
         <span style="color:var(--text-soft); font-size:16px;">›</span>
       </div>`;
@@ -11232,7 +11233,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       const when = formatTimeAgo(n.timestamp);
       return `<div class="notif-card ${n.severity}">
         <div class="notif-head">
-          <span>${n.icon || icon('intervals', { size: 15 })}</span>
+          <span>${(n.icon && ICON_PATHS[n.icon]) ? icon(n.icon, { size: 15 }) : (n.icon || icon('intervals', { size: 15 }))}</span>
           <span style="flex:1;">${escapeHtml(n.title)}</span>
           <span class="notif-time">${when}</span>
         </div>
@@ -11320,7 +11321,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
       if (s.actualHr > z2ceil + 5) {
         _pushNotification({
           dedupKey: 'easy-too-hard-' + day,
-          severity: 'info', icon: '🫀',
+          severity: 'info', icon: 'heart',
           title: `${day}'s easy session ran hot`,
           summary: `Avg HR ${s.actualHr} was above your easy ceiling (~${z2ceil}). Easy days should stay easy so hard days can be hard (80/20).`,
           breakdown: [
@@ -13724,7 +13725,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
     banner.style.color = '';
 
     if (days < 0) {
-      if (count) { count.textContent = '✓'; count.style.background = 'var(--secondary)'; }
+      if (count) { count.innerHTML = icon('check', { size: 11, color: '#fff', stroke: 3 }); count.style.background = 'var(--secondary)'; }
       if (top) top.textContent = 'Race complete';
       if (bottom) bottom.innerHTML = `${escapeHtml(event)}${location ? ' · ' + escapeHtml(location) : ''} · <a onclick="resetForNewGoal()" style="color:var(--primary); text-decoration:none; font-weight:600; cursor:pointer;">Set new goal →</a>`;
       planState.postRace = true;
@@ -15281,7 +15282,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
         const notes = (planState.aiPlanNotes || []).map(n => `<li>${escapeHtml(n)}</li>`).join('');
         summaryEl.innerHTML = `<div class="card" style="margin-bottom:14px; background:var(--primary-soft); border:1px solid var(--primary);">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span style="font-size:14px;">🧠</span>
+            <span>${icon('brain', { size: 14, color: 'var(--primary-dark)' })}</span>
             <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--primary-dark);">Plan summary</div>
           </div>
           ${planState.aiPlanSummary ? `<div style="font-size:13px; line-height:1.5; color:var(--text);">${escapeHtml(planState.aiPlanSummary)}</div>` : ''}
@@ -19892,7 +19893,7 @@ You MUST DECLINE these topics and redirect to the appropriate specialist. Be war
 • "What is 80/20?" / "How hard should I go?" / "What's a brick?". scripted explanations<br>
 <br>
 For <strong>real thinking</strong>. "why is my plan structured this way?", "should I be worried about my load?", nuanced coaching advice. switch to Coach Chat.
-<div style="margin-top: 12px;"><button onclick="toggleChatMode()" class="btn btn-primary btn-sm">🧠 Switch to Coach Chat</button></div>`;
+<div style="margin-top: 12px;"><button onclick="toggleChatMode()" class="btn btn-primary btn-sm">${icon('brain', { size: 14, color: '#fff' })} Switch to Coach Chat</button></div>`;
       area.appendChild(b);
       area.scrollTop = area.scrollHeight;
       return;
@@ -20209,13 +20210,13 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     // Adapt the CTA copy to whether the check-in signals a likely adjustment.
     const lowRecovery = (body === 'Exhausted') || (sleep === 'Under 5h') || (sleep === '5-6h') || (stress === 'High');
     const askLabel = lowRecovery
-      ? '🧠 Ask coach to adjust today'
-      : '🧠 Ask coach for today\'s tweaks';
+      ? icon('brain', { size: 14 }) + ' Ask coach to adjust today'
+      : icon('brain', { size: 14 }) + ' Ask coach for today\'s tweaks';
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;">
         <div>
           <div class="card-title" style="margin:0;">Today's check-in</div>
-          <div style="font-size:11px; color:var(--primary); font-weight:600; margin-top:2px;">✓ Saved · engine using this</div>
+          <div style="font-size:11px; color:var(--primary); font-weight:600; margin-top:2px;">${icon('check', { size: 12, color: 'var(--primary)' })} Saved · engine using this</div>
         </div>
         <button onclick="editCheckin()" style="background:var(--primary); color:#fff; border:0; padding:7px 14px; border-radius:100px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 2px 6px rgba(59,137,104,0.25);">Edit ›</button>
       </div>
@@ -20501,7 +20502,7 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
       const lowRecovery = body === 'Exhausted' || sleep === 'Under 5h' || sleep === '5-6h';
       card.innerHTML = `
         <div style="text-align:center; padding: 8px 0 4px;">
-          <div style="font-size: 28px; margin-bottom: 6px;">✓</div>
+          <div style="margin-bottom: 6px;">${icon('check', { size: 30, color: 'var(--primary)', stroke: 2.5 })}</div>
           <div style="font-weight: 700; font-size: 17px; margin-bottom: 4px;">Check-in saved</div>
           <div style="font-size: 13px; color: var(--text-soft); margin-bottom: 16px;">The engine is using this to shape today.</div>
         </div>
@@ -20715,7 +20716,7 @@ For <strong>real thinking</strong>. "why is my plan structured this way?", "shou
     // even if renderAll() throws — the modal always closes.
     const applyBtn = document.querySelector('#crunch .btn.btn-primary');
     if (applyBtn) {
-      applyBtn.textContent = '✓ Applied';
+      applyBtn.innerHTML = icon('check', { size: 13, color: 'currentColor' }) + ' Applied';
       applyBtn.disabled = true;
       applyBtn.style.background = 'var(--primary-dark)';
       applyBtn.style.opacity = '0.9';
